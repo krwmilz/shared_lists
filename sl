@@ -94,6 +94,10 @@ while (my $new_sock = $sock->accept()) {
 
 		$new_list_sth->execute($list_id, $phone_num, $name, time);
 	}
+	else {
+		print "info: bad message type $msg_type\n";
+	}
+
 	close($new_sock);
 }
 $dbh->disconnect();

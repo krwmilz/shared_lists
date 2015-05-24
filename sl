@@ -6,6 +6,7 @@ use strict;
 use DBI;
 use IO::Socket;
 use Scalar::Util qw(looks_like_number);
+use Socket;
 
 my $dbh = DBI->connect(
 	"dbi:SQLite:dbname=db",
@@ -52,45 +53,53 @@ my $sql = qq{insert into lists (list_id, phone_num, name, timestamp)
 	values (?, ?, ?, ?)};
 my $new_list_sth = $dbh->prepare($sql);
 
-while (my $new_sock = $sock->accept()) {
+while (my ($new_sock, $peer_addr_bin) = $sock->accept()) {
+
+	# I don't know how to reliably detect whether its ipv4 or ipv6
+	# my $peer_addr = Socket::inet_ntop(AF_INET6, $peer_addr_bin);
 
 	read $new_sock, my $msg_type, 1;
 	if ($msg_type == 1) {
 		# new list
 
-		print "msg_type is new_list\n";
+		print "msg_type is new list\n";
 		read $new_sock, my $new_list_size, 2;
 
+		# my $hdr = "$peer_addr: new list";
+		my $hdr = "new list";
+
 		if (!looks_like_number($new_list_size)) {
-			print "warn: $new_list_size is not a number, skipping\n";
+			print "warn: $hdr: $new_list_size is not a number, skipping\n";
 			next;
 		}
 		# we know this is safe
 		$new_list_size = int($new_list_size);
 
-		print "info: message size = $new_list_size\n";
+		print "info: $hdr: message size = $new_list_size\n";
 		read $new_sock, my $new_list, $new_list_size;
 
-		print "info: raw message: $new_list\n";
+		print "info: $hdr: raw message: $new_list\n";
 		my ($phone_num, $name) = split("\0", $new_list);
 
 		unless ($name && $name ne "") {
-			print "info: name missing or empty, skipping\n";
+			print "info: $hdr: name missing or empty, skipping\n";
 			next;
 		}
 		unless ($phone_num && $phone_num ne "") {
-			print "info: phone number missing, skipping\n";
+			print "info: $hdr: phone number missing, skipping\n";
 			next;
 		}
 
 		if (!looks_like_number($phone_num)) {
-			print "warn: $phone_num is not a number, skipping\n";
+			print "warn: $hdr: $phone_num is not a number, skipping\n";
 			next;
 		}
-		print "info: new list: phone number = $phone_num\n";
-		print "info: new list: name = $name\n";
+		print "info: $hdr: phone number = $phone_num\n";
+		print "info: $hdr: name = $name\n";
+		# XXX: this should be a hash of all the other fields
+		# concatenated, i think?
 		my $list_id = rand;
-		print "info: list id = $list_id";
+		print "info: $hdr: list id = $list_id\n";
 
 		$new_list_sth->execute($list_id, $phone_num, $name, time);
 	}

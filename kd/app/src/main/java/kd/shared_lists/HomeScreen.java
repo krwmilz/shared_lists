@@ -39,28 +39,20 @@ public class HomeScreen extends ActionBarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.layout_home_screen);
-        Button sendMsgButton = new Button(this);
-        numbertv = new EditText(this);
-        numbertv.setText("4039235990");
-        nametv = new EditText(this);
-        nametv.setText("puffdaddy");
+        Button sendMsgButton = (Button) findViewById(R.id.sendMsgButton);
+        numbertv = (EditText) findViewById(R.id.number);
+        nametv = (EditText) findViewById(R.id.name);
         sendMsgButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 new sendMessageTask().execute("foobar", "joobar");
             }
         });
-        LinearLayout rl = (LinearLayout) findViewById(R.id.mainlayout);
-        sendMsgButton.setText("Send Message");
-        rl.addView(sendMsgButton);
-        rl.addView(numbertv);
-        rl.addView(nametv);
     }
 
     private void testNet() {
         ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-        tv = (TextView) findViewById(R.id.hellotext);
         if (networkInfo != null && networkInfo.isConnected()) {
             tv.setText("Connected");
         } else {

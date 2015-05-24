@@ -4,6 +4,7 @@ use warnings;
 use strict;
 
 use DBI;
+use Digest::SHA qw(sha256_hex);
 use IO::Socket;
 use Scalar::Util qw(looks_like_number);
 use Socket;
@@ -70,6 +71,7 @@ while (my ($new_sock, $peer_addr_bin) = $sock->accept()) {
 
 		if (!looks_like_number($new_list_size)) {
 			print "warn: $hdr: $new_list_size is not a number, skipping\n";
+			close($new_sock);
 			next;
 		}
 		# we know this is safe
@@ -83,25 +85,30 @@ while (my ($new_sock, $peer_addr_bin) = $sock->accept()) {
 
 		unless ($name && $name ne "") {
 			print "warn: $hdr: name missing or empty, skipping\n";
+			close($new_sock);
 			next;
 		}
 		unless ($phone_num && $phone_num ne "") {
 			print "warn: $hdr: phone number missing, skipping\n";
+			close($new_sock);
 			next;
 		}
 
 		if (!looks_like_number($phone_num)) {
 			print "warn: $hdr: $phone_num is not a number, skipping\n";
+			close($new_sock);
 			next;
 		}
 		print "info: $hdr: phone number = $phone_num\n";
 		print "info: $hdr: name = $name\n";
-		# XXX: this should be a hash of all the other fields
-		# concatenated, i think?
-		my $list_id = rand;
+
+		my $time = time;
+		my $list_id = sha256_hex($new_list . $time);
 		print "info: $hdr: list id = $list_id\n";
 
-		$new_list_sth->execute($list_id, $phone_num, $name, time);
+		$new_list_sth->execute($list_id, $phone_num, $name, $time);
+
+		print $new_sock $list_id;
 	}
 	else {
 		print "info: bad message type $msg_type\n";

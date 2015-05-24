@@ -82,11 +82,11 @@ while (my ($new_sock, $peer_addr_bin) = $sock->accept()) {
 		my ($phone_num, $name) = split("\0", $new_list);
 
 		unless ($name && $name ne "") {
-			print "info: $hdr: name missing or empty, skipping\n";
+			print "warn: $hdr: name missing or empty, skipping\n";
 			next;
 		}
 		unless ($phone_num && $phone_num ne "") {
-			print "info: $hdr: phone number missing, skipping\n";
+			print "warn: $hdr: phone number missing, skipping\n";
 			next;
 		}
 

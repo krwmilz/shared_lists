@@ -58,7 +58,11 @@ public class HomeScreen extends ActionBarActivity {
             if (out != null) {
                 if (!out.checkError()) {
                     tv.setText("sending");
-                    out.println("CHECK IT OUT");
+                    String message = "4039235990\0bob";
+                    String type = "1";
+                    int length = message.length();
+                    out.println(type + length + message);
+                    tv.setText("Sent: " + type + length + message);
                 } else {
                     tv.setText("errror");
                 }

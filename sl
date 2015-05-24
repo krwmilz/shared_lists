@@ -40,9 +40,11 @@ my $sock = new IO::Socket::INET (
 
 die "Could not create socket: $!\n" unless $sock;
 
-my $new_sock = $sock->accept();
+while (1) {
+	my $new_sock = $sock->accept();
 
-while(<$new_sock>) {
-	print $_;
+	while(<$new_sock>) {
+		print $_;
+	}
 }
 close($sock);

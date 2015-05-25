@@ -5,7 +5,7 @@ use strict;
 
 use DBI;
 use Digest::SHA qw(sha256_hex);
-use IO::Socket;
+use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
 use Scalar::Util qw(looks_like_number);
 use Socket;
 
@@ -56,21 +56,19 @@ my $sql = qq{insert into lists (list_id, phone_num, name, timestamp)
 my $new_list_sth = $dbh->prepare($sql);
 
 print "info: ready for connections\n";
-while (my ($new_sock, $peer_addr_bin) = $sock->accept()) {
+while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
-	# I don't know how to reliably detect whether its ipv4 or ipv6
-	# my $peer_addr = Socket::inet_ntop(AF_INET6, $peer_addr_bin);
+	my ($err, $addr, $port) = getnameinfo($bin_addr, NI_NUMERICHOST | NI_NUMERICSERV);
+	print "warn: getnameinfo() failed: $err\n" if ($err);
+	print "info: new connection from $addr:$port\n";
 
 	read $new_sock, my $msg_type, 1;
+
 	if ($msg_type == 1) {
-		# new list
-
-		print "msg_type is new list\n";
-		read $new_sock, my $new_list_size, 2;
-
-		# my $hdr = "$peer_addr: new list";
 		my $hdr = "new list";
+		print "info: received msg type = new list\n";
 
+		read $new_sock, my $new_list_size, 2;
 		if (!looks_like_number($new_list_size)) {
 			print "warn: $hdr: $new_list_size is not a number, skipping\n";
 			close($new_sock);
@@ -79,10 +77,7 @@ while (my ($new_sock, $peer_addr_bin) = $sock->accept()) {
 		# we know this is safe
 		$new_list_size = int($new_list_size);
 
-		print "info: $hdr: message size = $new_list_size\n";
 		read($new_sock, my $new_list, $new_list_size);
-
-		print "info: $hdr: raw message: $new_list\n";
 		my ($phone_num, $name) = split("\0", $new_list);
 
 		unless ($name && $name ne "") {

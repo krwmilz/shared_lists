@@ -49,8 +49,6 @@ my $sock = new IO::Socket::INET (
 
 die "Could not create socket: $!\n" unless $sock;
 
-srand;
-
 my $sql = qq{insert into lists (list_id, phone_num, name, timestamp)
 	values (?, ?, ?, ?)};
 my $new_list_sth = $dbh->prepare($sql);

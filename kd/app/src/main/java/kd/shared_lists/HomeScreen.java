@@ -20,7 +20,9 @@ import android.widget.TextView;
 
 import org.w3c.dom.Text;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Inet4Address;
@@ -33,22 +35,26 @@ public class HomeScreen extends ActionBarActivity {
     public String number;
     EditText numbertv;
     EditText nametv;
+    String message = "juice";
     public String name;
     public static final int SERVERPORT = 5437;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.layout_home_screen);
-        Button sendMsgButton = (Button) findViewById(R.id.sendMsgButton);
+        final Button sendMsgButton = (Button) findViewById(R.id.sendMsgButton);
         numbertv = (EditText) findViewById(R.id.number);
         nametv = (EditText) findViewById(R.id.name);
         sendMsgButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 new sendMessageTask().execute("foobar", "joobar");
+                sendMsgButton.setText(message);
             }
         });
     }
+
+
 
     private void testNet() {
         ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -94,7 +100,14 @@ public class HomeScreen extends ActionBarActivity {
             } else {
           //      tv.setText("null");
             }
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            boolean listening = true;
             out.flush();
+
+            while (listening) {
+                message = in.readLine();
+                break;
+            }
             socket.close();
             //tv.setText("Sent");
         } catch (java.net.UnknownHostException e) {

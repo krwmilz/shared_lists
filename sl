@@ -28,6 +28,7 @@ $dbh->do(qq{create table if not exists list_data(
 	status int not null default 0,
 	owner int not null,
 	primary key(list_id, position),
+	foreign key(list_id) references lists(list_id),
 	foreign key(owner) references contacts(phone_num))
 }) or die $DBI::errstr;
 
@@ -54,6 +55,7 @@ my $sql = qq{insert into lists (list_id, phone_num, name, timestamp)
 	values (?, ?, ?, ?)};
 my $new_list_sth = $dbh->prepare($sql);
 
+print "info: ready for connections\n";
 while (my ($new_sock, $peer_addr_bin) = $sock->accept()) {
 
 	# I don't know how to reliably detect whether its ipv4 or ipv6
@@ -78,7 +80,7 @@ while (my ($new_sock, $peer_addr_bin) = $sock->accept()) {
 		$new_list_size = int($new_list_size);
 
 		print "info: $hdr: message size = $new_list_size\n";
-		read $new_sock, my $new_list, $new_list_size;
+		read($new_sock, my $new_list, $new_list_size);
 
 		print "info: $hdr: raw message: $new_list\n";
 		my ($phone_num, $name) = split("\0", $new_list);

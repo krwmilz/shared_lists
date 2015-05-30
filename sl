@@ -16,9 +16,10 @@ my $dbh = DBI->connect(
 	{ RaiseError => 1 }
 ) or die $DBI::errstr;
 
-$dbh->do(qq{create table if not exists contacts(
+$dbh->do(qq{create table if not exists devices(
 		phone_num int not null primary key,
-		name text not null)
+		name text not null,
+		first_seen int not null)
 }) or die $DBI::errstr;
 
 $dbh->do(qq{create table if not exists list_data(
@@ -27,16 +28,32 @@ $dbh->do(qq{create table if not exists list_data(
 	text text not null,
 	status int not null default 0,
 	owner int not null,
+	last_updated int not null,
 	primary key(list_id, position),
 	foreign key(list_id) references lists(list_id),
-	foreign key(owner) references contacts(phone_num))
+	foreign key(owner) references devices(phone_num))
 }) or die $DBI::errstr;
 
 $dbh->do(qq{create table if not exists lists(
 	list_id int not null primary key,
 	phone_num int not null,
 	name text not null,
-	timestamp int not null)
+	first_created int not null,
+	last_updated int not null)
+}) or die $DBI::errstr;
+
+$dbh->do(qq{create table if not exists friends_map(
+	user int not null,
+	friend int not null,
+	primary key(user, friend),
+	foreign key(user) references devices(phone_num))
+}) or die $DBI::errstr;
+
+$dbh->do(qq{create table if not exists mutual_friends(
+	user int not null,
+	mutual_friend int not null,
+	primary key(user, mutual_friend),
+	foreign key(user) references devices(phone_num))
 }) or die $DBI::errstr;
 
 my $sock = new IO::Socket::INET (
@@ -49,8 +66,8 @@ my $sock = new IO::Socket::INET (
 
 die "Could not create socket: $!\n" unless $sock;
 
-my $sql = qq{insert into lists (list_id, phone_num, name, timestamp)
-	values (?, ?, ?, ?)};
+my $sql = qq{insert into lists (list_id, phone_num, name, first_created, last_updated)
+	values (?, ?, ?, ?, ?)};
 my $new_list_sth = $dbh->prepare($sql);
 
 print "info: ready for connections\n";
@@ -59,26 +76,40 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	my ($err, $addr, $port) = getnameinfo($bin_addr, NI_NUMERICHOST | NI_NUMERICSERV);
 	print "warn: getnameinfo() failed: $err\n" if ($err);
 	print "info: new connection from $addr:$port\n";
+	my $hdr = $addr;
 
-	read $new_sock, my $msg_type, 1;
+	binmode($new_sock);
+
+	my $bread = read $new_sock, my $raw_msg_type, 2;
+	my ($msg_type) = unpack("n", $raw_msg_type);
+
+	if (!defined $msg_type) {
+		print "warn: error unpacking msg_type\n";
+		close $new_sock;
+		next;
+	}
+
+	if ($msg_type > 5) {
+		print "warn: unknown msg type " . sprintf "%x\n", $msg_type;
+		close $new_sock;
+		next;
+	}
+	print "info: received msg type $msg_type\n";
+
+	read($new_sock, my $raw_msg_size, 2);
+	my ($msg_size) = unpack("n", $raw_msg_size);
+
+	if ($msg_size == 0) {
+		print "warn: empty message received\n";
+	}
+	print "info: msg size = $msg_size\n";
+
+	read($new_sock, my $msg, $msg_size);
 
 	if ($msg_type == 1) {
-		my $hdr = "new list";
-		print "info: received msg type = new list\n";
+		my ($phone_num, $list_name) = split("\0", $msg);
 
-		read $new_sock, my $new_list_size, 2;
-		if (!looks_like_number($new_list_size)) {
-			print "warn: $hdr: $new_list_size is not a number, skipping\n";
-			close($new_sock);
-			next;
-		}
-		# we know this is safe
-		$new_list_size = int($new_list_size);
-
-		read($new_sock, my $new_list, $new_list_size);
-		my ($phone_num, $name) = split("\0", $new_list);
-
-		unless ($name && $name ne "") {
+		unless ($list_name && $list_name ne "") {
 			print "warn: $hdr: name missing or empty, skipping\n";
 			close($new_sock);
 			next;
@@ -95,18 +126,31 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			next;
 		}
 		print "info: $hdr: phone number = $phone_num\n";
-		print "info: $hdr: name = $name\n";
+		print "info: $hdr: list name = $list_name\n";
 
 		my $time = time;
-		my $list_id = sha256_hex($new_list . $time);
+		my $list_id = sha256_hex($msg . $time);
 		print "info: $hdr: list id = $list_id\n";
 
-		$new_list_sth->execute($list_id, $phone_num, $name, $time);
+		$new_list_sth->execute($list_id, $phone_num, $list_name, $time, $time);
 
 		print $new_sock $list_id;
 	}
-	else {
-		print "info: bad message type $msg_type\n";
+	elsif ($msg_type == 2) {
+		# update friend visibility map
+		my ($device_ph_num, @friends) = split("\0", $msg);
+
+		if (!looks_like_number($device_ph_num)) {
+			print "warn: device phone number $device_ph_num invalid, skipping\n";
+			close $new_sock;
+			next;
+		}
+
+		print "info: device $device_ph_num, " . @friends . " friends\n";
+	}
+	elsif ($msg_type == 3) {
+		# new device
+		my ($device_ph_num, $name) = split("\0", $msg);
 	}
 
 	close($new_sock);

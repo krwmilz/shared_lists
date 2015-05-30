@@ -9,6 +9,7 @@ import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.telephony.TelephonyManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -22,12 +23,14 @@ import org.w3c.dom.Text;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 
 
 public class HomeScreen extends ActionBarActivity {
@@ -41,10 +44,13 @@ public class HomeScreen extends ActionBarActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        TelephonyManager tMgr = (TelephonyManager) this.getSystemService(Context.TELEPHONY_SERVICE);
+        String mPhoneNumber = tMgr.getLine1Number();
         setContentView(R.layout.layout_home_screen);
         final Button sendMsgButton = (Button) findViewById(R.id.sendMsgButton);
         numbertv = (EditText) findViewById(R.id.number);
         nametv = (EditText) findViewById(R.id.name);
+        sendMsgButton.setText(mPhoneNumber);
         sendMsgButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -91,9 +97,16 @@ public class HomeScreen extends ActionBarActivity {
 //                    tv.setText("sending");
                     String message = number + "\0" + name;
                     String type = "1";
-                    int length = message.length();
-                    out.println(type + length + message);
-      //              tv.setText("Sent: " + type + length + message);
+                    //byte length = (byte) message.length();
+                    byte length = 00000001;
+                    byte[] mtype = {0x00, 0x01};
+                    byte[] mtype2 = {0x00, 0x1f};
+                    //byte[] bytes = ByteBuffer.allocate(2).putInt(45).array();
+                    //out.println(type + length + message);
+                    socket.getOutputStream().write(mtype);
+                    socket.getOutputStream().write(mtype2);
+                    out.print("1\0p");
+      //              tv.setText();
                 } else {
         //            tv.setText("errror");
                 }

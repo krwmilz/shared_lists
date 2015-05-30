@@ -80,24 +80,25 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
 	binmode($new_sock);
 
-	read $new_sock, my $msg_type, 1;
+	my $bread = read $new_sock, my $raw_msg_type, 2;
+	my ($msg_type) = unpack("n", $raw_msg_type);
 
-	my $msg_size_size = undef;
-	$msg_size_size = 1 if ($msg_type == 1);
-	$msg_size_size = 2 if ($msg_type == 2);
-	$msg_size_size = 1 if ($msg_type == 3);
-	$msg_size_size = 1 if ($msg_type == 4);
-
-	unless (defined $msg_size_size) {
-		print "warn: unknown msg type " .  printf "%x\n", $msg_type;
+	if (!defined $msg_type) {
+		print "warn: error unpacking msg_type\n";
 		close $new_sock;
 		next;
 	}
-	print "info: msg size size = $msg_size_size\n";
-	my $ascii_msg_type = sprintf("%x", $msg_type);
-	print "info: received msg type $ascii_msg_type\n";
 
-	read($new_sock, my $msg_size, $msg_size_size);
+	if ($msg_type > 5) {
+		print "warn: unknown msg type " . sprintf "%x\n", $msg_type;
+		close $new_sock;
+		next;
+	}
+	print "info: received msg type $msg_type\n";
+
+	read($new_sock, my $raw_msg_size, 2);
+	my ($msg_size) = unpack("n", $raw_msg_size);
+
 	if ($msg_size == 0) {
 		print "warn: empty message received\n";
 	}

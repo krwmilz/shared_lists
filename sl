@@ -78,6 +78,8 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	print "info: new connection from $addr:$port\n";
 	my $hdr = $addr;
 
+	binmode($new_sock);
+
 	read $new_sock, my $msg_type, 1;
 
 	my $msg_size_size = undef;
@@ -86,17 +88,20 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	$msg_size_size = 1 if ($msg_type == 3);
 	$msg_size_size = 1 if ($msg_type == 4);
 
-	if ($msg_size_size == undef) {
+	unless (defined $msg_size_size) {
 		print "warn: unknown msg type " .  printf "%x\n", $msg_type;
 		close $new_sock;
 		next;
 	}
-	print "info: received msg type " . printf "%x\n", $msg_type;
+	print "info: msg size size = $msg_size_size\n";
+	my $ascii_msg_type = sprintf("%x", $msg_type);
+	print "info: received msg type $ascii_msg_type\n";
 
 	read($new_sock, my $msg_size, $msg_size_size);
 	if ($msg_size == 0) {
 		print "warn: empty message received\n";
 	}
+	print "info: msg size = $msg_size\n";
 
 	read($new_sock, my $msg, $msg_size);
 

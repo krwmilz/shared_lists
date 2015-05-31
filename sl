@@ -3,8 +3,9 @@
 use warnings;
 use strict;
 
+use BSD::arc4random qw(:all);
 use DBI;
-use Digest::SHA qw(sha256_hex);
+use Digest::SHA qw(sha256_base64);
 use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
 use Scalar::Util qw(looks_like_number);
 use Socket;
@@ -17,7 +18,8 @@ my $dbh = DBI->connect(
 ) or die $DBI::errstr;
 
 $dbh->do(qq{create table if not exists devices(
-		phone_num int not null primary key,
+		token text not null primary key,
+		phone_num int not null,
 		first_seen int not null)
 }) or die $DBI::errstr;
 
@@ -69,8 +71,14 @@ my $sql = qq{insert into lists (list_id, phone_num, name, first_created, last_up
 	values (?, ?, ?, ?, ?)};
 my $new_list_sth = $dbh->prepare($sql);
 
-$sql = qq{insert into devices (phone_num, first_seen) values (?, ?)};
+$sql = qq{insert into devices (token, phone_num, first_seen) values (?, ?, ?)};
 my $new_device_sth = $dbh->prepare($sql);
+
+$sql = qq{insert into friends_map (user, friend) values (?, ?)};
+my $friends_map_sth = $dbh->prepare($sql);
+
+$sql = qq{select * from devices where phone_num = ?};
+my $ph_num_exists_sth = $dbh->prepare($sql);
 
 print "info: ready for connections\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
@@ -146,7 +154,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		print "info: $addr: list name = $list_name\n";
 
 		my $time = time;
-		my $list_id = sha256_hex($msg . $time);
+		my $list_id = sha256_base64($msg . $time);
 		print "info: $addr: list id = $list_id\n";
 
 		$new_list_sth->execute($list_id, $phone_num, $list_name, $time, $time);
@@ -164,23 +172,35 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			close $new_sock;
 			next;
 		}
-
 		print "info: $addr: device $device_ph_num, " . @friends . " friends\n";
 
+		for (@friends) {
+			$friends_map_sth->execute($device_ph_num, $_);
+		}
 	}
 	elsif ($msg_type == 3) {
 		# new device
 
 		# single field
-		my $device_ph_num = $msg;
+		my $ph_num = $msg;
 
-		if (!looks_like_number($device_ph_num)) {
-			print "warn: $addr: device phone number $device_ph_num invalid\n";
+		if (!looks_like_number($ph_num)) {
+			print "warn: $addr: device phone number $ph_num invalid\n";
+			close $new_sock;
+			next;
+		}
+		if ($dbh->selectall_arrayref($ph_num_exists_sth, undef, $ph_num)) {
+			print "warn: $addr: phone number $ph_num already exists\n";
 			close $new_sock;
 			next;
 		}
 
-		$new_device_sth->execute($device_ph_num, time);
+		# make a new device id, the client will supply this on all
+		# further communication
+		my $token = sha256_base64(arc4random_bytes(32));
+
+		print $new_sock $token;
+		$new_device_sth->execute($token, $ph_num, time);
 	}
 
 	close($new_sock);

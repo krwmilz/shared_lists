@@ -37,10 +37,11 @@ $dbh->do(qq{create table if not exists list_data(
 
 $dbh->do(qq{create table if not exists lists(
 	list_id int not null primary key,
-	phone_num int not null,
+	device_id text not null,
 	name text not null,
 	first_created int not null,
-	last_updated int not null)
+	last_updated int not null,
+	foreign key(device_id) references devices(token))
 }) or die $DBI::errstr;
 
 $dbh->do(qq{create table if not exists friends_map(
@@ -67,7 +68,7 @@ my $sock = new IO::Socket::INET (
 
 die "Could not create socket: $!\n" unless $sock;
 
-my $sql = qq{insert into lists (list_id, phone_num, name, first_created, last_updated)
+my $sql = qq{insert into lists (list_id, device_id, name, first_created, last_updated)
 	values (?, ?, ?, ?, ?)};
 my $new_list_sth = $dbh->prepare($sql);
 
@@ -79,6 +80,9 @@ my $friends_map_sth = $dbh->prepare($sql);
 
 $sql = qq{select * from devices where phone_num = ?};
 my $ph_num_exists_sth = $dbh->prepare($sql);
+
+$sql = qq{select * from devices where token = ?};
+my $device_id_exists_sth = $dbh->prepare($sql);
 
 print "info: ready for connections\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
@@ -132,11 +136,11 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		# new list
 
 		# expecting two fields delimited by null
-		my ($phone_num, $list_name) = split("\0", $msg);
+		my ($device_id, $list_name) = split("\0", $msg);
 
-		unless ($phone_num && $phone_num ne "") {
-			print "warn: $addr: phone number missing or empty\n";
-			close($new_sock);
+		# validate input
+		if (device_id_invalid($device_id, $addr)) {
+			close $new_sock;
 			next;
 		}
 		unless ($list_name && $list_name ne "") {
@@ -145,37 +149,36 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			next;
 		}
 
-		if (!looks_like_number($phone_num)) {
-			print "warn: $addr: $phone_num is not a number\n";
-			close($new_sock);
-			next;
-		}
-		print "info: $addr: phone number = $phone_num\n";
+		print "info: $addr: device id = $device_id\n";
 		print "info: $addr: list name = $list_name\n";
 
 		my $time = time;
 		my $list_id = sha256_base64($msg . $time);
 		print "info: $addr: list id = $list_id\n";
 
-		$new_list_sth->execute($list_id, $phone_num, $list_name, $time, $time);
+		$new_list_sth->execute($list_id, $device_id, $list_name, $time, $time);
 
 		print $new_sock $list_id;
 	}
 	elsif ($msg_type == 2) {
 		# update friend map
 
-		# users phone number followed by 0 or more friends numbers
-		my ($device_ph_num, @friends) = split("\0", $msg);
+		# device id followed by 0 or more friends numbers
+		my ($device_id, @friends) = split("\0", $msg);
 
-		if (!looks_like_number($device_ph_num)) {
-			print "warn: $addr: device phone number $device_ph_num invalid\n";
+		if (device_id_invalid($device_id, $addr)) {
 			close $new_sock;
 			next;
 		}
-		print "info: $addr: device $device_ph_num, " . @friends . " friends\n";
+		print "info: $addr: device $device_id, " . @friends . " friends\n";
 
 		for (@friends) {
-			$friends_map_sth->execute($device_ph_num, $_);
+			unless (looks_like_number($_)) {
+				print "warn: bad friends number $_\n";
+				next;
+			}
+			$friends_map_sth->execute($device_id, $_);
+			print "info: $addr: added friend $_\n";
 		}
 	}
 	elsif ($msg_type == 3) {
@@ -189,7 +192,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			close $new_sock;
 			next;
 		}
-		if ($dbh->selectall_arrayref($ph_num_exists_sth, undef, $ph_num)) {
+		if ($dbh->selectrow_array($ph_num_exists_sth, undef, $ph_num)) {
 			print "warn: $addr: phone number $ph_num already exists\n";
 			close $new_sock;
 			next;
@@ -207,3 +210,23 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 }
 $dbh->disconnect();
 close($sock);
+
+sub device_id_invalid
+{
+	my $device_id = shift;
+	my $addr = shift;
+
+	# validate this at least looks like base64
+	unless ($device_id =~ m/^[a-zA-Z0-9=]+$/) {
+		print "warn: $addr: device id $device_id invalid\n";
+		return 1;
+	}
+
+	# make sure we know about this device id
+	unless ($dbh->selectrow_array($device_id_exists_sth, undef, $device_id)) {
+		print "warn: $addr: unknown device $device_id\n";
+		return 1;
+	}
+
+	return 0;
+}

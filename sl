@@ -6,9 +6,13 @@ use strict;
 use BSD::arc4random qw(:all);
 use DBI;
 use Digest::SHA qw(sha256_base64);
+use Getopt::Std;
 use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
 use Scalar::Util qw(looks_like_number);
 use Socket;
+
+my %args;
+getopts("p:", \%args);
 
 my $dbh = DBI->connect(
 	"dbi:SQLite:dbname=db",
@@ -45,28 +49,29 @@ $dbh->do(qq{create table if not exists lists(
 }) or die $DBI::errstr;
 
 $dbh->do(qq{create table if not exists friends_map(
-	user int not null,
+	device_id text not null,
 	friend int not null,
-	primary key(user, friend),
-	foreign key(user) references devices(phone_num))
+	primary key(device_id, friend),
+	foreign key(device_id) references devices(token))
 }) or die $DBI::errstr;
 
 $dbh->do(qq{create table if not exists mutual_friends(
-	user int not null,
-	mutual_friend int not null,
-	primary key(user, mutual_friend),
-	foreign key(user) references devices(phone_num))
+	device_id text not null,
+	mutual_friend text not null,
+	primary key(device_id, mutual_friend),
+	foreign key(device_id) references devices(device_id))
 }) or die $DBI::errstr;
 
 my $sock = new IO::Socket::INET (
 	LocalHost => '0.0.0.0',
-	LocalPort => '5437',
+	LocalPort => $args{p} || '5437',
 	Proto => 'tcp',
 	Listen => 1,
 	Reuse => 1,
 );
 
 die "Could not create socket: $!\n" unless $sock;
+my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
 
 my $sql = qq{insert into lists (list_id, device_id, name, first_created, last_updated)
 	values (?, ?, ?, ?, ?)};
@@ -75,8 +80,14 @@ my $new_list_sth = $dbh->prepare($sql);
 $sql = qq{insert into devices (token, phone_num, first_seen) values (?, ?, ?)};
 my $new_device_sth = $dbh->prepare($sql);
 
-$sql = qq{insert into friends_map (user, friend) values (?, ?)};
+$sql = qq{insert into friends_map (device_id, friend) values (?, ?)};
 my $friends_map_sth = $dbh->prepare($sql);
+
+$sql = qq{delete from friends_map where device_id = ?};
+my $friends_map_delete_sth = $dbh->prepare($sql);
+
+$sql = qq{delete from mutual_friends where device_id = ? or mutual_friend = ?};
+my $mutual_friends_delete_sth = $dbh->prepare($sql);
 
 $sql = qq{select * from devices where phone_num = ?};
 my $ph_num_exists_sth = $dbh->prepare($sql);
@@ -84,7 +95,7 @@ my $ph_num_exists_sth = $dbh->prepare($sql);
 $sql = qq{select * from devices where token = ?};
 my $device_id_exists_sth = $dbh->prepare($sql);
 
-print "info: ready for connections\n";
+print "info: ready for connections on $local_addr_port\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
 	# don't try and resolve ip address or port
@@ -156,12 +167,12 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		my $list_id = sha256_base64($msg . $time);
 		print "info: $addr: list id = $list_id\n";
 
-		$new_list_sth->execute($list_id, $device_id, $list_name, $time, $time);
-
 		print $new_sock $list_id;
+		$new_list_sth->execute($list_id, $device_id, $list_name, $time, $time);
 	}
 	elsif ($msg_type == 2) {
-		# update friend map
+		# update friend map, note this is meant to be a wholesale update
+		# of the friends that are associated with a given device id
 
 		# device id followed by 0 or more friends numbers
 		my ($device_id, @friends) = split("\0", $msg);
@@ -171,6 +182,10 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			next;
 		}
 		print "info: $addr: device $device_id, " . @friends . " friends\n";
+
+		# delete all friends, remove mutual friend references
+		$friends_map_delete_sth->execute($device_id);
+		$mutual_friends_delete_sth->execute($device_id, $device_id);
 
 		for (@friends) {
 			unless (looks_like_number($_)) {
@@ -200,10 +215,12 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
 		# make a new device id, the client will supply this on all
 		# further communication
+		# XXX: need to check the db to make sure this isn't duplicate
 		my $token = sha256_base64(arc4random_bytes(32));
 
 		print $new_sock $token;
 		$new_device_sth->execute($token, $ph_num, time);
+		print "info: $addr: added new device $ph_num:$token\n";
 	}
 
 	close($new_sock);
@@ -217,7 +234,7 @@ sub device_id_invalid
 	my $addr = shift;
 
 	# validate this at least looks like base64
-	unless ($device_id =~ m/^[a-zA-Z0-9=]+$/) {
+	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
 		print "warn: $addr: device id $device_id invalid\n";
 		return 1;
 	}

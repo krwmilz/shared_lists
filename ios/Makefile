@@ -5,20 +5,26 @@
 #
 
 CC=clang
-CFLAGS=-isysroot /var/sdks/Latest.sdk
+CFLAGS=-isysroot /var/sdks/iPhoneOS7.1.sdk
 LDFLAGS=-framework Foundation -framework UIKit
 
-OBJS=main.o TestLabel.o
+PROG=shlist
+OBJS=main.o ViewController.o
 
 .SUFFIXES: .m .o
 
-Shist: $(OBJS)
+$(PROG): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $@
+	cp $@ /Applications/$(PROG).App/
+	killall -HUP SpringBoard
 
 .m.o:
 	$(CC) $(CFLAGS) -c $<
 
-$(OBJS): TestLabel.h
+$(OBJS): ViewController.h
+
+open:
+	open net.iphonedevwiki.shlist
 
 clean:
-	rm -f *.o Shist
+	rm -f *.o $(PROG)

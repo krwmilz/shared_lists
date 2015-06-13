@@ -4,14 +4,21 @@
 # for more information
 #
 
-build: main.m TestLabel.m
-	clang -isysroot /var/sdks/Latest.sdk -c main.m
-	clang -isysroot /var/sdks/Latest.sdk -c TestLabel.m
-	clang -isysroot /var/sdks/Latest.sdk -framework Foundation \
-	       -framework UIKit main.o TestLabel.o -o Shist
+CC=clang
+CFLAGS=-isysroot /var/sdks/Latest.sdk
+LDFLAGS=-framework Foundation -framework UIKit
 
-install: build
-	cp Shist /Applications/Shist.app/
+OBJS=main.o TestLabel.o
+
+.SUFFIXES: .m .o
+
+Shist: $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $@
+
+.m.o:
+	$(CC) $(CFLAGS) -c $<
+
+$(OBJS): TestLabel.h
 
 clean:
 	rm -f *.o Shist

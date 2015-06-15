@@ -1,30 +1,7 @@
-#
-# the sdk needs to be unpacked and ready to go before running this, see
-# http://iphonedevwiki.net/index.php/Compiling_iOS_applications_on-device
-# for more information
-#
+include theos/makefiles/common.mk
 
-CC=clang
-CFLAGS=-isysroot /var/sdks/iPhoneOS7.1.sdk
-LDFLAGS=-framework Foundation -framework UIKit
+APPLICATION_NAME = shlist
+shlist_FILES = main.m shlistApplication.mm RootViewController.mm
+shlist_FRAMEWORKS = UIKit CoreGraphics
 
-PROG=shlist
-OBJS=main.o ViewController.o
-
-.SUFFIXES: .m .o
-
-$(PROG): $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $@
-	cp $@ /Applications/$(PROG).App/
-	killall -HUP SpringBoard
-
-.m.o:
-	$(CC) $(CFLAGS) -c $<
-
-$(OBJS): ViewController.h
-
-open:
-	open net.iphonedevwiki.shlist
-
-clean:
-	rm -f *.o $(PROG)
+include $(THEOS_MAKE_PATH)/application.mk

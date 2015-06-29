@@ -19,6 +19,8 @@
 		27C70F301B33F4FA00DADEB3 /* SharedListsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F2F1B33F4FA00DADEB3 /* SharedListsTableViewController.m */; };
 		27C70F321B3650CB00DADEB3 /* libsqlite3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 27C70F311B3650CB00DADEB3 /* libsqlite3.dylib */; };
 		27C70F351B36513200DADEB3 /* DBManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F341B36513200DADEB3 /* DBManager.m */; };
+		BF7776B91B38928D00526CB0 /* ListDetailTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */; };
+		BF7776BC1B38D0DB00526CB0 /* ListItem.m in Sources */ = {isa = PBXBuildFile; fileRef = BF7776BB1B38D0DB00526CB0 /* ListItem.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,6 +56,10 @@
 		27C70F311B3650CB00DADEB3 /* libsqlite3.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libsqlite3.dylib; path = usr/lib/libsqlite3.dylib; sourceTree = SDKROOT; };
 		27C70F331B36513200DADEB3 /* DBManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DBManager.h; sourceTree = "<group>"; };
 		27C70F341B36513200DADEB3 /* DBManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DBManager.m; sourceTree = "<group>"; };
+		BF7776B71B38928D00526CB0 /* ListDetailTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListDetailTableViewController.h; sourceTree = "<group>"; };
+		BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ListDetailTableViewController.m; sourceTree = "<group>"; };
+		BF7776BA1B38D0DB00526CB0 /* ListItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListItem.h; sourceTree = "<group>"; };
+		BF7776BB1B38D0DB00526CB0 /* ListItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ListItem.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,6 +110,10 @@
 				27C70F061B32AF8000DADEB3 /* AppDelegate.h */,
 				27C70F071B32AF8000DADEB3 /* AppDelegate.m */,
 				27C70F0C1B32AF8000DADEB3 /* Main.storyboard */,
+				BF7776B71B38928D00526CB0 /* ListDetailTableViewController.h */,
+				BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */,
+				BF7776BA1B38D0DB00526CB0 /* ListItem.h */,
+				BF7776BB1B38D0DB00526CB0 /* ListItem.m */,
 				27C70F2E1B33F4FA00DADEB3 /* SharedListsTableViewController.h */,
 				27C70F2F1B33F4FA00DADEB3 /* SharedListsTableViewController.m */,
 				27C70F2B1B33F3C300DADEB3 /* NewListViewController.h */,
@@ -244,7 +254,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BF7776B91B38928D00526CB0 /* ListDetailTableViewController.m in Sources */,
 				27C70F351B36513200DADEB3 /* DBManager.m in Sources */,
+				BF7776BC1B38D0DB00526CB0 /* ListItem.m in Sources */,
 				27C70F0B1B32AF8000DADEB3 /* Server.m in Sources */,
 				27C70F2A1B33D1C900DADEB3 /* SharedList.m in Sources */,
 				27C70F2D1B33F3C300DADEB3 /* NewListViewController.m in Sources */,
@@ -455,6 +467,7 @@
 				27C70F241B32AF8000DADEB3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		27C70F251B32AF8000DADEB3 /* Build configuration list for PBXNativeTarget "shlistTests" */ = {
 			isa = XCConfigurationList;
@@ -463,6 +476,7 @@
 				27C70F271B32AF8000DADEB3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

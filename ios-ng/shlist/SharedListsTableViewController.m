@@ -10,91 +10,88 @@
 
 - (void)load_initial_data
 {
-    // load local shared list data from db
-    // sync with server and check if there's any updates
+	// load local shared list data from db
+	// sync with server and check if there's any updates
 
-    NSLog(@"SharedListsTableViewController::load_initial_data()");
+	NSLog(@"SharedListsTableViewController::load_initial_data()");
 
-    SharedList *list1 = [[SharedList alloc] init];
-    list1.list_name = @"Camping";
-    list1.list_members = @"David, Kyle, Greg";
-    [self.shared_lists addObject:list1];
+	SharedList *list1 = [[SharedList alloc] init];
+	list1.list_name = @"Camping";
+	list1.list_members = @"David, Kyle, Greg";
+	[self.shared_lists addObject:list1];
     
-    SharedList *list2 = [[SharedList alloc] init];
-    list2.list_name = @"Wedding";
-    list2.list_members = @"Kyle, Stephanie";
-    [self.shared_lists addObject:list2];
-    
+	SharedList *list2 = [[SharedList alloc] init];
+	list2.list_name = @"Wedding";
+	list2.list_members = @"Kyle, Stephanie";
+	[self.shared_lists addObject:list2];
 }
 
 - (IBAction)unwindToList:(UIStoryboardSegue *)segue
 {
-    NewListViewController *source = [segue sourceViewController];
-    SharedList *list = source.shared_list;
+	NewListViewController *source = [segue sourceViewController];
+	SharedList *list = source.shared_list;
 
-    if (list != nil) {
-        [self.shared_lists addObject:list];
-        [self.tableView reloadData];
-    }
+	if (list != nil) {
+		[self.shared_lists addObject:list];
+		[self.tableView reloadData];
+	}
 
-    NSLog(@"unwindToList(): done");
+	NSLog(@"unwindToList(): done");
 }
 
 - (void)viewDidLoad
 {
-    [super viewDidLoad];
+	[super viewDidLoad];
     
-    // Uncomment the following line to preserve selection between presentations.
-    // self.clearsSelectionOnViewWillAppear = NO;
+	// Uncomment the following line to preserve selection between
+	// presentations.
+	// self.clearsSelectionOnViewWillAppear = NO;
     
-    // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-    self.navigationItem.leftBarButtonItem = self.editButtonItem;
+	// display an Edit button in the navigation bar for this view controller
+	self.navigationItem.leftBarButtonItem = self.editButtonItem;
     
-    self.shared_lists = [[NSMutableArray alloc] init];
-    [self load_initial_data];
+	self.shared_lists = [[NSMutableArray alloc] init];
+	[self load_initial_data];
 }
 
 - (void)didReceiveMemoryWarning
 {
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+	[super didReceiveMemoryWarning];
+	// Dispose of any resources that can be recreated.
 }
 
 #pragma mark - Table view data source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
 {
-    return 1;
+	return 1;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    return [self.shared_lists count];
+	return [self.shared_lists count];
 }
-
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell" forIndexPath:indexPath];
-    // UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell"];
+	UITableViewCell *cell;
+	cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell" forIndexPath:indexPath];
+	// UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell"];
     
-    if (cell == nil) {
-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"SharedListPrototypeCell"];
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    }
+	if (cell == nil) {
+		cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"SharedListPrototypeCell"];
+		cell.selectionStyle = UITableViewCellSelectionStyleNone;
+	}
 
-    
-    NSLog(@"cellForRowAtIndexPath(): start");
-    
-    // Configure the cell...
-    
-    SharedList *shared_list = [self.shared_lists objectAtIndex:indexPath.row];
-    cell.textLabel.text = shared_list.list_name;
-    cell.detailTextLabel.text = shared_list.list_members;
+	NSLog(@"SharedListsTableViewController::cellForRowAtIndexPath()");
 
-    return cell;
+	// configure the cell
+	SharedList *shared_list = [self.shared_lists objectAtIndex:indexPath.row];
+	cell.textLabel.text = shared_list.list_name;
+	cell.detailTextLabel.text = shared_list.list_members;
+
+	return cell;
 }
-
 
 /*
 // Override to support conditional editing of the table view.

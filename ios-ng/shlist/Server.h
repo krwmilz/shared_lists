@@ -2,4 +2,7 @@
 
 @interface Server : NSObject <NSStreamDelegate>
 
+- (void)read;
+- (void)write;
+
 @end

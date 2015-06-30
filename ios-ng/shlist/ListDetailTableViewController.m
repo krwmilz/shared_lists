@@ -11,69 +11,69 @@
 
 - (void)load_initial_data
 {
-    NSLog(@"ListDetailTableViewController::load_initial_data()");
-    
-    ListItem *item1 = [[ListItem alloc] init];
-    item1.name = @"Axe";
-    item1.owner = @"Kyle";
-    [self.list_items addObject:item1];
-    
-    ListItem *item2 = [[ListItem alloc] init];
-    item2.name = @"Camp Stove";
-    item2.owner = @"<none>";
-    [self.list_items addObject:item2];
-    
-    ListItem *item3 = [[ListItem alloc] init];
-    item3.name = @"Tent";
-    item3.owner = @"David";
-    [self.list_items addObject:item3];
+	NSLog(@"ListDetailTableViewController::load_initial_data()");
+
+	ListItem *item1 = [[ListItem alloc] init];
+	item1.name = @"Axe";
+	item1.owner = @"Kyle";
+	[self.list_items addObject:item1];
+
+	ListItem *item2 = [[ListItem alloc] init];
+	item2.name = @"Camp Stove";
+	item2.owner = @"<none>";
+	[self.list_items addObject:item2];
+
+	ListItem *item3 = [[ListItem alloc] init];
+	item3.name = @"Tent";
+	item3.owner = @"David";
+	[self.list_items addObject:item3];
 }
 
 - (void)viewDidLoad
 {
-    [super viewDidLoad];
-    
-    // Uncomment the following line to preserve selection between presentations.
-    // self.clearsSelectionOnViewWillAppear = NO;
-    
-    // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-    // self.navigationItem.leftBarButtonItem = self.editButtonItem;
-    
-    self.list_items = [[NSMutableArray alloc] init];
-    [self load_initial_data];
+	[super viewDidLoad];
+
+	// Uncomment the following line to preserve selection between
+	// presentations.
+	// self.clearsSelectionOnViewWillAppear = NO;
+
+	// Uncomment the following line to display an Edit button in the
+	// navigation bar for this view controller.
+	// self.navigationItem.leftBarButtonItem = self.editButtonItem;
+
+	self.list_items = [[NSMutableArray alloc] init];
+	[self load_initial_data];
 }
 
 - (void)didReceiveMemoryWarning
 {
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+	[super didReceiveMemoryWarning];
+	// Dispose of any resources that can be recreated.
 }
 
 #pragma mark - Table view data source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
 {
-    return 1;
+	return 1;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    return [self.list_items count];
+	return [self.list_items count];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ListDetailPrototypeCell" forIndexPath:indexPath];
+	UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ListDetailPrototypeCell" forIndexPath:indexPath];
     
-    NSLog(@"ListDetailTableViewController::cellForRowAtIndexPath()");
+	NSLog(@"ListDetailTableViewController::cellForRowAtIndexPath()");
     
-    // Configure the cell...
-    
-    ListItem *item = [self.list_items objectAtIndex:indexPath.row];
-    cell.textLabel.text = item.name;
-    cell.detailTextLabel.text = item.owner;
-    
-    return cell;
+	ListItem *item = [self.list_items objectAtIndex:indexPath.row];
+	cell.textLabel.text = item.name;
+	cell.detailTextLabel.text = item.owner;
+
+	return cell;
 }
 
 /*

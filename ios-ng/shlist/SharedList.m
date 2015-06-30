@@ -3,9 +3,4 @@
 
 @implementation SharedList
 
-- (void)set_name:(NSString*)name
-{
-    self.list_name = name;
-}
-
 @end

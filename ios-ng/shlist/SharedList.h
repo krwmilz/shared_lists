@@ -10,7 +10,6 @@
 @property NSString *list_members;
 @property NSDate *list_date;
 
-- (void)set_name:(NSString*)name;
 @end
 
 #endif

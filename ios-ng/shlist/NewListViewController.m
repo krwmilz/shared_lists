@@ -24,10 +24,11 @@
 #pragma mark - Navigation
 
 // preparation before navigation
-- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
+{
 	// Get the new view controller using [segue destinationViewController].
 	// Pass the selected object to the new view controller.
-    
+
 	if (sender != self.saveButton) return;
 
 	if (self.textField.text.length > 0) {

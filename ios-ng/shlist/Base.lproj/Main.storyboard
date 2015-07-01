@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="7706" systemVersion="14D136" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" initialViewController="0GJ-5e-Vr4">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="7706" systemVersion="14D136" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" initialViewController="KKJ-Fr-5sX">
     <dependencies>
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="7703"/>
@@ -44,7 +44,7 @@
                 </tableViewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="H64-xB-1er" userLabel="First Responder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="1008" y="-358"/>
+            <point key="canvasLocation" x="1188" y="-70"/>
         </scene>
         <!--Shared Lists-->
         <scene sceneID="hc1-Lv-WtP">
@@ -112,16 +112,16 @@
                         <rect key="frame" x="0.0" y="0.0" width="600" height="600"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" ambiguous="YES" misplaced="YES" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="new list name" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="gPO-fo-XXP">
-                                <rect key="frame" x="0.0" y="88" width="600" height="30"/>
+                            <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="new list name" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="gPO-fo-XXP">
+                                <rect key="frame" x="16" y="72" width="568" height="30"/>
                                 <fontDescription key="fontDescription" type="system" pointSize="14"/>
                                 <textInputTraits key="textInputTraits" returnKeyType="done"/>
                                 <connections>
                                     <action selector="textField" destination="BYZ-38-t0r" eventType="editingDidEnd" id="x6t-Ub-mbI"/>
                                 </connections>
                             </textField>
-                            <datePicker contentMode="scaleToFill" ambiguous="YES" misplaced="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" datePickerMode="date" minuteInterval="1" translatesAutoresizingMaskIntoConstraints="NO" id="6qD-8D-Z17">
-                                <rect key="frame" x="0.0" y="134" width="600" height="162"/>
+                            <datePicker contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" datePickerMode="date" minuteInterval="1" translatesAutoresizingMaskIntoConstraints="NO" id="6qD-8D-Z17">
+                                <rect key="frame" x="16" y="110" width="568" height="162"/>
                                 <date key="date" timeIntervalSinceReferenceDate="456394105.70743901">
                                     <!--2015-06-19 08:08:25 +0000-->
                                 </date>
@@ -130,11 +130,12 @@
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="calibratedWhite"/>
                         <constraints>
                             <constraint firstAttribute="centerX" secondItem="gPO-fo-XXP" secondAttribute="centerX" id="1OY-B2-wev"/>
-                            <constraint firstAttribute="trailingMargin" secondItem="6qD-8D-Z17" secondAttribute="trailing" constant="-16" id="Bo3-B6-6Tu"/>
-                            <constraint firstItem="gPO-fo-XXP" firstAttribute="leading" secondItem="8bC-Xf-vdC" secondAttribute="leadingMargin" constant="-16" id="H3z-m6-BeL"/>
-                            <constraint firstAttribute="trailingMargin" secondItem="gPO-fo-XXP" secondAttribute="trailing" constant="-16" id="iEx-da-9za"/>
-                            <constraint firstItem="6qD-8D-Z17" firstAttribute="leading" secondItem="8bC-Xf-vdC" secondAttribute="leadingMargin" constant="-16" id="o9a-P2-Pqm"/>
-                            <constraint firstAttribute="centerX" secondItem="6qD-8D-Z17" secondAttribute="centerX" id="scx-j8-F8B"/>
+                            <constraint firstItem="gPO-fo-XXP" firstAttribute="leading" secondItem="8bC-Xf-vdC" secondAttribute="leadingMargin" id="G0c-db-8sM"/>
+                            <constraint firstItem="6qD-8D-Z17" firstAttribute="top" secondItem="gPO-fo-XXP" secondAttribute="bottom" constant="8" id="SJ3-NV-PjO"/>
+                            <constraint firstItem="gPO-fo-XXP" firstAttribute="top" secondItem="y3c-jy-aDJ" secondAttribute="bottom" constant="8" id="ZtU-cg-SZX"/>
+                            <constraint firstItem="6qD-8D-Z17" firstAttribute="trailing" secondItem="8bC-Xf-vdC" secondAttribute="trailingMargin" id="dr7-PJ-P2B"/>
+                            <constraint firstItem="6qD-8D-Z17" firstAttribute="leading" secondItem="8bC-Xf-vdC" secondAttribute="leadingMargin" id="fhE-11-QTl"/>
+                            <constraint firstItem="gPO-fo-XXP" firstAttribute="trailing" secondItem="8bC-Xf-vdC" secondAttribute="trailingMargin" id="qlT-al-6aa"/>
                         </constraints>
                     </view>
                     <navigationItem key="navigationItem" title="New List" id="5ys-ck-wLj">
@@ -158,12 +159,104 @@
                 <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzr" sceneMemberID="firstResponder"/>
                 <exit id="C3w-Ab-gX6" userLabel="Exit" sceneMemberID="exit"/>
             </objects>
-            <point key="canvasLocation" x="2064" y="387"/>
+            <point key="canvasLocation" x="2044" y="811"/>
         </scene>
-        <!--Navigation Controller-->
+        <!--About Us-->
+        <scene sceneID="noJ-Ez-70t">
+            <objects>
+                <viewController id="FlT-Xw-f5e" userLabel="About Us" sceneMemberID="viewController">
+                    <layoutGuides>
+                        <viewControllerLayoutGuide type="top" id="3hJ-K1-i1o"/>
+                        <viewControllerLayoutGuide type="bottom" id="9zw-4a-J6h"/>
+                    </layoutGuides>
+                    <view key="view" contentMode="scaleToFill" id="BEH-Qp-ix3">
+                        <rect key="frame" x="0.0" y="0.0" width="600" height="600"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <textView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" ambiguous="YES" misplaced="YES" text="This is something we do on our free time. If you respect that, please donate." translatesAutoresizingMaskIntoConstraints="NO" id="3Tn-bI-uKk">
+                                <rect key="frame" x="16" y="134" width="568" height="37"/>
+                                <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <textInputTraits key="textInputTraits" autocapitalizationType="sentences"/>
+                            </textView>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="About Us" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="hjG-BQ-XBF">
+                                <rect key="frame" x="16" y="28" width="72" height="21"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <textView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" ambiguous="YES" misplaced="YES" translatesAutoresizingMaskIntoConstraints="NO" id="vqD-fu-CUL">
+                                <rect key="frame" x="16" y="49" width="568" height="77"/>
+                                <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                <string key="text">This project is a humble attempt to help people be more organized. It's main purpose is to make group events easy to plan and execute. It's founders hope you find it as useful as they do.</string>
+                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <textInputTraits key="textInputTraits" autocapitalizationType="sentences"/>
+                            </textView>
+                        </subviews>
+                        <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                        <constraints>
+                            <constraint firstItem="vqD-fu-CUL" firstAttribute="trailing" secondItem="BEH-Qp-ix3" secondAttribute="trailingMargin" id="0kQ-sN-zkj"/>
+                            <constraint firstItem="hjG-BQ-XBF" firstAttribute="leading" secondItem="BEH-Qp-ix3" secondAttribute="leadingMargin" id="64i-ls-ddW"/>
+                            <constraint firstItem="3Tn-bI-uKk" firstAttribute="trailing" secondItem="BEH-Qp-ix3" secondAttribute="trailingMargin" id="AlZ-Vo-99h"/>
+                            <constraint firstItem="vqD-fu-CUL" firstAttribute="leading" secondItem="BEH-Qp-ix3" secondAttribute="leadingMargin" id="Bxp-G1-gOp"/>
+                            <constraint firstItem="3Tn-bI-uKk" firstAttribute="top" secondItem="vqD-fu-CUL" secondAttribute="bottom" constant="8" id="GR0-aa-vSO"/>
+                            <constraint firstItem="3Tn-bI-uKk" firstAttribute="leading" secondItem="BEH-Qp-ix3" secondAttribute="leadingMargin" id="e5J-II-Cyn"/>
+                            <constraint firstAttribute="trailingMargin" secondItem="hjG-BQ-XBF" secondAttribute="trailing" constant="496" id="mgk-JE-jzk"/>
+                            <constraint firstItem="vqD-fu-CUL" firstAttribute="top" secondItem="hjG-BQ-XBF" secondAttribute="bottom" constant="8" id="rnu-FP-hp6"/>
+                            <constraint firstItem="hjG-BQ-XBF" firstAttribute="top" secondItem="3hJ-K1-i1o" secondAttribute="bottom" constant="8" id="vgR-2B-gRS"/>
+                            <constraint firstItem="9zw-4a-J6h" firstAttribute="top" secondItem="3Tn-bI-uKk" secondAttribute="bottom" constant="8" symbolic="YES" id="w2y-Cf-BBd"/>
+                        </constraints>
+                    </view>
+                    <tabBarItem key="tabBarItem" title="About Us" id="djS-DN-skn" userLabel="About Us"/>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="BxS-VD-IQ2" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="292" y="-1628"/>
+        </scene>
+        <!--Contacts-->
+        <scene sceneID="QO3-Nz-2Rw">
+            <objects>
+                <viewController id="U8c-wO-OWj" userLabel="Contacts" customClass="ContactsViewController" sceneMemberID="viewController">
+                    <layoutGuides>
+                        <viewControllerLayoutGuide type="top" id="lbu-UM-pRT"/>
+                        <viewControllerLayoutGuide type="bottom" id="FAF-HB-8uI"/>
+                    </layoutGuides>
+                    <view key="view" contentMode="scaleToFill" id="rZG-yU-46M">
+                        <rect key="frame" x="0.0" y="0.0" width="600" height="600"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                    </view>
+                    <tabBarItem key="tabBarItem" systemItem="contacts" id="Ify-RM-5Th"/>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="ess-Hw-XyD" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="292" y="-702"/>
+        </scene>
+        <!--Tab Bar Controller-->
+        <scene sceneID="TmM-gX-MFR">
+            <objects>
+                <tabBarController id="KKJ-Fr-5sX" sceneMemberID="viewController">
+                    <nil key="simulatedBottomBarMetrics"/>
+                    <tabBar key="tabBar" contentMode="scaleToFill" id="v2a-Bs-81y">
+                        <rect key="frame" x="0.0" y="0.0" width="320" height="49"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                        <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="calibratedWhite"/>
+                    </tabBar>
+                    <connections>
+                        <segue destination="0GJ-5e-Vr4" kind="relationship" relationship="viewControllers" id="nLJ-0v-l7T"/>
+                        <segue destination="U8c-wO-OWj" kind="relationship" relationship="viewControllers" id="Tf1-0f-ulH"/>
+                        <segue destination="FlT-Xw-f5e" kind="relationship" relationship="viewControllers" id="Hqb-Fa-lrf"/>
+                    </connections>
+                </tabBarController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="PWN-St-ASU" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-520" y="-702"/>
+        </scene>
+        <!--Shared Lists-->
         <scene sceneID="vP4-SE-UGa">
             <objects>
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="0GJ-5e-Vr4" sceneMemberID="viewController">
+                    <tabBarItem key="tabBarItem" title="Shared Lists" id="NkE-iK-fG8"/>
                     <toolbarItems/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="WYU-lv-pXW">
                         <rect key="frame" x="0.0" y="0.0" width="320" height="44"/>
@@ -194,7 +287,7 @@
                 </navigationController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="9KD-4M-SJA" userLabel="First Responder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="1252" y="387"/>
+            <point key="canvasLocation" x="1188" y="811"/>
         </scene>
     </scenes>
 </document>

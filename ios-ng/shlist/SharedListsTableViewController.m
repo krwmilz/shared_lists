@@ -1,32 +1,52 @@
 #import "SharedListsTableViewController.h"
 #import "SharedList.h"
 #import "NewListViewController.h"
+#import "ShlistServer.h"
 
 @interface SharedListsTableViewController ()
+
+@property (strong, nonatomic) ShlistServer *server;
 
 @end
 
 @implementation SharedListsTableViewController
 
-- (void)load_initial_data
+- (void) load_initial_data
 {
+	// register if we've never registered before
 	// load local shared list data from db
 	// sync with server and check if there's any updates
 
+	// initialize connection
+	_server = [[ShlistServer alloc] init];
+
+	bool initialized = false;
+	if (!initialized) {
+		// new client
+		[_server writeToServer:"\x00\x00\x00\x0a" "4037082094" :15];
+		// [server readFromServer];
+	}
+
 	NSLog(@"SharedListsTableViewController::load_initial_data()");
+
+	// NSString *num = [[NSUserDefaults standardUserDefaults] stringForKey:@"SBFormattedPhoneNumber"];
+	// NSLog(@"%@\n", num);
+
+	// ShlistServer *server = [[ShlistServer alloc] init];
+	// [server writeToServer:"\x00\x00\xff\0x00"];
 
 	SharedList *list1 = [[SharedList alloc] init];
 	list1.list_name = @"Camping";
 	list1.list_members = @"David, Kyle, Greg";
 	[self.shared_lists addObject:list1];
-    
+
 	SharedList *list2 = [[SharedList alloc] init];
 	list2.list_name = @"Wedding";
 	list2.list_members = @"Kyle, Stephanie";
 	[self.shared_lists addObject:list2];
 }
 
-- (IBAction)unwindToList:(UIStoryboardSegue *)segue
+- (IBAction) unwindToList:(UIStoryboardSegue *)segue
 {
 	NewListViewController *source = [segue sourceViewController];
 	SharedList *list = source.shared_list;

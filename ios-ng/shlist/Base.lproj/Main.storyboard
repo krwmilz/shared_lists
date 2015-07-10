@@ -78,6 +78,26 @@
                                     <segue destination="pMK-tA-j4s" kind="show" id="ORk-KR-Twe"/>
                                 </connections>
                             </tableViewCell>
+                            <tableViewCell contentMode="scaleToFill" selectionStyle="blue" hidesAccessoryWhenEditing="NO" indentationLevel="1" indentationWidth="0.0" reuseIdentifier="IndirectListPrototypeCell" textLabel="WuW-Sd-sxB" detailTextLabel="rf3-DG-Fgi" style="IBUITableViewCellStyleSubtitle" id="kbj-EX-eeF">
+                                <autoresizingMask key="autoresizingMask"/>
+                                <tableViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" tableViewCell="kbj-EX-eeF" id="fgg-hw-Da6">
+                                    <autoresizingMask key="autoresizingMask"/>
+                                    <subviews>
+                                        <label opaque="NO" multipleTouchEnabled="YES" contentMode="left" text="Title" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" id="WuW-Sd-sxB">
+                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                            <fontDescription key="fontDescription" type="system" pointSize="16"/>
+                                            <color key="textColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                            <nil key="highlightedColor"/>
+                                        </label>
+                                        <label opaque="NO" multipleTouchEnabled="YES" contentMode="left" text="Subtitle" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" id="rf3-DG-Fgi">
+                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                            <fontDescription key="fontDescription" type="system" pointSize="11"/>
+                                            <color key="textColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                            <nil key="highlightedColor"/>
+                                        </label>
+                                    </subviews>
+                                </tableViewCellContentView>
+                            </tableViewCell>
                         </prototypes>
                         <sections/>
                         <connections>
@@ -114,7 +134,7 @@
                         <subviews>
                             <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="new list name" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="gPO-fo-XXP">
                                 <rect key="frame" x="16" y="72" width="568" height="30"/>
-                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="16"/>
                                 <textInputTraits key="textInputTraits" returnKeyType="done"/>
                                 <connections>
                                     <action selector="textField" destination="BYZ-38-t0r" eventType="editingDidEnd" id="x6t-Ub-mbI"/>
@@ -173,9 +193,10 @@
                         <rect key="frame" x="0.0" y="0.0" width="600" height="600"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <textView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" ambiguous="YES" misplaced="YES" text="This is something we do on our free time. If you respect that, please donate." translatesAutoresizingMaskIntoConstraints="NO" id="3Tn-bI-uKk">
-                                <rect key="frame" x="16" y="134" width="568" height="37"/>
+                            <textView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" editable="NO" selectable="NO" translatesAutoresizingMaskIntoConstraints="NO" id="vqD-fu-CUL">
+                                <rect key="frame" x="16" y="57" width="568" height="316"/>
                                 <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                <string key="text">This project is a humble attempt to help people be more organized. It's main purpose is to make group events easy to plan and execute. It's founders hope you find it as useful as they do.  This is something we do on our free time. If you respect that, please donate.</string>
                                 <fontDescription key="fontDescription" type="system" pointSize="14"/>
                                 <textInputTraits key="textInputTraits" autocapitalizationType="sentences"/>
                             </textView>
@@ -185,26 +206,15 @@
                                 <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
                                 <nil key="highlightedColor"/>
                             </label>
-                            <textView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" ambiguous="YES" misplaced="YES" translatesAutoresizingMaskIntoConstraints="NO" id="vqD-fu-CUL">
-                                <rect key="frame" x="16" y="49" width="568" height="77"/>
-                                <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
-                                <string key="text">This project is a humble attempt to help people be more organized. It's main purpose is to make group events easy to plan and execute. It's founders hope you find it as useful as they do.</string>
-                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
-                                <textInputTraits key="textInputTraits" autocapitalizationType="sentences"/>
-                            </textView>
                         </subviews>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                         <constraints>
-                            <constraint firstItem="vqD-fu-CUL" firstAttribute="trailing" secondItem="BEH-Qp-ix3" secondAttribute="trailingMargin" id="0kQ-sN-zkj"/>
-                            <constraint firstItem="hjG-BQ-XBF" firstAttribute="leading" secondItem="BEH-Qp-ix3" secondAttribute="leadingMargin" id="64i-ls-ddW"/>
-                            <constraint firstItem="3Tn-bI-uKk" firstAttribute="trailing" secondItem="BEH-Qp-ix3" secondAttribute="trailingMargin" id="AlZ-Vo-99h"/>
-                            <constraint firstItem="vqD-fu-CUL" firstAttribute="leading" secondItem="BEH-Qp-ix3" secondAttribute="leadingMargin" id="Bxp-G1-gOp"/>
-                            <constraint firstItem="3Tn-bI-uKk" firstAttribute="top" secondItem="vqD-fu-CUL" secondAttribute="bottom" constant="8" id="GR0-aa-vSO"/>
-                            <constraint firstItem="3Tn-bI-uKk" firstAttribute="leading" secondItem="BEH-Qp-ix3" secondAttribute="leadingMargin" id="e5J-II-Cyn"/>
-                            <constraint firstAttribute="trailingMargin" secondItem="hjG-BQ-XBF" secondAttribute="trailing" constant="496" id="mgk-JE-jzk"/>
-                            <constraint firstItem="vqD-fu-CUL" firstAttribute="top" secondItem="hjG-BQ-XBF" secondAttribute="bottom" constant="8" id="rnu-FP-hp6"/>
-                            <constraint firstItem="hjG-BQ-XBF" firstAttribute="top" secondItem="3hJ-K1-i1o" secondAttribute="bottom" constant="8" id="vgR-2B-gRS"/>
-                            <constraint firstItem="9zw-4a-J6h" firstAttribute="top" secondItem="3Tn-bI-uKk" secondAttribute="bottom" constant="8" symbolic="YES" id="w2y-Cf-BBd"/>
+                            <constraint firstItem="9zw-4a-J6h" firstAttribute="top" secondItem="vqD-fu-CUL" secondAttribute="bottom" constant="178" id="9Cp-IX-R3d"/>
+                            <constraint firstItem="vqD-fu-CUL" firstAttribute="leading" secondItem="hjG-BQ-XBF" secondAttribute="leading" id="XeA-5Y-GFI"/>
+                            <constraint firstItem="vqD-fu-CUL" firstAttribute="top" secondItem="hjG-BQ-XBF" secondAttribute="bottom" constant="8" symbolic="YES" id="ZQH-f4-CgD"/>
+                            <constraint firstItem="hjG-BQ-XBF" firstAttribute="leading" secondItem="BEH-Qp-ix3" secondAttribute="leadingMargin" id="dS7-kL-9Vc"/>
+                            <constraint firstItem="hjG-BQ-XBF" firstAttribute="top" secondItem="3hJ-K1-i1o" secondAttribute="bottom" constant="8" symbolic="YES" id="nss-ZG-IMi"/>
+                            <constraint firstItem="vqD-fu-CUL" firstAttribute="trailing" secondItem="BEH-Qp-ix3" secondAttribute="trailingMargin" id="rlU-s2-Y9s"/>
                         </constraints>
                     </view>
                     <tabBarItem key="tabBarItem" title="About Us" id="djS-DN-skn" userLabel="About Us"/>

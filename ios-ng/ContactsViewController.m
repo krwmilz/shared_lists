@@ -6,7 +6,7 @@
 
 @implementation ContactsViewController
 
-- (void)viewDidLoad {
+- (void) viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view.
 	
@@ -19,12 +19,12 @@
 	[self.view addSubview:picker.view];
 }
 
-- (void)didReceiveMemoryWarning {
+- (void) didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
 }
 
-- (BOOL)peoplePickerNavigationController:
+- (BOOL) peoplePickerNavigationController:
 (ABPeoplePickerNavigationController *)peoplePicker
       shouldContinueAfterSelectingPerson:(ABRecordRef)person {
  
@@ -35,7 +35,7 @@
 	return NO;
 }
 
-- (BOOL)peoplePickerNavigationController:
+- (BOOL) peoplePickerNavigationController:
 (ABPeoplePickerNavigationController *)peoplePicker
       shouldContinueAfterSelectingPerson:(ABRecordRef)person
 				property:(ABPropertyID)property

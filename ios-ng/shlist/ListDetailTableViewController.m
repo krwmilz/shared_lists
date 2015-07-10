@@ -9,9 +9,9 @@
 
 @implementation ListDetailTableViewController
 
-- (void)load_initial_data
+- (void) load_initial_data
 {
-	NSLog(@"ListDetailTableViewController::load_initial_data()");
+	// NSLog(@"ListDetailTableViewController::load_initial_data()");
 
 	ListItem *item1 = [[ListItem alloc] init];
 	item1.name = @"Axe";
@@ -29,7 +29,7 @@
 	[self.list_items addObject:item3];
 }
 
-- (void)viewDidLoad
+- (void) viewDidLoad
 {
 	[super viewDidLoad];
 
@@ -45,7 +45,7 @@
 	[self load_initial_data];
 }
 
-- (void)didReceiveMemoryWarning
+- (void) didReceiveMemoryWarning
 {
 	[super didReceiveMemoryWarning];
 	// Dispose of any resources that can be recreated.
@@ -53,21 +53,32 @@
 
 #pragma mark - Table view data source
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+- (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView
 {
-	return 1;
+	return 2;
 }
 
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+- (NSInteger) tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
 	return [self.list_items count];
 }
 
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+{
+	if (section == 0) {
+		return @"shared items";
+	}
+	else if (section == 1) {
+		return @"personal items";
+	}
+	return @"";
+}
+
+- (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
 	UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ListDetailPrototypeCell" forIndexPath:indexPath];
     
-	NSLog(@"ListDetailTableViewController::cellForRowAtIndexPath()");
+	// NSLog(@"ListDetailTableViewController::cellForRowAtIndexPath()");
     
 	ListItem *item = [self.list_items objectAtIndex:indexPath.row];
 	cell.textLabel.text = item.name;
@@ -76,15 +87,13 @@
 	return cell;
 }
 
-/*
 // Override to support conditional editing of the table view.
 - (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
     // Return NO if you do not want the specified item to be editable.
     return YES;
 }
-*/
 
-/*
+
 // Override to support editing the table view.
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     if (editingStyle == UITableViewCellEditingStyleDelete) {
@@ -94,7 +103,7 @@
         // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
     }   
 }
-*/
+
 
 /*
 // Override to support rearranging the table view.

@@ -3,6 +3,8 @@
 @interface SharedListsTableViewController : UITableViewController
 
 @property NSMutableArray *shared_lists;
+@property NSMutableArray *indirect_lists;
+
 
 - (IBAction)unwindToList:(UIStoryboardSegue *)segue;
 

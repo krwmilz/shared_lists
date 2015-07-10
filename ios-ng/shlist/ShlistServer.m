@@ -1,4 +1,5 @@
 #import "ShlistServer.h"
+#import "SharedList.h"
 
 @interface ShlistServer ()
 
@@ -11,82 +12,162 @@
 - (id) init
 {
 	if (self = [super init]) {
-	    CFReadStreamRef readStream;
-	    CFWriteStreamRef writeStream;
-	    
-	    CFStringRef host_name = CFSTR("absentmindedproductions.ca");
-	    
-	    CFStreamCreatePairWithSocketToHost(NULL, host_name, 5437, &readStream, &writeStream);
-	    inputShlistStream = (__bridge NSInputStream *)readStream;
-	    outputShlistStream = (__bridge NSOutputStream *)writeStream;
-	    
-	    [inputShlistStream setDelegate:self];
-	    [outputShlistStream setDelegate:self];
-	    
-	    [inputShlistStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-	    [outputShlistStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-	    
-	    [inputShlistStream open];
-	    [outputShlistStream open];
+		/*
+		CFReadStreamRef readStream;
+		CFWriteStreamRef writeStream;
+
+		CFStringRef host_name = CFSTR("absentmindedproductions.ca");
+
+		CFStreamCreatePairWithSocketToHost(NULL, host_name, 5437, &readStream, &writeStream);
+		inputShlistStream = (__bridge NSInputStream *)readStream;
+		outputShlistStream = (__bridge NSOutputStream *)writeStream;
+
+		[inputShlistStream setDelegate:self];
+		[outputShlistStream setDelegate:self];
+
+		[inputShlistStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+		[outputShlistStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+
+		[inputShlistStream open];
+		[outputShlistStream open];
+		*/
 	}
 
 	return self;
 }
 
-- (void)stream:(NSStream *)aStream handleEvent:(NSStreamEvent)eventCode
+- (void)stream:(NSStream *)stream handleEvent:(NSStreamEvent)eventCode
 {
     switch (eventCode) {
 	case NSStreamEventNone:
 		break;
 	case NSStreamEventOpenCompleted:
-		NSLog(@"Stream Opened");
-		break;
+	if (stream == inputShlistStream) {
+		NSLog(@"info: input stream opened");
+	}
+	else if (stream == outputShlistStream) {
+		NSLog(@"info: output stream opened");
+	}
+	break;
 	case NSStreamEventHasBytesAvailable:
-	
-	if (aStream == inputShlistStream) {
+	if (stream == inputShlistStream) {
+		/*
+		if (![inputShlistStream hasBytesAvailable]) {
+			break;
+		}
+		*/
+
 		NSInteger len;
 		uint16_t msg_metadata[2];
 
 		len = [inputShlistStream read:(uint8_t *)&msg_metadata maxLength:4];
-
 		if (len != 4) {
-			NSLog(@"warn: msg metadata was %li bytes, expected 4 bytes",
+			NSLog(@"warn: read: msg metadata was %li bytes, expected 4",
 					(long)len);
 			break;
 		}
-		if (msg_metadata[0] > 4) {
-			NSLog(@"warn: out of range msg type %i", msg_metadata[0]);
+
+		uint16_t msg_type = ntohs(msg_metadata[0]);
+		uint16_t msg_length = ntohs(msg_metadata[1]);
+		if (msg_type > 4) {
+			NSLog(@"warn: read: out of range msg type %i", msg_type);
 			break;
 		}
 
-		NSLog(@"info: received message type %i", msg_metadata[0]);
+		NSLog(@"info: read: received message type %i", msg_type);
 
-		if (msg_metadata[1] > 1024) {
-			NSLog(@"warn: message too large: %i bytes", msg_metadata[1]);
+		if (msg_length > 1024) {
+			NSLog(@"warn: read: message too large: %i bytes", msg_length);
 			break;
 		}
-		NSLog(@"info: message size is %i bytes", msg_metadata[1]);
-			
-		uint8_t *buffer = malloc(msg_metadata[1]);
+		NSLog(@"info: read: message size is %i bytes", msg_length);
+
+		uint8_t *buffer = malloc(msg_length);
 		if (buffer == nil) {
-			NSLog(@"warn: couldn't allocate receiving buffer size %i",
-			      msg_metadata[1]);
+			NSLog(@"warn: read: couldn't allocate receiving buffer size %i",
+			      msg_length);
 			break;
 		}
-		
-		len = [inputShlistStream read:buffer maxLength:msg_metadata[1]];
-		if (len != msg_metadata[1]) {
-			NSLog(@"warn: main message read byte mismatch: %li vs %i",
-				(long)len, msg_metadata[1]);
+
+		len = [inputShlistStream read:buffer maxLength:msg_length];
+		if (len != msg_length) {
+			NSLog(@"warn: read: main message read byte mismatch: %li vs %i",
+				(long)len, msg_length);
 			break;
 		}
 		NSString *output = [[NSString alloc] initWithBytes:buffer length:len encoding:NSASCIIStringEncoding];
+		NSData *data = [[NSData alloc] initWithBytes:buffer length:msg_length];
 
 		if (output == nil) {
-			NSLog(@"warn: couldn't allocate output string");
+			NSLog(@"warn: read: couldn't allocate output string");
 			break;
 		}
-		NSLog(@"info: message is %@", output);
+		NSLog(@"info: read: message is %@", output);
+		
+		if (msg_type == 0) {
+			// write key to file
+			NSLog(@"info: read: writing new keyfile to disk");
+			
+			NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+			NSString *documentsDirectory = [paths objectAtIndex:0];
+			
+			NSString *destinationPath = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
+			// if (![[NSFileManager defaultManager] fileExistsAtPath:destinationPath]) {
+				[data writeToFile:destinationPath atomically:YES];
+			// }
+		}
+
+		if (msg_type == 3) {
+			NSLog(@"info: read: processing bulk list update message");
+
+			// split over double \0
+			NSArray *list_types = [output componentsSeparatedByString:@"\0\0"];
+			if ([list_types count] != 2) {
+				NSLog(@"warn: more than one \\0\\0 found in response");
+				break;
+			}
+
+			// split over \0
+			NSString *direct_list_str = [list_types objectAtIndex:0];
+			NSString *indirect_list_str = [list_types objectAtIndex:1];
+
+			if ([direct_list_str length] != 0) {
+				NSArray *direct_lists = [direct_list_str componentsSeparatedByString:@"\0"];
+				[shlist_tvc.shared_lists removeAllObjects];
+
+				for (id str in direct_lists) {
+					// NSLog(@"info: got raw direct list %@", str);
+
+					NSArray *broken_down_list = [str componentsSeparatedByString:@":"];
+
+
+					SharedList *shared_list = [[SharedList alloc] init];
+					shared_list.list_name = [broken_down_list objectAtIndex:0];
+					shared_list.list_id = [broken_down_list objectAtIndex:1];
+					shared_list.list_members = [broken_down_list objectAtIndex:2];
+
+					NSLog(@"info: network: got list '%@'", shared_list.list_name);
+					[shlist_tvc.shared_lists addObject:shared_list];
+
+					// [direct_shared_lists addObject:shared_list];
+				}
+
+			}
+			if ([indirect_list_str length] != 0) {
+				NSArray *indirect_lists = [indirect_list_str componentsSeparatedByString:@"\0"];
+			}
+			[shlist_tvc.tableView reloadData];
+
+			/*
+			dispatch_async(dispatch_get_main_queue(), ^{
+				shlist_tvc.shared_lists = direct_shared_lists;
+				[shlist_tvc.tableView reloadData];
+			});
+			 */
+			// [shlist_tvc update_shared_lists:direct_shared_lists :indirect_shared_lists];
+
+			// NSLog(@"info: %i direct lists, %i indirect lists");
+		}
 	}
 	break;
 	case NSStreamEventHasSpaceAvailable:
@@ -94,6 +175,7 @@
 		break;
 	case NSStreamEventErrorOccurred:
 		NSLog(@"ShlistServer::NSStreamEventErrorOccurred");
+		    // I saw this case when trying to connect to a down server
 		break;
 	case NSStreamEventEndEncountered:
 	{
@@ -114,23 +196,23 @@
 	    break;
 	}
 	default:
-	    break;
-    }
+		break;
+	}
 }
 
 - (void) dealloc
 {
-    [inputShlistStream close];
-    [outputShlistStream close];
-    
-    [inputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
+	[inputShlistStream close];
+	[outputShlistStream close];
+
+	[inputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
 				 forMode:NSDefaultRunLoopMode];
-    [outputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
+	[outputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
 					 forMode:NSDefaultRunLoopMode];
+
     
-    
-    inputShlistStream = nil; // stream is ivar, so reinit it
-    outputShlistStream = nil; // stream is ivar, so reinit it
+	inputShlistStream = nil; // stream is ivar, so reinit it
+	outputShlistStream = nil; // stream is ivar, so reinit it
 }
 
 - (void) _readData
@@ -142,13 +224,32 @@
     NSLog(@"_writeData");
 }
 
-- (void) writeToServer:(const char *)bytes :(size_t)length
+- (void) writeToServer:(NSData *)data
 {
+	CFReadStreamRef readStream;
+	CFWriteStreamRef writeStream;
+
+	CFStringRef host_name = CFSTR("absentmindedproductions.ca");
+
+	CFStreamCreatePairWithSocketToHost(NULL, host_name, 5437, &readStream, &writeStream);
+	inputShlistStream = (__bridge NSInputStream *)readStream;
+	outputShlistStream = (__bridge NSOutputStream *)writeStream;
+
+	[inputShlistStream setDelegate:self];
+	[outputShlistStream setDelegate:self];
+
+	[inputShlistStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+	[outputShlistStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+
+	[inputShlistStream open];
+	[outputShlistStream open];
+
 	// const char bytes[] = "\x00\x00\xff\0x00";
 	//string literals have implicit trailing '\0'
 	// size_t length = (sizeof bytes) - 1;
 	
-	NSData *data = [NSData dataWithBytes:bytes length:length];
+	// NSData *data = [NSData dataWithBytes:bytes length:length];
+	NSLog(@"writeToServer()");
 	[outputShlistStream write:[data bytes] maxLength:[data length]];
 }
 

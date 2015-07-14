@@ -129,6 +129,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	binmode($new_sock);
 
 	# read and unpack message type
+	# XXX: i think we should loop until we read the number of bytes we expect
 	my $bread = read $new_sock, my $raw_msg_type, 2;
 	my ($msg_type) = unpack("n", $raw_msg_type);
 
@@ -146,7 +147,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	print "info: $addr: message type $msg_type\n";
 
 	# read and unpack message size
-	read($new_sock, my $raw_msg_size, 2);
+	$bread = read($new_sock, my $raw_msg_size, 2);
 	my ($msg_size) = unpack("n", $raw_msg_size);
 
 	# validate message size
@@ -168,154 +169,206 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	print "info: $addr: message size = $msg_size\n";
 
 	# read message
-	read($new_sock, my $msg, $msg_size);
+	$bread = read($new_sock, my $msg, $msg_size);
 
 	if ($msg_type == 0) {
-		# new device
-
-		# single field
-		my $ph_num = $msg;
-
-		if (!looks_like_number($ph_num)) {
-			print "warn: $addr: device phone number $ph_num invalid\n";
-			close $new_sock;
-			next;
-		}
-		if ($dbh->selectrow_array($ph_num_exists_sth, undef, $ph_num)) {
-			print "warn: $addr: phone number $ph_num already exists\n";
-			close $new_sock;
-			next;
-		}
-
-		# make a new device id, the client will supply this on all
-		# further communication
-		# XXX: need to check the db to make sure this isn't duplicate
-		my $token = sha256_base64(arc4random_bytes(32));
-
-		# token length 43 = 0x2b
-		print $new_sock "\x00\x00\x2b\x00";
-		print $new_sock $token;
-		$new_device_sth->execute($token, $ph_num, time);
-		print "info: $addr: added new device $ph_num:$token\n";
+		msg_new_device($new_sock, $addr, $msg);
 	}
 	elsif ($msg_type == 1) {
-		# new list
-
-		# expecting two fields delimited by null
-		my ($device_id, $list_name) = split("\0", $msg);
-
-		# validate input
-		if (device_id_invalid($device_id, $addr)) {
-			close $new_sock;
-			next;
-		}
-		unless ($list_name) {
-			print "warn: $addr: list name missing\n";
-			close($new_sock);
-			next;
-		}
-
-		print "info: $addr: adding new list: $list_name\n";
-		print "info: $addr: adding first list member $device_id\n";
-
-		my $time = time;
-		my $list_id = sha256_base64($msg . $time);
-		print "info: $addr: list id = $list_id\n";
-
-		# add new list with single list member
-		$new_list_sth->execute($list_id, $list_name, $time, $time);
-		$new_list_member_sth->execute($list_id, $device_id, $time);
-
-		print $new_sock pack("n", 1);
-		print $new_sock pack("n", length($list_id));
-		print $new_sock $list_id;
+		msg_new_list($new_sock, $addr, $msg);
 	}
 	elsif ($msg_type == 2) {
-		# update friend map, note this is meant to be a wholesale update
-		# of the friends that are associated with a given device id
-
-		# device id followed by 0 or more friends numbers
-		my ($device_id, @friends) = split("\0", $msg);
-
-		if (device_id_invalid($device_id, $addr)) {
-			close $new_sock;
-			next;
-		}
-		print "info: $addr: device $device_id, " . @friends . " friends\n";
-
-		# delete all friends, remove mutual friend references
-		$friends_map_delete_sth->execute($device_id);
-		$mutual_friends_delete_sth->execute($device_id, $device_id);
-
-		for (@friends) {
-			unless (looks_like_number($_)) {
-				print "warn: bad friends number $_\n";
-				next;
-			}
-			$friends_map_sth->execute($device_id, $_);
-			print "info: $addr: added friend $_\n";
-		}
+		msg_update_friends($new_sock, $addr, $msg);
 	}
 	elsif ($msg_type == 3) {
-		# get both lists the device is in, and lists it can see
-
-		# check if the device id is valid
-		if (device_id_invalid($msg, $addr)) {
-			# XXX: i don't think $msg is null terminated
-			print "warn: device id $msg invalid\n";
-			close $new_sock;
-			next;
-		}
-
-		# keep the message types synced
-		my $out = pack("n", 3);;
-
-		print "info: gathering lists for $msg\n";
-
-		my @direct_lists;
-		# first get all lists this device id is a direct member of
-		$get_lists_sth->execute($msg);
-		while (my ($list_id, $list_name) = $get_lists_sth->fetchrow_array()) {
-			print "info: $addr: found list '$list_name' : $list_id\n";
-
-			# get all members of this list
-			my @list_members;
-			$get_list_members_sth->execute($list_id);
-			while (my ($member_device_id) = $get_list_members_sth->execute($list_id)) {
-				push @list_members, $member_device_id;
-				print "info: $addr: direct list: found member $member_device_id\n";
-			}
-
-			push @direct_lists, "$list_name:$list_id:" . join(":", @list_members);
-		}
-		$out += join("\0", @direct_lists);
-
-		# separator between direct lists
-		$out += "\0\0";
-
-		my @indirect_lists;
-		# now calculate which lists this device id should see
-		$friend_map_select_sth->execute($msg);
-		while (my ($friend) = $friend_map_select_sth->fetchrow_array()) {
-			print "info: $addr: found friend $friend";
-
-			# get all of my friends lists
-			$get_lists_sth->execute($friend);
-			while (my ($list_id, $list_name) =
-				$get_lists_sth->fetchrow_array()) {
-
-				push @indirect_lists
-		}
-
-
-		# my $temp = join("\0", @temp);
-		# $out .= length $temp;
+		msg_list_request($new_sock, $addr, $msg);
 	}
 
 	close($new_sock);
 }
+
 $dbh->disconnect();
 close($sock);
+
+sub get_phone_number
+{
+	my $device_id = shift;
+
+	#print "info: get_phone_number() unimplemented, returning device id!\n";
+	#return $device_id;
+	my (undef, $ph_num) = $dbh->selectrow_array($device_id_exists_sth, undef, $device_id);
+	unless (defined $ph_num && looks_like_number($ph_num)) {
+		print "warn: phone number lookup for $device_id failed!\n";
+		return "000";
+	}
+
+	return $ph_num;
+}
+
+sub msg_new_device
+{
+	my $new_sock = shift;
+	my $addr = shift;
+	my $msg = shift;
+
+	# single field
+	my $ph_num = $msg;
+
+	if (!looks_like_number($ph_num)) {
+		print "warn: $addr: device phone number $ph_num invalid\n";
+		close $new_sock;
+		next;
+	}
+	if ($dbh->selectrow_array($ph_num_exists_sth, undef, $ph_num)) {
+		print "warn: $addr: phone number $ph_num already exists\n";
+		close $new_sock;
+		next;
+	}
+
+	# make a new device id, the client will supply this on all
+	# further communication
+	# XXX: need to check the db to make sure this isn't duplicate
+	my $token = sha256_base64(arc4random_bytes(32));
+
+	# token length 43 = 0x2b
+	print $new_sock "\x00\x00\x2b\x00";
+	print $new_sock $token;
+	$new_device_sth->execute($token, $ph_num, time);
+	print "info: $addr: added new device $ph_num:$token\n";
+}
+
+sub msg_new_list
+{
+	my $new_sock = shift;
+	my $addr = shift;
+	my $msg = shift;
+
+	# expecting two fields delimited by null
+	my ($device_id, $list_name) = split("\0", $msg);
+
+	# validate input
+	if (device_id_invalid($device_id, $addr)) {
+		close $new_sock;
+		next;
+	}
+	unless ($list_name) {
+		print "warn: $addr: list name missing\n";
+		close($new_sock);
+		next;
+	}
+
+	print "info: $addr: adding new list: $list_name\n";
+	print "info: $addr: adding first list member $device_id\n";
+
+	my $time = time;
+	my $list_id = sha256_base64($msg . $time);
+	print "info: $addr: list id = $list_id\n";
+
+	# add new list with single list member
+	$new_list_sth->execute($list_id, $list_name, $time, $time);
+	$new_list_member_sth->execute($list_id, $device_id, $time);
+
+	print $new_sock pack("n", 1);
+	print $new_sock pack("n", length($list_id));
+	print $new_sock $list_id;
+}
+
+sub msg_update_friends
+{
+	my $new_sock = shift;
+	my $addr = shift;
+	my $msg = shift;
+
+	# update friend map, note this is meant to be a wholesale update
+	# of the friends that are associated with a given device id
+
+	# device id followed by 0 or more friends numbers
+	my ($device_id, @friends) = split("\0", $msg);
+
+	if (device_id_invalid($device_id, $addr)) {
+		close $new_sock;
+		next;
+	}
+	print "info: $addr: device $device_id, " . @friends . " friends\n";
+
+	# delete all friends, remove mutual friend references
+	$friends_map_delete_sth->execute($device_id);
+	$mutual_friends_delete_sth->execute($device_id, $device_id);
+
+	for (@friends) {
+		unless (looks_like_number($_)) {
+			print "warn: bad friends number $_\n";
+			next;
+		}
+		$friends_map_sth->execute($device_id, $_);
+		print "info: $addr: added friend $_\n";
+	}
+}
+
+# get both lists the device is in, and lists it can see
+sub msg_list_request
+{
+	my $new_sock = shift;
+	my $addr = shift;
+	my $msg = shift;
+
+
+	# check if the device id is valid
+	if (device_id_invalid($msg, $addr)) {
+		# XXX: i don't think $msg is null terminated
+		print "warn: device id $msg invalid\n";
+		close $new_sock;
+		next;
+	}
+
+	print "info: $addr: gathering lists for $msg\n";
+
+	my @direct_lists;
+	# first get all lists this device id is a direct member of
+	$get_lists_sth->execute($msg);
+	while (my ($list_id, $list_name) = $get_lists_sth->fetchrow_array()) {
+		print "info: $addr: found list '$list_name' : $list_id\n";
+
+		# get all members of this list
+		my @list_members;
+		$get_list_members_sth->execute($list_id);
+		while (my ($member_device_id) = $get_list_members_sth->fetchrow_array()) {
+			push @list_members, get_phone_number($member_device_id);
+			print "info: $addr: direct list: found member $member_device_id\n";
+		}
+
+		push @direct_lists, "$list_name:$list_id:" . join(":", @list_members);
+	}
+	my $out .= join("\0", @direct_lists);
+
+	# separator between direct/indirect lists
+	$out .= "\0\0";
+
+	my @indirect_lists;
+	# now calculate which lists this device id should see
+	$friends_map_select_sth->execute($msg);
+	while (my ($friend) = $friends_map_select_sth->fetchrow_array()) {
+		print "info: $addr: found friend $friend";
+
+		# get all of my friends lists
+		$get_lists_sth->execute($friend);
+
+		# we can't send device id's back to the client
+		my $friend_ph_num = get_phone_number($friend);
+
+		while (my ($list_id, $list_name) =
+			$get_lists_sth->fetchrow_array()) {
+
+			push @indirect_lists, "$list_name:$list_id:$friend_ph_num"
+		}
+	}
+	$out .= join("\0", @indirect_lists);
+
+	print $new_sock pack("nn", 3, length($out));
+	print $new_sock $out;
+
+	# XXX: add time of last request to list (rate throttling)?
+}
 
 sub device_id_invalid
 {

@@ -97,6 +97,9 @@ my $friends_map_select_sth = $dbh->prepare($sql);
 $sql = qq{delete from friends_map where device_id = ?};
 my $friends_map_delete_sth = $dbh->prepare($sql);
 
+$sql = qq{select mutual_friend from mutual_friends where device_id = ?};
+my $mutual_friend_select_sth = $dbh->prepare($sql);
+
 $sql = qq{delete from mutual_friends where device_id = ? or mutual_friend = ?};
 my $mutual_friends_delete_sth = $dbh->prepare($sql);
 
@@ -346,9 +349,9 @@ sub msg_list_request
 
 	my @indirect_lists;
 	# now calculate which lists this device id should see
-	$friends_map_select_sth->execute($msg);
-	while (my ($friend) = $friends_map_select_sth->fetchrow_array()) {
-		print "info: $addr: found friend $friend";
+	$mutual_friend_select_sth->execute($msg);
+	while (my ($friend) = $mutual_friend_select_sth->fetchrow_array()) {
+		print "info: $addr: found mutual friend $friend\n";
 
 		# get all of my friends lists
 		$get_lists_sth->execute($friend);
@@ -358,6 +361,7 @@ sub msg_list_request
 
 		while (my ($list_id, $list_name) =
 			$get_lists_sth->fetchrow_array()) {
+			print "info: $addr: found mutual friends list '$list_name'\n";
 
 			push @indirect_lists, "$list_name:$list_id:$friend_ph_num"
 		}

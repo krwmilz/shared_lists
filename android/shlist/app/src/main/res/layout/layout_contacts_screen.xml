@@ -1,0 +1,76 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/contactScreenLayout"
+    android:orientation="vertical">
+
+    <!-- <TextView
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+         android:text="Foobar"
+         android:id="@+id/deviceID"
+         android:textAppearance="?android:attr/textAppearanceLarge"
+         android:background="@color/white"
+         android:textColor="@color/black"
+         android:paddingTop="10dp"
+         android:paddingBottom="10dp"
+         android:paddingLeft="5dp"
+         android:textSize="15sp"/>-->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Contacts"
+        android:id="@+id/currentListsTV"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:background="@color/black"
+        android:textColor="@color/white"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:paddingLeft="5dp"
+        android:textSize="15sp"/>
+
+
+    <ListView
+        android:id="@+id/contactList"
+        android:layout_width="fill_parent"
+        android:layout_height="275dp"
+        android:layout_weight="0.4"/>
+
+    <!--<Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:onClick="removeDB"
+        android:text="Delete DB File"/>-->
+    <TableLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TableRow
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent">
+
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Lists"
+                android:id="@+id/button"
+                android:layout_weight="0.5"
+                android:padding="0dp"
+                android:background="#ff353535"
+                android:textColor="#ffffffff"
+                android:onClick="listPage"/>
+
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Contacts"
+                android:id="@+id/button2"
+                android:layout_weight="0.5"
+                android:padding="0dp"
+                android:layout_margin="0dp"
+                android:background="#ff000000"
+                android:textColor="#ffffffff"
+                />
+        </TableRow>
+    </TableLayout>
+</LinearLayout>

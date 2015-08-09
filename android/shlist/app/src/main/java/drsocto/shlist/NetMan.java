@@ -17,6 +17,9 @@ import java.net.UnknownHostException;
  * Created by David on 7/12/2015.
  */
 public class NetMan {
+    private final int NEW_DEVICE_MESSAGE_TYPE= 0;
+    private final int NEW_LIST_MESSAGE_TYPE= 1;
+    private final int LIST_REQUEST_MESSAGE_TYPE=3;
     private String addr;
     private int port;
     Socket socket;
@@ -55,6 +58,8 @@ public class NetMan {
         Log.d("NetMan", "In sendMessage");
         int mTypeInt = lookupMessageType(message[1]);
         byte[] type = toByteArray(mTypeInt);
+        Log.d("NetMan", "Type is: " + mTypeInt);
+        Log.d("NetMan", "message is: " + message[0]);
         byte[] length = toByteArray(message[0].length());
         //Log.d("HomeScreen", "Resulting type array is of size: " + type.length);
         //Log.d("HomeScreen", "Resulting length array is of size: " + type.length);
@@ -62,21 +67,22 @@ public class NetMan {
             try {
                 PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
                 socket.getOutputStream().write(type);
-                Log.d("NetMan", "Sent Message Type: 3");
                 socket.getOutputStream().write(length);
-                Log.d("NetMan", "Sent Message Type: " + message[0].length());
-                Log.d("NetMan", "Sending Message: " + message[0]);
                 out.print(message[0]);
                 out.flush();
                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 String response = in.readLine();
-                Log.d("NetMan", "Received Device ID: " + response);
-                DBHelper dbh = new DBHelper("shlist.db", context);
-                dbh.openOrCreateDB();
-                dbh.setDeviceID(response, message[0]);
-                if (mTypeInt == 1) {
+                if (mTypeInt == NEW_DEVICE_MESSAGE_TYPE) {
+                    Log.d("NetMan", "Received Device ID: " + response.substring(4));
+                    DBHelper dbh = new DBHelper("shlist.db", context);
+                    dbh.openOrCreateDB();
+                    dbh.setDeviceID(response.substring(4), message[0]);
+                    dbh.closeDB();
+                } else if (mTypeInt == NEW_LIST_MESSAGE_TYPE) {
                     String[] messageParts = message[0].split("\0");
-                    response = messageParts[1] + " - " + response;
+                    response = messageParts[1] + " - " + response.substring(4);
+                } else if (mTypeInt == LIST_REQUEST_MESSAGE_TYPE) {
+                    Log.d("NetMan", response.substring(4));
                 }
                 return response;
 
@@ -90,9 +96,11 @@ public class NetMan {
 
     public int lookupMessageType(String mTypeStr) {
         if (mTypeStr.equals("new_list")) {
-            return 1;
+            return NEW_LIST_MESSAGE_TYPE;
         } else if (mTypeStr.equals("new_device")) {
-            return 3;
+            return NEW_DEVICE_MESSAGE_TYPE;
+        } else if (mTypeStr.equals("get_lists")) {
+            return LIST_REQUEST_MESSAGE_TYPE;
         }
         return -1;
     }

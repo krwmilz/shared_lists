@@ -126,7 +126,13 @@ $sql = qq{delete from list_members where list_id = ? and device_id = ?};
 my $remove_list_member_sth = $dbh->prepare($sql);
 
 $sql = qq{select device_id from list_members where list_id = ? and device_id = ?};
-my $check_list_member_std = $dbh->prepare($sql);
+my $check_list_member_sth = $dbh->prepare($sql);
+
+$sql = qq{delete from list_data where list_id = ?};
+my $delete_list_data_sth = $dbh->prepare($sql);
+
+$sql = qq{delete from lists where list_id = ?};
+my $delete_list_sth = $dbh->prepare($sql);
 
 print "info: ready for connections on $local_addr_port\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
@@ -305,7 +311,17 @@ sub msg_join_list
     print "info: $addr: list $list_id\n";
     
     my $time = time;
-    $new_list_member_sth->execute($list_id, $device_id, $time);
+    $check_list_member_sth->execute($list_id, $device_id);
+
+    if (!$check_list_member_sth->fetchrow_array()) {
+        $new_list_member_sth->execute($list_id, $device_id, $time);
+        print "info: $addr: device $device_id has been added to list $list_id\n";
+    } else {
+        print "warn: $addr: tried to create a duplicate list member entry for device $device_id and list $list_id\n";
+    }
+
+    print $new_sock pack("nn", 4, length($list_id));
+    print $new_sock $list_id;
 }
 
 sub msg_leave_list
@@ -320,6 +336,32 @@ sub msg_leave_list
         close $new_sock;
         next;
     }
+    
+    print "info: $addr: device $device_id\n";
+    print "info: $addr: list $list_id\n";
+
+    $check_list_member_sth->execute($list_id, $device_id);
+
+    if ($check_list_member_sth->fetchrow_array()) {
+        $remove_list_member_sth->execute($list_id, $device_id);
+        print "info: $addr: device $device_id has been removed from list $list_id\n";
+    } else {
+        print "warn: $addr: tried to leave a list the user was not in for device $device_id and list $list_id\n";
+    }
+
+    $get_list_members_sth->execute($list_id);
+    
+    my $alive = 1;
+
+    if (!$get_list_members_sth->fetchrow_array()) {
+        print "info: $addr: list $list_id is empty... deleting\n";
+        $delete_list_sth->execute($list_id);
+        $delete_list_data_sth->execute($list_id);
+        $alive = 0;
+    }
+    my $out = "$list_id\0$alive";
+    print $new_sock pack("nn", 5, length($out));
+    print $new_sock $out;
 }
 
 sub msg_update_friends
@@ -373,6 +415,7 @@ sub msg_list_request
 	print "info: $addr: gathering lists for $msg\n";
 
 	my @direct_lists;
+    my @direct_list_ids;
 	# first get all lists this device id is a direct member of
 	$get_lists_sth->execute($msg);
 	while (my ($list_id, $list_name) = $get_lists_sth->fetchrow_array()) {
@@ -385,12 +428,12 @@ sub msg_list_request
 			push @list_members, get_phone_number($member_device_id);
 			print "info: $addr: direct list: found member $member_device_id\n";
 		}
-
+        push @direct_list_ids, $list_id;
 		push @direct_lists, "$list_name:$list_id:" . join(":", @list_members);
 	}
 	my $out .= join("\0", @direct_lists);
 
-	# separator between direct/indirect lists
+    # separator between direct/indirect lists
 	$out .= "\0\0";
 
 	my @indirect_lists;
@@ -407,9 +450,12 @@ sub msg_list_request
 
 		while (my ($list_id, $list_name) =
 			$get_lists_sth->fetchrow_array()) {
-			print "info: $addr: found mutual friends list '$list_name'\n";
+            if ($list_id ~~ @direct_list_ids) {
+                next;
+            }
+		    print "info: $addr: found mutual friends list '$list_name'\n";
 
-			push @indirect_lists, "$list_name:$list_id:$friend_ph_num"
+		    push @indirect_lists, "$list_name:$list_id:$friend_ph_num"
 		}
 	}
 	$out .= join("\0", @indirect_lists);

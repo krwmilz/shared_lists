@@ -51,6 +51,17 @@
 	// Dispose of any resources that can be recreated.
 }
 
+- (IBAction)unwindToList:(UIStoryboardSegue *)segue {
+
+}
+
+- (void) setMetadata:(SharedList *)metadata
+{
+	_list_metadata = metadata;
+	self.title = _list_metadata.list_name;
+
+}
+
 #pragma mark - Table view data source
 
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView

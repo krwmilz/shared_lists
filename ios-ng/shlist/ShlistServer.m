@@ -69,7 +69,7 @@
 
 		uint16_t msg_type = ntohs(msg_metadata[0]);
 		uint16_t msg_length = ntohs(msg_metadata[1]);
-		if (msg_type > 4) {
+		if (msg_type > 6) {
 			NSLog(@"warn: read: out of range msg type %i", msg_type);
 			break;
 		}
@@ -102,7 +102,7 @@
 			NSLog(@"warn: read: couldn't allocate output string");
 			break;
 		}
-		NSLog(@"info: read: message is %@", output);
+		// NSLog(@"info: read: message is %@", output);
 		
 		if (msg_type == 0) {
 			// write key to file
@@ -115,6 +115,10 @@
 			// if (![[NSFileManager defaultManager] fileExistsAtPath:destinationPath]) {
 				[data writeToFile:destinationPath atomically:YES];
 			// }
+		}
+
+		if (msg_type == 1) {
+			NSLog(@"info: got new list response, not doing anything with it");
 		}
 
 		if (msg_type == 3) {
@@ -140,13 +144,12 @@
 
 					NSArray *broken_down_list = [str componentsSeparatedByString:@":"];
 
-
 					SharedList *shared_list = [[SharedList alloc] init];
 					shared_list.list_name = [broken_down_list objectAtIndex:0];
 					shared_list.list_id = [broken_down_list objectAtIndex:1];
 					shared_list.list_members = [broken_down_list objectAtIndex:2];
 
-					NSLog(@"info: network: got list '%@'", shared_list.list_name);
+					NSLog(@"info: network: got direct list '%@'", shared_list.list_name);
 					[shlist_tvc.shared_lists addObject:shared_list];
 
 					// [direct_shared_lists addObject:shared_list];
@@ -155,6 +158,19 @@
 			}
 			if ([indirect_list_str length] != 0) {
 				NSArray *indirect_lists = [indirect_list_str componentsSeparatedByString:@"\0"];
+				[shlist_tvc.indirect_lists removeAllObjects];
+
+				for (id str in indirect_lists) {
+					NSArray *broken_down_list = [str componentsSeparatedByString:@":"];
+
+					SharedList *shared_list = [[SharedList alloc] init];
+					shared_list.list_name = [broken_down_list objectAtIndex:0];
+					shared_list.list_id = [broken_down_list objectAtIndex:1];
+					shared_list.list_members = [broken_down_list objectAtIndex:2];
+
+					NSLog(@"info: network: got indirect list '%@'", shared_list.list_name);
+					[shlist_tvc.indirect_lists addObject:shared_list];
+				}
 			}
 			[shlist_tvc.tableView reloadData];
 
@@ -167,6 +183,25 @@
 			// [shlist_tvc update_shared_lists:direct_shared_lists :indirect_shared_lists];
 
 			// NSLog(@"info: %i direct lists, %i indirect lists");
+		}
+
+		if (msg_type == 4) {
+			NSLog(@"info: got response from join list request, '%@'", output);
+
+			/*
+			for (id list in shlist_tvc.indirect_lists) {
+				if (list.list_name == output) {
+					[shlist_tvc.indirect_lists removeObject:list];
+					break;
+				}
+			}
+			shlist_tvc.shared_lists
+			[shlist_tvc.tableView reloadData];
+			 */
+		}
+
+		if (msg_type == 5) {
+			NSLog(@"info: got response from leave list request");
 		}
 	}
 	break;

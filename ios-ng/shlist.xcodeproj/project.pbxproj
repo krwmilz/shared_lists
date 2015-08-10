@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		27AAC22C1B50ABAF00D99171 /* NewItemTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27AAC22B1B50ABAF00D99171 /* NewItemTableViewController.m */; };
 		27B039FF1B43B6830054B6D2 /* ContactsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27B039FE1B43B6830054B6D2 /* ContactsViewController.m */; };
 		27B03A021B43B8660054B6D2 /* AddressBook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27B03A001B43B8660054B6D2 /* AddressBook.framework */; };
 		27B03A031B43B8660054B6D2 /* AddressBookUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27B03A011B43B8660054B6D2 /* AddressBookUI.framework */; };
@@ -37,6 +38,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		27AAC22A1B50ABAF00D99171 /* NewItemTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NewItemTableViewController.h; sourceTree = "<group>"; };
+		27AAC22B1B50ABAF00D99171 /* NewItemTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NewItemTableViewController.m; sourceTree = "<group>"; };
 		27B039FD1B43B6830054B6D2 /* ContactsViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ContactsViewController.h; sourceTree = SOURCE_ROOT; };
 		27B039FE1B43B6830054B6D2 /* ContactsViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ContactsViewController.m; sourceTree = SOURCE_ROOT; };
 		27B03A001B43B8660054B6D2 /* AddressBook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AddressBook.framework; path = System/Library/Frameworks/AddressBook.framework; sourceTree = SDKROOT; };
@@ -93,6 +96,8 @@
 		27C70EF61B32AF7F00DADEB3 = {
 			isa = PBXGroup;
 			children = (
+				27AAC22A1B50ABAF00D99171 /* NewItemTableViewController.h */,
+				27AAC22B1B50ABAF00D99171 /* NewItemTableViewController.m */,
 				27B03A001B43B8660054B6D2 /* AddressBook.framework */,
 				27B03A011B43B8660054B6D2 /* AddressBookUI.framework */,
 				27C70F331B36513200DADEB3 /* DBManager.h */,
@@ -269,6 +274,7 @@
 			files = (
 				BF7776B91B38928D00526CB0 /* ListDetailTableViewController.m in Sources */,
 				27C70F351B36513200DADEB3 /* DBManager.m in Sources */,
+				27AAC22C1B50ABAF00D99171 /* NewItemTableViewController.m in Sources */,
 				BF7776BC1B38D0DB00526CB0 /* ListItem.m in Sources */,
 				27C70F0B1B32AF8000DADEB3 /* ShlistServer.m in Sources */,
 				27C70F2A1B33D1C900DADEB3 /* SharedList.m in Sources */,

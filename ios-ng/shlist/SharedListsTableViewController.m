@@ -2,6 +2,7 @@
 #import "SharedList.h"
 #import "NewListViewController.h"
 #import "ShlistServer.h"
+#import "ListDetailTableViewController.h"
 
 @interface SharedListsTableViewController ()
 
@@ -25,6 +26,9 @@
 	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
 	NSString *documentsDirectory = [paths objectAtIndex:0];
 	NSString *destinationPath = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
+
+	// NSError *error = nil;
+	// [[NSFileManager defaultManager] removeItemAtPath:destinationPath error:&error];
 
 	if (![[NSFileManager defaultManager] fileExistsAtPath:destinationPath]) {
 		// do a fake registration
@@ -54,16 +58,6 @@
 
 	// ShlistServer *server = [[ShlistServer alloc] init];
 	[_server writeToServer:msg];
-
-	SharedList *list1 = [[SharedList alloc] init];
-	list1.list_name = @"Camping";
-	list1.list_members = @"David, Greg";
-	[self.indirect_lists addObject:list1];
-
-	SharedList *list2 = [[SharedList alloc] init];
-	list2.list_name = @"Wedding";
-	list2.list_members = @"Stephanie, Beatrice";
-	[self.indirect_lists addObject:list2];
 }
 
 - (IBAction) unwindToList:(UIStoryboardSegue *)segue
@@ -78,7 +72,7 @@
 	[self.shared_lists addObject:list];
 	[self.tableView reloadData];
 
-	// send new list message
+	// new list message
 	NSMutableData *msg = [NSMutableData data];
 	[msg appendBytes:"\x00\x01" length:2];
 
@@ -95,12 +89,13 @@
 	// append new list name
 	[msg appendData:[list.list_name dataUsingEncoding:NSUTF8StringEncoding]];
 
+	// send message
 	[_server writeToServer:msg];
 
 	NSLog(@"unwindToList(): done");
 }
 
-- (void)viewDidLoad
+- (void) viewDidLoad
 {
 	[super viewDidLoad];
 
@@ -117,7 +112,7 @@
 	[self load_initial_data];
 }
 
-- (void)didReceiveMemoryWarning
+- (void) didReceiveMemoryWarning
 {
 	[super didReceiveMemoryWarning];
 	// Dispose of any resources that can be recreated.
@@ -136,10 +131,16 @@
 		return [self.shared_lists count];
 	}
 	else if (section == 1) {
-		return 2;
+		return [self.indirect_lists count];
 	}
 
 	return 0;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
+	NSLog(@"did cell selection");
+	[tableView deselectRowAtIndexPath:indexPath animated:NO];
 }
 
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -202,15 +203,24 @@
 	return @"";
 }
 
+- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView
+	   editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+	if ([indexPath section] == 0) {
+		return UITableViewCellEditingStyleDelete;
+	}
+	return UITableViewCellEditingStyleInsert;
+}
+
 // Override to support conditional editing of the table view.
 - (BOOL) tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	if ([indexPath section] == 0) {
+	// if ([indexPath section] == 0) {
 		// editable
 		return YES;
-	}
+	// }
 
-	return NO;
+	// return NO;
 }
 
 // Override to support editing the table view.
@@ -218,11 +228,61 @@
 {
 	if (editingStyle == UITableViewCellEditingStyleDelete) {
 		// Delete the row from the data source
-		[tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+		// [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+
+		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
+		SharedList *selected_list = [self.shared_lists objectAtIndex:[path row]];
+
+		NSLog(@"info: leaving list '%@'", selected_list.list_name);
+
+		// delete list message
+		NSMutableData *msg = [NSMutableData data];
+		[msg appendBytes:"\x00\x05" length:2];
+
+		// length = device id + null separator + list id
+		uint16_t length_network_endian = htons([_device_id length] + [selected_list.list_id length] + 1);
+		[msg appendBytes:&length_network_endian length:2];
+
+		// append device id
+		[msg appendData:_device_id];
+
+		// append null separator
+		[msg appendBytes:"\0" length:1];
+
+		// append new list name
+		[msg appendData:[selected_list.list_id dataUsingEncoding:NSUTF8StringEncoding]];
+
+		// send message
+		[_server writeToServer:msg];
+
 		// [self.shared_lists removeObjectAtIndex:[indexPath row]];
 	} else if (editingStyle == UITableViewCellEditingStyleInsert) {
-		NSLog(@"editing style insert");
 		// Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
+
+		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
+		SharedList *selected_list = [self.indirect_lists objectAtIndex:[path row]];
+
+		NSLog(@"info: joining list '%@'", selected_list.list_name);
+
+		// join list message
+		NSMutableData *msg = [NSMutableData data];
+		[msg appendBytes:"\x00\x04" length:2];
+
+		// length = device id + null separator + list id
+		uint16_t length_network_endian = htons([_device_id length] + [selected_list.list_id length] + 1);
+		[msg appendBytes:&length_network_endian length:2];
+
+		// append device id
+		[msg appendData:_device_id];
+
+		// append null separator
+		[msg appendBytes:"\0" length:1];
+
+		// append new list name
+		[msg appendData:[selected_list.list_id dataUsingEncoding:NSUTF8StringEncoding]];
+
+		// send message
+		[_server writeToServer:msg];
 	}
 }
 
@@ -244,6 +304,20 @@
 - (void) prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
     // Get the new view controller using [segue destinationViewController].
     // Pass the selected object to the new view controller.
+
+	if ([[segue identifier] isEqualToString:@"show list segue"]) {
+
+		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
+		SharedList *selected_list = [self.shared_lists objectAtIndex:[path row]];
+
+		// only list detail table view controller has this method
+		[segue.destinationViewController setMetadata:selected_list];
+	}
+	// DetailObject *detail = [self detailForIndexPath:path];
+
+
+	// ListDetailTableViewController *list_detail_tvc = [segue destinationViewController];
+	// list_detail_tvc.navigationItem.title = @"Test Title";
 
 	NSLog(@"preparing for segue");
 }

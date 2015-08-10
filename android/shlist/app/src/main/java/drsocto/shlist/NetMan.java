@@ -20,6 +20,8 @@ public class NetMan {
     private final int NEW_DEVICE_MESSAGE_TYPE= 0;
     private final int NEW_LIST_MESSAGE_TYPE= 1;
     private final int LIST_REQUEST_MESSAGE_TYPE=3;
+    private final int JOIN_LIST_MESSAGE_TYPE=4;
+    private final int LEAVE_LIST_MESSAGE_TYPE=5;
     private String addr;
     private int port;
     Socket socket;
@@ -80,7 +82,7 @@ public class NetMan {
                     dbh.closeDB();
                 } else if (mTypeInt == NEW_LIST_MESSAGE_TYPE) {
                     String[] messageParts = message[0].split("\0");
-                    response = messageParts[1] + " - " + response.substring(4);
+                    response = messageParts[1] + ":" + response.substring(4);
                 } else if (mTypeInt == LIST_REQUEST_MESSAGE_TYPE) {
                     Log.d("NetMan", response.substring(4));
                 }
@@ -101,6 +103,10 @@ public class NetMan {
             return NEW_DEVICE_MESSAGE_TYPE;
         } else if (mTypeStr.equals("get_lists")) {
             return LIST_REQUEST_MESSAGE_TYPE;
+        } else if (mTypeStr.equals("join_list")) {
+            return JOIN_LIST_MESSAGE_TYPE;
+        } else if (mTypeStr.equals("leave_list")) {
+            return LEAVE_LIST_MESSAGE_TYPE;
         }
         return -1;
     }

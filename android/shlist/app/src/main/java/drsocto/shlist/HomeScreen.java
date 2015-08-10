@@ -18,6 +18,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -40,15 +41,18 @@ public class HomeScreen extends ActionBarActivity {
 
     private final String DEBUG_TAG = "PIMPJUICE";
     private final String SERVER_ADDRESS = "104.236.186.39";
-    private final int SERVER_PORT = 5438;
+    private final int SERVER_PORT = 5437;
     private final String dbName = "shlist.db";
     private ArrayList<String> list1;
     private ArrayAdapter<String> adapter1;
     private ArrayAdapter<String> adapter2;
     private ArrayList<String> list2;
     private long phoneNum;
+    private String id;
     private TextView cListsTV;
     private TextView oListsTV;
+    private String joinLeaveMessage;
+    private int joinLeavePosition;
     NetMan nm;
     DBHelper dbHelper;
 
@@ -69,7 +73,7 @@ public class HomeScreen extends ActionBarActivity {
         // remove '+' before parsing
         phoneNum = Long.parseLong(mPhoneNumber);
 
-        String id = dbHelper.getDeviceID();
+        id = dbHelper.getDeviceID();
 
         dbHelper.closeDB();
 
@@ -94,14 +98,6 @@ public class HomeScreen extends ActionBarActivity {
         ListView lv1 = (ListView) findViewById(R.id.currentLists);
 
         list2 = new ArrayList<String>();
-        list2.add("Ain't that just the shlist");
-        list2.add("Tough shlist");
-        list2.add("shlist happens");
-        list2.add("YOU WANNA START SOME shlist?");
-        list2.add("awww shlist... I think I'm out");
-        list2.add("gotta pad this shlist a bit more");
-        list2.add("and we're done...");
-        list2.add("... shlist");
 
         adapter2 = new ArrayAdapter<String>(this, R.layout.list_row, R.id.r_text, list2);
 
@@ -116,6 +112,32 @@ public class HomeScreen extends ActionBarActivity {
         lv1.setAdapter(adapter1);
         lv2.setAdapter(adapter2);
 
+        lv1.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long posid) {
+                String text = adapter1.getItem(position);
+                Log.d("lv1", "Clicked: " + text);
+                String[] nameID = text.split(":");
+                String message = id + "\0" + nameID[1];
+                new sendLeaveListMessageTask().execute(message, "leave_list");
+                joinLeaveMessage = text;
+                joinLeavePosition = position;
+            }
+        });
+
+        lv2.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long posid) {
+                String text = adapter2.getItem(position);
+                Log.d("lv2", "Clicked: " + text);
+                String[] nameID = text.split(":");
+                String message = id + "\0" + nameID[1];
+                new sendJoinListMessageTask().execute(message, "join_list");
+                joinLeaveMessage = text;
+                joinLeavePosition = position;
+            }
+        });
+
         if (id != null) {
             new sendGetListsMessageTask().execute(id, "get_lists");
         }
@@ -124,10 +146,10 @@ public class HomeScreen extends ActionBarActivity {
         /* if device id doesn't exist
             get phone number
             send to server
-            TODO: make sure server always rolls new id and clears data
+            TODO: if phone number already exists, verify contacts,
+            TODO: resend device id, or reroll id and wipe out references
             get device id
             write device id locally
-
 
 
          */
@@ -228,6 +250,50 @@ public class HomeScreen extends ActionBarActivity {
         }
     }
 
+    public class sendJoinListMessageTask extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... urls) {
+            Log.d("NetMan", "Join List Start");
+            String result = nm.sendMessage(urls);
+            return result;
+        }
+        @Override
+        protected void onPostExecute(String result) {
+            Log.d("NetMan", "Join List End");
+            list1.add(joinLeaveMessage);
+            list2.remove(joinLeavePosition);
+            adapter1.notifyDataSetChanged();
+            adapter2.notifyDataSetChanged();
+            cListsTV.setText("Current Lists (" + list1.size() + ")");
+            oListsTV.setText("Available Lists (" + list2.size() + ")");
+        }
+    }
+
+    public class sendLeaveListMessageTask extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... urls) {
+            Log.d("NetMan", "Leave List Start");
+            String result = nm.sendMessage(urls);
+            return result;
+        }
+        @Override
+        protected void onPostExecute(String result) {
+            result = result.substring(4);
+            String[] parts = result.split("\0");
+            Log.d("NetMan", "List id: " + parts[0]);
+            Log.d("NetMan", "Alive: " + parts[1]);
+            Log.d("NetMan", "Leave List End");
+            if (parts[1].equals("1")) {
+                list2.add(joinLeaveMessage);
+            }
+            list1.remove(joinLeavePosition);
+            adapter1.notifyDataSetChanged();
+            adapter2.notifyDataSetChanged();
+            cListsTV.setText("Current Lists (" + list1.size() + ")");
+            oListsTV.setText("Available Lists (" + list2.size() + ")");
+        }
+    }
+
     public class sendGetListsMessageTask extends AsyncTask<String, Void, String> {
         @Override
         protected String doInBackground(String... urls) {
@@ -239,12 +305,48 @@ public class HomeScreen extends ActionBarActivity {
         protected void onPostExecute(String result) {
             Log.d("NetMan", "Get Lists Done");
             result = result.substring(4);
-            String[] lists = result.split("\0");
-            for (int i = 0; i < lists.length; ++i) {
-                String[] deets = lists[i].split(":");
-                list1.add(deets[0] + " - " + deets[1]);
+            if (!result.equals("\0\0")) {
+                Log.d("NetMan", "Got Response: " + result);
+                String[] halves = result.split("\0\0");
+                Log.d("NetMan", "halves size: " + halves.length);
+                String[] cur_lists = halves[0].split("\0");
+                if (halves.length > 1) {
+                    String[] ava_lists = halves[1].split("\0");
+                    for (int i = 0; i < ava_lists.length; ++i) {
+                        String[] temp = ava_lists[i].split(":");
+                        Log.d("NetMan", "-------------------");
+                        Log.d("NetMan", "List (Available): " + (i+1));
+                        Log.d("NetMan", "-------------------");
+                        Log.d("NetMan", "Name: " + temp[0]);
+                        list2.add(temp[0] + ":" + temp[1]);
+                        Log.d("NetMan", "ID: " + temp[1]);
+                        for (int j = 2; j < temp.length; ++j) {
+                            Log.d("NetMan", "Member: " + temp[j]);
+                        }
+                    }
+                }
+                if (!cur_lists[0].equals("")) {
+                    for (int i = 0; i < cur_lists.length; ++i) {
+                        String[] temp = cur_lists[i].split(":");
+                        Log.d("NetMan", "-------------------");
+                        Log.d("NetMan", "List (Current): " + (i + 1));
+                        Log.d("NetMan", "-------------------");
+                        Log.d("NetMan", "Name: " + temp[0]);
+                        Log.d("NetMan", "ID: " + temp[1]);
+                        list1.add(temp[0] + ":" + temp[1]);
+                        for (int j = 2; j < temp.length; ++j) {
+                            Log.d("NetMan", "Member: " + temp[j]);
+                        }
+                    }
+                }
+
+                adapter1.notifyDataSetChanged();
+                adapter2.notifyDataSetChanged();
+                cListsTV.setText("Current Lists (" + list1.size() + ")");
+                oListsTV.setText("Available Lists (" + list2.size() + ")");
+            } else {
+                Log.d("NetMan", "No Lists");
             }
-            adapter1.notifyDataSetChanged();
         }
     }
 

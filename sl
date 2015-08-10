@@ -247,8 +247,7 @@ sub msg_new_device
 	# XXX: need to check the db to make sure this isn't duplicate
 	my $token = sha256_base64(arc4random_bytes(32));
 
-	# token length 43 = 0x2b
-	print $new_sock "\x00\x00\x2b\x00";
+	print $new_sock pack("nn", 0, length($token));
 	print $new_sock $token;
 	$new_device_sth->execute($token, $ph_num, time);
 	print "info: $addr: added new device $ph_num:$token\n";

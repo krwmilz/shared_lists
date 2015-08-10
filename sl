@@ -48,7 +48,7 @@ $dbh->do(qq{create table if not exists lists(
 }) or die $DBI::errstr;
 
 $dbh->do(qq{create table if not exists list_members(
-	list_id int not null primary key,
+	list_id int not null,
 	device_id text not null,
 	joined_date int not null,
 	primary key(list_id, device_id),
@@ -85,6 +85,9 @@ my $sql = qq{insert into lists (list_id, name, first_created, last_updated)
 	values (?, ?, ?, ?)};
 my $new_list_sth = $dbh->prepare($sql);
 
+$sql = qq{delete from lists where list_id=?};
+my $remove_list_sth = $dbh->prepare($sql);
+
 $sql = qq{insert into devices (token, phone_num, first_seen) values (?, ?, ?)};
 my $new_device_sth = $dbh->prepare($sql);
 
@@ -119,6 +122,11 @@ my $get_list_members_sth = $dbh->prepare($sql);
 $sql = qq{insert into list_members (list_id, device_id, joined_date) values (?, ?, ?)};
 my $new_list_member_sth = $dbh->prepare($sql);
 
+$sql = qq{delete from list_members where list_id = ? and device_id = ?};
+my $remove_list_member_sth = $dbh->prepare($sql);
+
+$sql = qq{select device_id from list_members where list_id = ? and device_id = ?};
+my $check_list_member_std = $dbh->prepare($sql);
 
 print "info: ready for connections on $local_addr_port\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
@@ -186,6 +194,12 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	elsif ($msg_type == 3) {
 		msg_list_request($new_sock, $addr, $msg);
 	}
+    elsif ($msg_type == 4) {
+		msg_join_list($new_sock, $addr, $msg);
+    }
+    elsif ($msg_type == 5) {
+        msg_leave_list($new_sock, $addr, $msg);
+    }
 
 	close($new_sock);
 }
@@ -274,6 +288,39 @@ sub msg_new_list
 	print $new_sock pack("n", 1);
 	print $new_sock pack("n", length($list_id));
 	print $new_sock $list_id;
+}
+
+sub msg_join_list
+{
+    my $new_sock = shift;
+    my $addr = shift;
+    my $msg = shift;
+
+    my ($device_id, $list_id) = split("\0", $msg);
+
+    if (device_id_invalid($device_id, $addr)) {
+        close $new_sock;
+        next;
+    }
+    print "info: $addr: device $device_id\n";
+    print "info: $addr: list $list_id\n";
+    
+    my $time = time;
+    $new_list_member_sth->execute($list_id, $device_id, $time);
+}
+
+sub msg_leave_list
+{
+    my $new_sock = shift;
+    my $addr = shift;
+    my $msg = shift;
+
+    my ($device_id, $list_id) = split("\0", $msg);
+
+    if (device_id_invalid($device_id, $addr)) {
+        close $new_sock;
+        next;
+    }
 }
 
 sub msg_update_friends

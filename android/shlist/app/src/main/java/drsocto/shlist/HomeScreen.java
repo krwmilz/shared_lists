@@ -39,6 +39,8 @@ import java.util.concurrent.TimeoutException;
 
 public class HomeScreen extends ActionBarActivity {
 
+    public final static String SELECTED_LIST = "drsocto.shlist.SELECTED_LIST";
+
     private final String DEBUG_TAG = "PIMPJUICE";
     private final String SERVER_ADDRESS = "104.236.186.39";
     private final int SERVER_PORT = 5437;
@@ -115,13 +117,14 @@ public class HomeScreen extends ActionBarActivity {
         lv1.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long posid) {
-                String text = adapter1.getItem(position);
+                /*String text = adapter1.getItem(position);
                 Log.d("lv1", "Clicked: " + text);
                 String[] nameID = text.split(":");
                 String message = id + "\0" + nameID[1];
                 new sendLeaveListMessageTask().execute(message, "leave_list");
                 joinLeaveMessage = text;
-                joinLeavePosition = position;
+                joinLeavePosition = position;*/
+                listPage(adapter1.getItem(position));
             }
         });
 
@@ -184,6 +187,8 @@ public class HomeScreen extends ActionBarActivity {
             addPlanDialog();
         } else if(id == R.id.delete_db) {
             dbHelper.deleteDB();
+        } else if(id == R.id.action_contacts) {
+            contactsPage();
         }
 
         return super.onOptionsItemSelected(item);
@@ -193,7 +198,13 @@ public class HomeScreen extends ActionBarActivity {
         dbHelper.deleteDB();
     }
 
-    public void contactsPage(View v) {
+    public void listPage(String name) {
+        Intent intent = new Intent(this, ListScreen.class);
+        intent.putExtra(SELECTED_LIST, name);
+        startActivity(intent);
+    }
+
+    public void contactsPage() {
         Intent intent = new Intent(this, ContactsScreen.class);
         startActivity(intent);
     }
@@ -201,6 +212,7 @@ public class HomeScreen extends ActionBarActivity {
     public void addList(String name) {
         dbHelper.openOrCreateDB();
         String device_id = dbHelper.getDeviceID();
+        dbHelper.closeDB();
         String message = device_id + "\0" + name;
         new sendNewListMessageTask().execute(message, "new_list");
         // send pair to server

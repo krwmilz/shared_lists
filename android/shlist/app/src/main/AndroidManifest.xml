@@ -22,7 +22,15 @@
         </activity>
         <activity
             android:name=".ContactsScreen"
-            android:label="@string/app_name">
+            android:label="@string/app_name" >
+        </activity>
+        <activity
+            android:name=".ListScreen"
+            android:label="@string/title_activity_list_screen"
+            android:parentActivityName=".HomeScreen" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="drsocto.shlist.HomeScreen" />
         </activity>
     </application>
 

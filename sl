@@ -134,6 +134,9 @@ my $delete_list_data_sth = $dbh->prepare($sql);
 $sql = qq{delete from lists where list_id = ?};
 my $delete_list_sth = $dbh->prepare($sql);
 
+$sql = qq{select * from list_data where list_id = ?};
+my $get_list_items_sth = $dbh->prepare($sql);
+
 print "info: ready for connections on $local_addr_port\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
@@ -156,7 +159,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		close $new_sock;
 		next;
 	}
-	if ($msg_type > 5) {
+	if ($msg_type > 10) {
 		print "warn: $addr: unknown message type " . sprintf "0x%x\n", $msg_type;
 		close $new_sock;
 		next;
@@ -206,6 +209,9 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
     elsif ($msg_type == 5) {
         msg_leave_list($new_sock, $addr, $msg);
     }
+	elsif ($msg_type == 6) {
+		msg_list_items_request($new_sock, $addr, $msg);
+	}
 
 	close($new_sock);
 }
@@ -240,12 +246,12 @@ sub msg_new_device
 	if (!looks_like_number($ph_num)) {
 		print "warn: $addr: device phone number $ph_num invalid\n";
 		close $new_sock;
-		next;
+		return;
 	}
 	if ($dbh->selectrow_array($ph_num_exists_sth, undef, $ph_num)) {
 		print "warn: $addr: phone number $ph_num already exists\n";
 		close $new_sock;
-		next;
+		return;
 	}
 
 	# make a new device id, the client will supply this on all
@@ -271,12 +277,12 @@ sub msg_new_list
 	# validate input
 	if (device_id_invalid($device_id, $addr)) {
 		close $new_sock;
-		next;
+		return;
 	}
 	unless ($list_name) {
 		print "warn: $addr: list name missing\n";
 		close($new_sock);
-		next;
+		return;
 	}
 
 	print "info: $addr: adding new list: $list_name\n";
@@ -290,8 +296,7 @@ sub msg_new_list
 	$new_list_sth->execute($list_id, $list_name, $time, $time);
 	$new_list_member_sth->execute($list_id, $device_id, $time);
 
-	print $new_sock pack("n", 1);
-	print $new_sock pack("n", length($list_id));
+	print $new_sock pack("nn", 1, length($list_id));
 	print $new_sock $list_id;
 }
 
@@ -305,7 +310,7 @@ sub msg_join_list
 
     if (device_id_invalid($device_id, $addr)) {
         close $new_sock;
-        next;
+        return;
     }
     print "info: $addr: device $device_id\n";
     print "info: $addr: list $list_id\n";
@@ -334,7 +339,7 @@ sub msg_leave_list
 
     if (device_id_invalid($device_id, $addr)) {
         close $new_sock;
-        next;
+	return;
     }
     
     print "info: $addr: device $device_id\n";
@@ -378,7 +383,7 @@ sub msg_update_friends
 
 	if (device_id_invalid($device_id, $addr)) {
 		close $new_sock;
-		next;
+		return;
 	}
 	print "info: $addr: device $device_id, " . @friends . " friends\n";
 
@@ -409,7 +414,7 @@ sub msg_list_request
 		# XXX: i don't think $msg is null terminated
 		print "warn: device id $msg invalid\n";
 		close $new_sock;
-		next;
+		return;
 	}
 
 	print "info: $addr: gathering lists for $msg\n";
@@ -464,6 +469,42 @@ sub msg_list_request
 	print $new_sock $out;
 
 	# XXX: add time of last request to list (rate throttling)?
+}
+
+sub msg_list_items_request
+{
+	my $new_sock = shift;
+	my $addr = shift;
+	my $msg = shift;
+
+	my ($device_id, $list_id) = split("\0", $msg);
+
+	if (device_id_invalid($device_id, $addr)) {
+		print "warn: $addr: device id $device_id invalid\n";
+		close $new_sock;
+		return;
+	}
+	unless ($dbh->selectrow_array($check_list_member_sth, undef, $list_id, $device_id)) {
+		# XXX: table list_members list_id's should always exist
+		print "warn: $addr: $device_id not a member of $list_id\n";
+		close $new_sock;
+		return;
+	}
+	print "info: $addr: $device_id request items for $list_id\n";
+
+	$get_list_items_sth->execute($list_id);
+
+	my @items;
+	while (my ($list_id, $pos, $name, $status, $owner, undef) =
+		$get_list_items_sth->fetchrow_array()) {
+		print "info: $addr: list item #$pos $name\n";
+
+		push "$pos:$name:$owner:$status", @items;
+	}
+
+	my $out = join("\0", @items);
+	print $new_sock pack("nn", 6, length($out));
+	print $new_sock $out;
 }
 
 sub device_id_invalid

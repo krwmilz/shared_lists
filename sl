@@ -30,14 +30,14 @@ $dbh->do(qq{create table if not exists devices(
 
 $dbh->do(qq{create table if not exists list_data(
 	list_id int not null,
-	position int not null,
-	text text not null,
+	name text not null,
+	quantity non null,
 	status int not null default 0,
-	owner int not null,
+	owner text not null,
 	last_updated int not null,
-	primary key(list_id, position),
+	primary key(list_id, name, owner),
 	foreign key(list_id) references lists(list_id),
-	foreign key(owner) references devices(phone_num))
+	foreign key(owner) references devices(token))
 }) or die $DBI::errstr;
 
 $dbh->do(qq{create table if not exists lists(
@@ -485,7 +485,7 @@ sub msg_list_items_request
 		return;
 	}
 	unless ($dbh->selectrow_array($check_list_member_sth, undef, $list_id, $device_id)) {
-		# XXX: table list_members list_id's should always exist
+		# XXX: table list_members list_id's should always exist in table lists
 		print "warn: $addr: $device_id not a member of $list_id\n";
 		close $new_sock;
 		return;

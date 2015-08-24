@@ -1,9 +1,11 @@
 #import "ListDetailTableViewController.h"
 #import "ListItem.h"
+#import "ShlistServer.h"
 
 @interface ListDetailTableViewController ()
 
 - (void)load_initial_data;
+@property (strong, nonatomic) ShlistServer *server;
 
 @end
 
@@ -14,18 +16,27 @@
 	// NSLog(@"ListDetailTableViewController::load_initial_data()");
 
 	ListItem *item1 = [[ListItem alloc] init];
-	item1.name = @"Axe";
+	item1.modifier = 1;
+	item1.name = @"cheese";
+	item1.quantity = 3;
 	item1.owner = @"Kyle";
+	item1.completed = 0;
 	[self.list_items addObject:item1];
 
 	ListItem *item2 = [[ListItem alloc] init];
-	item2.name = @"Camp Stove";
-	item2.owner = @"<none>";
+	item2.modifier = 0;
+	item2.name = @"camp stove";
+	item2.quantity = 1;
+	item2.owner = @"";
+	item2.completed = 1;
 	[self.list_items addObject:item2];
 
 	ListItem *item3 = [[ListItem alloc] init];
-	item3.name = @"Tent";
-	item3.owner = @"David";
+	item3.modifier = 2;
+	item3.name = @"ear plugs";
+	item3.quantity = 1;
+	item3.owner = @"";
+	item3.completed = 0;
 	[self.list_items addObject:item3];
 }
 
@@ -90,10 +101,42 @@
 	UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ListDetailPrototypeCell" forIndexPath:indexPath];
     
 	// NSLog(@"ListDetailTableViewController::cellForRowAtIndexPath()");
-    
+	// Tags:
+	// 1) modifier -- ie $, info, etc
+	// 2) item name
+	// 3) quantity of item, in parenthesis
+	// 4) owners name
+	// 5) completion/packing of item
+
+	UILabel *label;
 	ListItem *item = [self.list_items objectAtIndex:indexPath.row];
-	cell.textLabel.text = item.name;
-	cell.detailTextLabel.text = item.owner;
+
+	if (item.modifier == 1) {
+		UIImageView *image_view;
+		image_view = (UIImageView *)[cell viewWithTag:1];
+		image_view.image = [UIImage imageNamed: @"dollar103-4.png"];
+	}
+	else if (item.modifier == 2) {
+		UIImageView *image_view;
+		image_view = (UIImageView *)[cell viewWithTag:1];
+		image_view.image = [UIImage imageNamed: @"information15-2.png"];
+	}
+
+	label = (UILabel *)[cell viewWithTag:2];
+	label.text = item.name;
+
+	label = (UILabel *)[cell viewWithTag:3];
+	if (item.quantity > 1) {
+		label.text = [NSString stringWithFormat:@"(x%d)", item.quantity];
+	} else {
+		label.text = @"";
+	}
+
+	label = (UILabel *)[cell viewWithTag:4];
+	// XXX: this should go to N/A when item doesn't have an owner
+	label.text = item.owner;
+
+	// label = (UILabel *)[cell viewWithTag:5];
 
 	return cell;
 }

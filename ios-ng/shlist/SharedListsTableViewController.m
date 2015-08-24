@@ -308,10 +308,33 @@
 	if ([[segue identifier] isEqualToString:@"show list segue"]) {
 
 		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
-		SharedList *selected_list = [self.shared_lists objectAtIndex:[path row]];
+		SharedList *list = [self.shared_lists objectAtIndex:[path row]];
 
 		// only list detail table view controller has this method
-		[segue.destinationViewController setMetadata:selected_list];
+		[segue.destinationViewController setMetadata:list];
+
+		// has to be done before issuing network request
+		_server->shlist_ldvc = segue.destinationViewController;
+
+		// update list items message type
+		NSMutableData *msg = [NSMutableData data];
+		[msg appendBytes:"\x00\x06" length:2];
+
+		// length = device id + list name + null separator
+		uint16_t length_network_endian = htons([_device_id length] + [list.list_id length] + 1);
+		[msg appendBytes:&length_network_endian length:2];
+
+		// append device id
+		[msg appendData:_device_id];
+
+		// append null separator
+		[msg appendBytes:"\0" length:1];
+
+		// append new list name
+		[msg appendData:[list.list_id dataUsingEncoding:NSUTF8StringEncoding]];
+
+		// send message
+		[_server writeToServer:msg];
 	}
 	// DetailObject *detail = [self detailForIndexPath:path];
 

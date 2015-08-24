@@ -23,6 +23,11 @@
 		27C70F301B33F4FA00DADEB3 /* SharedListsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F2F1B33F4FA00DADEB3 /* SharedListsTableViewController.m */; };
 		27C70F321B3650CB00DADEB3 /* libsqlite3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 27C70F311B3650CB00DADEB3 /* libsqlite3.dylib */; };
 		27C70F351B36513200DADEB3 /* DBManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F341B36513200DADEB3 /* DBManager.m */; };
+		27DCC9DC1B8A96A900207340 /* dollar103.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9DB1B8A96A900207340 /* dollar103.png */; };
+		27DCC9DE1B8A98D400207340 /* dollar103-2.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9DD1B8A98D400207340 /* dollar103-2.png */; };
+		27DCC9E01B8A993300207340 /* dollar103-3.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9DF1B8A993300207340 /* dollar103-3.png */; };
+		27DCC9E21B8A9A6900207340 /* dollar103-4.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9E11B8A9A6900207340 /* dollar103-4.png */; };
+		27DCC9E41B8A9EBB00207340 /* information15-2.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9E31B8A9EBB00207340 /* information15-2.png */; };
 		BF7776B91B38928D00526CB0 /* ListDetailTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */; };
 		BF7776BC1B38D0DB00526CB0 /* ListItem.m in Sources */ = {isa = PBXBuildFile; fileRef = BF7776BB1B38D0DB00526CB0 /* ListItem.m */; };
 /* End PBXBuildFile section */
@@ -66,6 +71,11 @@
 		27C70F311B3650CB00DADEB3 /* libsqlite3.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libsqlite3.dylib; path = usr/lib/libsqlite3.dylib; sourceTree = SDKROOT; };
 		27C70F331B36513200DADEB3 /* DBManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DBManager.h; sourceTree = "<group>"; };
 		27C70F341B36513200DADEB3 /* DBManager.m */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.objc; path = DBManager.m; sourceTree = "<group>"; tabWidth = 8; usesTabs = 1; };
+		27DCC9DB1B8A96A900207340 /* dollar103.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = dollar103.png; path = ../../../Downloads/dollar103.png; sourceTree = "<group>"; };
+		27DCC9DD1B8A98D400207340 /* dollar103-2.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "dollar103-2.png"; path = "../../../Downloads/dollar103-2.png"; sourceTree = "<group>"; };
+		27DCC9DF1B8A993300207340 /* dollar103-3.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "dollar103-3.png"; path = "../../../Downloads/dollar103-3.png"; sourceTree = "<group>"; };
+		27DCC9E11B8A9A6900207340 /* dollar103-4.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "dollar103-4.png"; path = "../../../Downloads/dollar103-4.png"; sourceTree = "<group>"; };
+		27DCC9E31B8A9EBB00207340 /* information15-2.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "information15-2.png"; path = "../../../Downloads/information15-2.png"; sourceTree = "<group>"; };
 		BF7776B71B38928D00526CB0 /* ListDetailTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListDetailTableViewController.h; sourceTree = "<group>"; };
 		BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ListDetailTableViewController.m; sourceTree = "<group>"; };
 		BF7776BA1B38D0DB00526CB0 /* ListItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListItem.h; sourceTree = "<group>"; };
@@ -128,8 +138,13 @@
 				27B039FD1B43B6830054B6D2 /* ContactsViewController.h */,
 				27B039FE1B43B6830054B6D2 /* ContactsViewController.m */,
 				27C70F0C1B32AF8000DADEB3 /* Main.storyboard */,
+				27DCC9DB1B8A96A900207340 /* dollar103.png */,
 				BF7776B71B38928D00526CB0 /* ListDetailTableViewController.h */,
 				BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */,
+				27DCC9E31B8A9EBB00207340 /* information15-2.png */,
+				27DCC9E11B8A9A6900207340 /* dollar103-4.png */,
+				27DCC9DF1B8A993300207340 /* dollar103-3.png */,
+				27DCC9DD1B8A98D400207340 /* dollar103-2.png */,
 				BF7776BA1B38D0DB00526CB0 /* ListItem.h */,
 				BF7776BB1B38D0DB00526CB0 /* ListItem.m */,
 				27C70F2E1B33F4FA00DADEB3 /* SharedListsTableViewController.h */,
@@ -253,8 +268,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				27C70F0E1B32AF8000DADEB3 /* Main.storyboard in Resources */,
+				27DCC9E41B8A9EBB00207340 /* information15-2.png in Resources */,
 				27C70F131B32AF8000DADEB3 /* LaunchScreen.xib in Resources */,
+				27DCC9E21B8A9A6900207340 /* dollar103-4.png in Resources */,
+				27DCC9E01B8A993300207340 /* dollar103-3.png in Resources */,
+				27DCC9DC1B8A96A900207340 /* dollar103.png in Resources */,
 				27C70F101B32AF8000DADEB3 /* Images.xcassets in Resources */,
+				27DCC9DE1B8A98D400207340 /* dollar103-2.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

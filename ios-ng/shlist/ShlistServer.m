@@ -188,20 +188,27 @@
 		if (msg_type == 4) {
 			NSLog(@"info: got response from join list request, '%@'", output);
 
-			/*
-			for (id list in shlist_tvc.indirect_lists) {
+			for (SharedList *list in shlist_tvc.indirect_lists) {
 				if (list.list_name == output) {
+					[shlist_tvc.shared_lists addObject:list];
 					[shlist_tvc.indirect_lists removeObject:list];
 					break;
 				}
 			}
-			shlist_tvc.shared_lists
 			[shlist_tvc.tableView reloadData];
-			 */
 		}
 
 		if (msg_type == 5) {
 			NSLog(@"info: got response from leave list request");
+
+			for (SharedList *list in shlist_tvc.shared_lists) {
+				if (list.list_name == output) {
+					[shlist_tvc.indirect_lists addObject:list];
+					[shlist_tvc.shared_lists removeObject:list];
+					break;
+				}
+			}
+			[shlist_tvc.tableView reloadData];
 		}
 	}
 	break;

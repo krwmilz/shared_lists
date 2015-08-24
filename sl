@@ -137,6 +137,9 @@ my $delete_list_sth = $dbh->prepare($sql);
 $sql = qq{select * from list_data where list_id = ?};
 my $get_list_items_sth = $dbh->prepare($sql);
 
+$sql = qq{insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)};
+my $new_list_item_sth = $dbh->prepare($sql);
+
 print "info: ready for connections on $local_addr_port\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
@@ -212,6 +215,9 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	elsif ($msg_type == 6) {
 		msg_list_items_request($new_sock, $addr, $msg);
 	}
+    elsif ($msg_type == 7) {
+        msg_new_list_item($new_sock, $addr, $msg);
+    }
 
 	close($new_sock);
 }
@@ -298,6 +304,26 @@ sub msg_new_list
 
 	print $new_sock pack("nn", 1, length($list_id));
 	print $new_sock $list_id;
+}
+
+sub msg_new_list_item
+{
+    my $new_sock = shift;
+    my $addr = shift;
+    my $msg = shift;
+
+    # my ($list_id, $position, $text) = split ("\0", $msg);
+    
+    # print "info: $addr: list $list_id\n";
+    # print "info: $addr: position\n";
+    # print "info: $addr: text $text\n";
+
+    # check that list exists
+    # check if item exists
+    # check for "" owner on a stack
+    # either create or add to unowned stack
+    # owner will be emtpy
+    # last_update 
 }
 
 sub msg_join_list

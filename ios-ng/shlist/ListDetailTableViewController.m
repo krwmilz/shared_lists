@@ -98,7 +98,10 @@
 
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ListDetailPrototypeCell" forIndexPath:indexPath];
+	UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ListDetailPrototypeCell"
+		forIndexPath:indexPath];
+
+	NSUInteger section = [indexPath section];
     
 	// NSLog(@"ListDetailTableViewController::cellForRowAtIndexPath()");
 	// Tags:
@@ -114,12 +117,12 @@
 	if (item.modifier == 1) {
 		UIImageView *image_view;
 		image_view = (UIImageView *)[cell viewWithTag:1];
-		image_view.image = [UIImage imageNamed: @"dollar103-4.png"];
+		image_view.image = [UIImage imageNamed: @"dollar103-2.png"];
 	}
 	else if (item.modifier == 2) {
 		UIImageView *image_view;
 		image_view = (UIImageView *)[cell viewWithTag:1];
-		image_view.image = [UIImage imageNamed: @"information15-2.png"];
+		image_view.image = [UIImage imageNamed: @"information15-3.png"];
 	}
 
 	label = (UILabel *)[cell viewWithTag:2];
@@ -133,10 +136,17 @@
 	}
 
 	label = (UILabel *)[cell viewWithTag:4];
-	// XXX: this should go to N/A when item doesn't have an owner
-	label.text = item.owner;
+	if (section == 0)
+		// XXX: this should go to N/A when item doesn't have an owner
+		label.text = item.owner;
+	else
+		label.hidden = true;
 
-	// label = (UILabel *)[cell viewWithTag:5];
+	label = (UILabel *)[cell viewWithTag:5];
+	if (section == 0)
+		;
+	else
+		label.hidden = true;
 
 	return cell;
 }

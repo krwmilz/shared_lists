@@ -1,9 +1,11 @@
 #import "ShlistServer.h"
 #import "SharedList.h"
+#import "AddressBook.h"
 
 @interface ShlistServer ()
 
 @property (strong, retain) NSMutableData *data;
+@property (strong, retain) AddressBook *address_book;
 
 @end
 
@@ -31,6 +33,8 @@
 		[inputShlistStream open];
 		[outputShlistStream open];
 		*/
+
+		_address_book = [[AddressBook alloc] init];
 	}
 
 	return self;
@@ -122,67 +126,7 @@
 		}
 
 		if (msg_type == 3) {
-			NSLog(@"info: read: processing bulk list update message");
-
-			// split over double \0
-			NSArray *list_types = [output componentsSeparatedByString:@"\0\0"];
-			if ([list_types count] != 2) {
-				NSLog(@"warn: more than one \\0\\0 found in response");
-				break;
-			}
-
-			// split over \0
-			NSString *direct_list_str = [list_types objectAtIndex:0];
-			NSString *indirect_list_str = [list_types objectAtIndex:1];
-
-			if ([direct_list_str length] != 0) {
-				NSArray *direct_lists = [direct_list_str componentsSeparatedByString:@"\0"];
-				[shlist_tvc.shared_lists removeAllObjects];
-
-				for (id str in direct_lists) {
-					// NSLog(@"info: got raw direct list %@", str);
-
-					NSArray *broken_down_list = [str componentsSeparatedByString:@":"];
-
-					SharedList *shared_list = [[SharedList alloc] init];
-					shared_list.list_name = [broken_down_list objectAtIndex:0];
-					shared_list.list_id = [broken_down_list objectAtIndex:1];
-					shared_list.list_members = [broken_down_list objectAtIndex:2];
-
-					NSLog(@"info: network: got direct list '%@'", shared_list.list_name);
-					[shlist_tvc.shared_lists addObject:shared_list];
-
-					// [direct_shared_lists addObject:shared_list];
-				}
-
-			}
-			if ([indirect_list_str length] != 0) {
-				NSArray *indirect_lists = [indirect_list_str componentsSeparatedByString:@"\0"];
-				[shlist_tvc.indirect_lists removeAllObjects];
-
-				for (id str in indirect_lists) {
-					NSArray *broken_down_list = [str componentsSeparatedByString:@":"];
-
-					SharedList *shared_list = [[SharedList alloc] init];
-					shared_list.list_name = [broken_down_list objectAtIndex:0];
-					shared_list.list_id = [broken_down_list objectAtIndex:1];
-					shared_list.list_members = [broken_down_list objectAtIndex:2];
-
-					NSLog(@"info: network: got indirect list '%@'", shared_list.list_name);
-					[shlist_tvc.indirect_lists addObject:shared_list];
-				}
-			}
-			[shlist_tvc.tableView reloadData];
-
-			/*
-			dispatch_async(dispatch_get_main_queue(), ^{
-				shlist_tvc.shared_lists = direct_shared_lists;
-				[shlist_tvc.tableView reloadData];
-			});
-			 */
-			// [shlist_tvc update_shared_lists:direct_shared_lists :indirect_shared_lists];
-
-			// NSLog(@"info: %i direct lists, %i indirect lists");
+			[self handle_bulk_list_update:output];
 		}
 
 		if (msg_type == 4) {
@@ -240,6 +184,100 @@
 	default:
 		break;
 	}
+}
+
+- (void) handle_bulk_list_update:(NSString *)raw_data
+{
+	NSLog(@"info: handling bulk list update message");
+
+	// split over double \0
+	NSArray *list_types = [raw_data componentsSeparatedByString:@"\0\0"];
+	if ([list_types count] != 2) {
+		NSLog(@"warn: wrong number if \\0\\0 found: %i", [list_types count]);
+		return;
+	}
+
+	NSString *my_lists = [list_types objectAtIndex:0];
+	NSString *my_friends_lists = [list_types objectAtIndex:1];
+
+	[shlist_tvc.shared_lists removeAllObjects];
+	[shlist_tvc.indirect_lists removeAllObjects];
+
+	if ([my_lists length] != 0) {
+		NSArray *my_lists_parsed = [self parse_lists:my_lists];
+		[shlist_tvc.shared_lists addObjectsFromArray:my_lists_parsed];
+	}
+	if ([my_friends_lists length] != 0) {
+		NSArray *indirect_lists = [self parse_lists:my_friends_lists];
+		[shlist_tvc.indirect_lists addObjectsFromArray:indirect_lists];
+	}
+
+	[shlist_tvc.tableView reloadData];
+}
+
+- (NSArray *) parse_lists:(NSString *)raw_lists
+{
+	// each raw list is separated by a \0
+	NSArray *lists = [raw_lists componentsSeparatedByString:@"\0"];
+	NSMutableArray *output = [[NSMutableArray alloc] init];
+
+	for (id str in lists) {
+		NSArray *list_fields = [str componentsSeparatedByString:@":"];
+		int field_count = [list_fields count];
+
+		if (field_count < 3) {
+			NSLog(@"warn: less than 3 fields found: %i", field_count);
+
+			// can't do anything with this list
+			continue;
+		}
+		NSLog(@"info: parse_list: '%@' has %i fields",
+		      [list_fields objectAtIndex:0], field_count);
+
+
+		NSMutableArray *friends = [[NSMutableArray alloc] init];
+		int others = 0;
+
+		// anything past the second field are list members
+		NSArray *phone_numbers = [list_fields subarrayWithRange:NSMakeRange(2, field_count - 2)];
+		for (id phone_number in phone_numbers) {
+
+			/* try to find the list member in our address book */
+			NSString *name = _address_book.name_map[phone_number];
+
+			if (name)
+				[friends addObject:name];
+			else
+				/* didn't find it, you don't know this person */
+				others++;
+		}
+
+		NSMutableString *members_str =
+			[[friends componentsJoinedByString:@", "] mutableCopy];
+
+		if (others) {
+			char *plural;
+			if (others == 1)
+				plural = "other";
+			else
+				plural = "others";
+
+			NSString *buf = [NSString stringWithFormat:@" + %i %s",
+					 others, plural];
+			[members_str appendString:buf];
+		}
+
+		/* we've got everything we need */
+		SharedList *shared_list = [[SharedList alloc] init];
+
+		shared_list.list_name = [list_fields objectAtIndex:0];
+		shared_list.list_id = [list_fields objectAtIndex:1];
+		shared_list.list_members = members_str;
+
+		[output addObject:shared_list];
+	}
+
+	return output;
 }
 
 - (void) dealloc

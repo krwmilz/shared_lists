@@ -4,6 +4,8 @@
 #import "ShlistServer.h"
 #import "ListDetailTableViewController.h"
 
+#import <AddressBook/AddressBook.h>
+
 @interface SharedListsTableViewController ()
 
 @property (strong, nonatomic) ShlistServer *server;
@@ -110,6 +112,7 @@
 	self.indirect_lists = [[NSMutableArray alloc] init];
 
 	[self load_initial_data];
+
 }
 
 - (void) didReceiveMemoryWarning

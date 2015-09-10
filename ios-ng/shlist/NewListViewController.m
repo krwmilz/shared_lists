@@ -35,7 +35,7 @@
 		self.shared_list = [[SharedList alloc] init];
 		self.shared_list.list_name = self.textField.text;
 		// self.shared_list.list_date = self.datePicker.date;
-		self.shared_list.list_members = @"Test, Test";
+		self.shared_list.list_members = @"You";
 
 		NSLog(@"NewListViewController::prepareForSegue(): %@", self.textField.text);
 	}

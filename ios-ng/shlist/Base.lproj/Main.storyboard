@@ -245,7 +245,7 @@
             </objects>
             <point key="canvasLocation" x="1967" y="61"/>
         </scene>
-        <!--Lists-->
+        <!--Shlist-->
         <scene sceneID="hc1-Lv-WtP">
             <objects>
                 <tableViewController id="x0J-ua-E8Q" customClass="SharedListsTableViewController" sceneMemberID="viewController">
@@ -311,7 +311,7 @@
                         </connections>
                     </tableView>
                     <toolbarItems/>
-                    <navigationItem key="navigationItem" title="Lists" id="uhM-V6-aB7">
+                    <navigationItem key="navigationItem" title="Shlist" id="uhM-V6-aB7">
                         <barButtonItem key="leftBarButtonItem" systemItem="edit" id="XHh-J3-UVD"/>
                         <barButtonItem key="rightBarButtonItem" systemItem="add" id="hNc-gt-QbU">
                             <connections>

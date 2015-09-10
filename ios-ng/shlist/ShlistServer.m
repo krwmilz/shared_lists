@@ -7,6 +7,9 @@
 @property (strong, retain) NSMutableData *data;
 @property (strong, retain) AddressBook *address_book;
 
+@property (strong, nonatomic) NSString *phone_number;
+@property (strong, nonatomic) NSData *device_id;
+
 @end
 
 @implementation ShlistServer
@@ -38,6 +41,72 @@
 	}
 
 	return self;
+}
+
+- (bool) prepare
+{
+	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+	NSString *documentsDirectory = [paths objectAtIndex:0];
+
+	// NSString *phone_num_file = [documentsDirectory stringByAppendingPathComponent:@"phone_num"];
+	NSString *device_id_file = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
+
+	// NSError *error = nil;
+	// [[NSFileManager defaultManager] removeItemAtPath:destinationPath error:&error];
+
+	// TODO: also check the length of the file
+	if (![[NSFileManager defaultManager] fileExistsAtPath:device_id_file]) {
+		// no device id file found, send a registration message
+		NSMutableData *msg = [NSMutableData data];
+
+		// message type 0
+		[msg appendBytes:"\x00\x00" length:2];
+
+		// phone number length is 9
+		uint16_t length_network = htons(9);
+		[msg appendBytes:&length_network length:2];
+
+		// actual phone number
+		const char *phone_number = "4037082094";
+		_phone_number = @"4037082094";
+		[msg appendBytes:phone_number length:9];
+
+		[self writeToServer:msg];
+		NSLog(@"info: sent registration message");
+
+		// we don't have a device id so we can't do anything yet
+		return false;
+	}
+
+	// read device id from filesystem into memory
+	_device_id = [NSData dataWithContentsOfFile:device_id_file];
+
+	return true;
+}
+
+- (void) send_message:(uint16_t)msg_type contents:(NSData *)payload
+{
+	NSMutableData *msg = [NSMutableData data];
+
+	uint16_t msg_type_network = htons(msg_type);
+	[msg appendBytes:&msg_type_network length:2];
+
+	int payload_length = 0;
+	if (payload)
+		// include null separator in this length
+		payload_length = [payload length] + 1;
+
+	uint16_t msg_len_network = htons([_device_id length] + payload_length);
+	[msg appendBytes:&msg_len_network length:2];
+
+	[msg appendData:_device_id];
+
+	if (payload) {
+		[msg appendBytes:"\0" length:1];
+		[msg appendData:payload];
+	}
+
+	[self writeToServer:msg];
 }
 
 - (void)stream:(NSStream *)stream handleEvent:(NSStreamEvent)eventCode
@@ -119,6 +188,12 @@
 			// if (![[NSFileManager defaultManager] fileExistsAtPath:destinationPath]) {
 				[data writeToFile:destinationPath atomically:YES];
 			// }
+
+			// set this so we're ready to send other message types
+			_device_id = data;
+
+			// do a bulk list update
+			[self send_message:3 contents:nil];
 		}
 
 		if (msg_type == 1) {
@@ -242,13 +317,15 @@
 		NSArray *phone_numbers = [list_fields subarrayWithRange:NSMakeRange(2, field_count - 2)];
 		for (id phone_number in phone_numbers) {
 
-			/* try to find the list member in our address book */
+			// try to find the list member in our address book
 			NSString *name = _address_book.name_map[phone_number];
 
 			if (name)
 				[friends addObject:name];
+			else if ([phone_number compare:_phone_number])
+				[friends addObject:@"You"];
 			else
-				/* didn't find it, you don't know this person */
+				// didn't find it, you don't know this person
 				others++;
 		}
 
@@ -271,7 +348,7 @@
 		SharedList *shared_list = [[SharedList alloc] init];
 
 		shared_list.list_name = [list_fields objectAtIndex:0];
-		shared_list.list_id = [list_fields objectAtIndex:1];
+		shared_list.list_id = [[list_fields objectAtIndex:1] dataUsingEncoding:NSUTF8StringEncoding];
 		shared_list.list_members = members_str;
 
 		[output addObject:shared_list];

@@ -7,7 +7,7 @@
 // UILabel *names;
 
 @property NSString *list_name;
-@property NSString *list_id;
+@property NSData *list_id;
 @property NSString *list_members;
 @property NSDate *list_date;
 

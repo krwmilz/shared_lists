@@ -9,7 +9,6 @@
 @interface SharedListsTableViewController ()
 
 @property (strong, nonatomic) ShlistServer *server;
-@property (strong, nonatomic) NSData *device_id;
 
 @end
 
@@ -17,49 +16,15 @@
 
 - (void) load_initial_data
 {
-	// register if we've never registered before
-	// load local shared list data from db
-	// sync with server and check if there's any updates
-
-	// initialize connection
+	// create one and only server instance, this gets passed around
 	_server = [[ShlistServer alloc] init];
 	_server->shlist_tvc = self;
-	
-	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-	NSString *documentsDirectory = [paths objectAtIndex:0];
-	NSString *destinationPath = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
 
-	// NSError *error = nil;
-	// [[NSFileManager defaultManager] removeItemAtPath:destinationPath error:&error];
-
-	if (![[NSFileManager defaultManager] fileExistsAtPath:destinationPath]) {
-		// do a fake registration
-		NSData *msg_register = [NSData dataWithBytes:"\x00\x00\x00\x0a" "4037082094" length:15];
-		[_server writeToServer:msg_register];
-		NSLog(@"Sent registration");
+	if ([_server prepare]) {
+		NSLog(@"info: server connection prepared");
+		// bulk update, doesn't take a payload
+		[_server send_message:3 contents:nil];
 	}
-
-	// send bulk shared list update
-	NSMutableData *msg = [NSMutableData data];
-	[msg appendBytes:"\x00\x03" length:2];
-
-	// read device id from filesystem into memory
-	_device_id = [NSData dataWithContentsOfFile:destinationPath];
-
-	// write length of device id as uint16
-	uint16_t dev_id_len_network = htons([_device_id length]);
-	[msg appendBytes:&dev_id_len_network length:2];
-	
-	// append device id itself
-	[msg appendData:_device_id];
-
-	// NSLog(@"SharedListsTableViewController::load_initial_data() device id lenth = %i", device_id_length);
-
-	// NSString *num = [[NSUserDefaults standardUserDefaults] stringForKey:@"SBFormattedPhoneNumber"];
-	// NSLog(@"%@\n", num);
-
-	// ShlistServer *server = [[ShlistServer alloc] init];
-	[_server writeToServer:msg];
 }
 
 - (IBAction) unwindToList:(UIStoryboardSegue *)segue
@@ -74,25 +39,9 @@
 	[self.shared_lists addObject:list];
 	[self.tableView reloadData];
 
-	// new list message
-	NSMutableData *msg = [NSMutableData data];
-	[msg appendBytes:"\x00\x01" length:2];
-
-	// length = device id + list name + null separator
-	uint16_t length_network_endian = htons([_device_id length] + [list.list_name length] + 1);
-	[msg appendBytes:&length_network_endian length:2];
-
-	// append device id
-	[msg appendData:_device_id];
-
-	// append null separator
-	[msg appendBytes:"\0" length:1];
-
-	// append new list name
-	[msg appendData:[list.list_name dataUsingEncoding:NSUTF8StringEncoding]];
-
-	// send message
-	[_server writeToServer:msg];
+	// send new list message with new list name as payload
+	NSData *payload = [list.list_name dataUsingEncoding:NSUTF8StringEncoding];
+	[_server send_message:1 contents:payload];
 
 	NSLog(@"unwindToList(): done");
 }
@@ -190,18 +139,18 @@
 			return @"you're not in any lists";
 		}
 		else if ([self.shared_lists count] == 1) {
-			return @"list you are in";
+			return @"shared list";
 		}
-		return @"lists you are in";
+		return @"shared lists";
 	}
 	else if (section == 1) {
 		if ([self.indirect_lists count] == 0) {
-			return @"your friends don't have any lists";
+			return @"no other shared lists";
 		}
 		else if ([self.indirect_lists count] == 1) {
-			return @"list your friends are in";
+			return @"other shared list";
 		}
-		return @"lists your friends are in";
+		return @"other shared lists";
 	}
 	return @"";
 }
@@ -227,7 +176,9 @@
 }
 
 // Override to support editing the table view.
-- (void) tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath
+- (void) tableView:(UITableView *)tableView
+	commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
+	forRowAtIndexPath:(NSIndexPath *)indexPath
 {
 	if (editingStyle == UITableViewCellEditingStyleDelete) {
 		// Delete the row from the data source
@@ -238,25 +189,8 @@
 
 		NSLog(@"info: leaving list '%@'", selected_list.list_name);
 
-		// delete list message
-		NSMutableData *msg = [NSMutableData data];
-		[msg appendBytes:"\x00\x05" length:2];
-
-		// length = device id + null separator + list id
-		uint16_t length_network_endian = htons([_device_id length] + [selected_list.list_id length] + 1);
-		[msg appendBytes:&length_network_endian length:2];
-
-		// append device id
-		[msg appendData:_device_id];
-
-		// append null separator
-		[msg appendBytes:"\0" length:1];
-
-		// append new list name
-		[msg appendData:[selected_list.list_id dataUsingEncoding:NSUTF8StringEncoding]];
-
-		// send message
-		[_server writeToServer:msg];
+		// send leave list message
+		[_server send_message:5 contents:selected_list.list_id];
 
 		// [self.shared_lists removeObjectAtIndex:[indexPath row]];
 	} else if (editingStyle == UITableViewCellEditingStyleInsert) {
@@ -267,25 +201,8 @@
 
 		NSLog(@"info: joining list '%@'", selected_list.list_name);
 
-		// join list message
-		NSMutableData *msg = [NSMutableData data];
-		[msg appendBytes:"\x00\x04" length:2];
-
-		// length = device id + null separator + list id
-		uint16_t length_network_endian = htons([_device_id length] + [selected_list.list_id length] + 1);
-		[msg appendBytes:&length_network_endian length:2];
-
-		// append device id
-		[msg appendData:_device_id];
-
-		// append null separator
-		[msg appendBytes:"\0" length:1];
-
-		// append new list name
-		[msg appendData:[selected_list.list_id dataUsingEncoding:NSUTF8StringEncoding]];
-
-		// send message
-		[_server writeToServer:msg];
+		// send join list message
+		[_server send_message:4 contents:selected_list.list_id];
 	}
 }
 
@@ -304,7 +221,8 @@
 */
 
 // In a storyboard-based application, you will often want to do a little preparation before navigation
-- (void) prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+- (void) prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
+{
     // Get the new view controller using [segue destinationViewController].
     // Pass the selected object to the new view controller.
 
@@ -319,25 +237,8 @@
 		// has to be done before issuing network request
 		_server->shlist_ldvc = segue.destinationViewController;
 
-		// update list items message type
-		NSMutableData *msg = [NSMutableData data];
-		[msg appendBytes:"\x00\x06" length:2];
-
-		// length = device id + list name + null separator
-		uint16_t length_network_endian = htons([_device_id length] + [list.list_id length] + 1);
-		[msg appendBytes:&length_network_endian length:2];
-
-		// append device id
-		[msg appendData:_device_id];
-
-		// append null separator
-		[msg appendBytes:"\0" length:1];
-
-		// append new list name
-		[msg appendData:[list.list_id dataUsingEncoding:NSUTF8StringEncoding]];
-
-		// send message
-		[_server writeToServer:msg];
+		// send update list items message
+		[_server send_message:6 contents:list.list_id];
 	}
 	// DetailObject *detail = [self detailForIndexPath:path];
 

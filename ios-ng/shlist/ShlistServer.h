@@ -13,7 +13,7 @@
 
 }
 
-
-- (void) writeToServer:(NSData *)data;
+- (bool) prepare;
+- (void) send_message:(uint16_t)msg_type contents:(NSData *)data;
 
 @end

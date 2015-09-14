@@ -61,7 +61,6 @@
 	self.indirect_lists = [[NSMutableArray alloc] init];
 
 	[self load_initial_data];
-
 }
 
 - (void) didReceiveMemoryWarning
@@ -79,12 +78,10 @@
 
 - (NSInteger) tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-	if (section == 0) {
+	if (section == 0)
 		return [self.shared_lists count];
-	}
-	else if (section == 1) {
+	else if (section == 1)
 		return [self.indirect_lists count];
-	}
 
 	return 0;
 }
@@ -95,36 +92,42 @@
 	[tableView deselectRowAtIndexPath:indexPath animated:NO];
 }
 
-- (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+- (UITableViewCell *) tableView:(UITableView *)tableView
+	  cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
 	UITableViewCell *cell;
 
-	// NSLog(@"SharedListsTableViewController::cellForRowAtIndexPath()");
+	int row = [indexPath row];
 
-	NSInteger section_number = [indexPath section];
-	if (section_number == 0) {
+	if ([indexPath section] == 0) {
 		cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell" forIndexPath:indexPath];
-		// UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell"];
 
-		if (cell == nil) {
-			cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"SharedListPrototypeCell"];
-			cell.selectionStyle = UITableViewCellSelectionStyleNone;
-		}
-
-		SharedList *shared_list = [self.shared_lists objectAtIndex:indexPath.row];
+		SharedList *shared_list = [self.shared_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.list_name;
 		cell.detailTextLabel.text = shared_list.list_members;
+
+		// fill in the completion fraction
+		UILabel *completion_fraction;
+		completion_fraction = (UILabel *)[cell viewWithTag:1];
+
+		// set color based on how complete the list is
+		float frac = (float) shared_list.items_ready / shared_list.items_total;
+		if (frac == 0.0f)
+			completion_fraction.textColor = [UIColor blackColor];
+		else if (frac < 0.5f)
+			completion_fraction.textColor = [UIColor redColor];
+		else if (frac < 0.75f)
+			completion_fraction.textColor = [UIColor orangeColor];
+		else
+			completion_fraction.textColor = [UIColor greenColor];
+
+		completion_fraction.text = [self fraction:shared_list.items_ready
+					      denominator:shared_list.items_total];
 	}
-	else if (section_number == 1) {
+	else if ([indexPath section] == 1) {
 		cell = [tableView dequeueReusableCellWithIdentifier:@"IndirectListPrototypeCell" forIndexPath:indexPath];
-		// UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell"];
 
-		if (cell == nil) {
-			cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"IndirectListPrototypeCell"];
-			cell.selectionStyle = UITableViewCellSelectionStyleNone;
-		}
-
-		SharedList *shared_list = [self.indirect_lists objectAtIndex:indexPath.row];
+		SharedList *shared_list = [self.indirect_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.list_name;
 		cell.detailTextLabel.text = shared_list.list_members;
 	}
@@ -132,24 +135,51 @@
 	return cell;
 }
 
+
+// taken from http://stackoverflow.com/questions/30859359/display-fraction-number-in-uilabel
+-(NSString *)fraction:(int)numerator denominator:(int)denominator {
+
+	NSMutableString *result = [NSMutableString string];
+
+	NSString *one = [NSString stringWithFormat:@"%i", numerator];
+	for (int i = 0; i < one.length; i++) {
+		[result appendString:[self superscript:[[one substringWithRange:NSMakeRange(i, 1)] intValue]]];
+	}
+	[result appendString:@"/"];
+
+	NSString *two = [NSString stringWithFormat:@"%i", denominator];
+	for (int i = 0; i < two.length; i++) {
+		[result appendString:[self subscript:[[two substringWithRange:NSMakeRange(i, 1)] intValue]]];
+	}
+	return result;
+}
+
+-(NSString *)superscript:(int)num
+{
+	NSDictionary *superscripts = @{@0: @"\u2070", @1: @"\u00B9", @2: @"\u00B2", @3: @"\u00B3", @4: @"\u2074", @5: @"\u2075", @6: @"\u2076", @7: @"\u2077", @8: @"\u2078", @9: @"\u2079"};
+	return superscripts[@(num)];
+}
+
+-(NSString *)subscript:(int)num
+{
+	NSDictionary *subscripts = @{@0: @"\u2080", @1: @"\u2081", @2: @"\u2082", @3: @"\u2083", @4: @"\u2084", @5: @"\u2085", @6: @"\u2086", @7: @"\u2087", @8: @"\u2088", @9: @"\u2089"};
+	return subscripts[@(num)];
+}
+
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
 {
 	if (section == 0) {
-		if ([self.shared_lists count] == 0) {
+		if ([self.shared_lists count] == 0)
 			return @"you're not in any lists";
-		}
-		else if ([self.shared_lists count] == 1) {
+		else if ([self.shared_lists count] == 1)
 			return @"shared list";
-		}
 		return @"shared lists";
 	}
 	else if (section == 1) {
-		if ([self.indirect_lists count] == 0) {
+		if ([self.indirect_lists count] == 0)
 			return @"no other shared lists";
-		}
-		else if ([self.indirect_lists count] == 1) {
+		else if ([self.indirect_lists count] == 1)
 			return @"other shared list";
-		}
 		return @"other shared lists";
 	}
 	return @"";
@@ -158,24 +188,18 @@
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView
 	   editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	if ([indexPath section] == 0) {
+	if ([indexPath section] == 0)
 		return UITableViewCellEditingStyleDelete;
-	}
+
 	return UITableViewCellEditingStyleInsert;
 }
 
-// Override to support conditional editing of the table view.
 - (BOOL) tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	// if ([indexPath section] == 0) {
-		// editable
-		return YES;
-	// }
-
-	// return NO;
+	// all lists are editable
+	return YES;
 }
 
-// Override to support editing the table view.
 - (void) tableView:(UITableView *)tableView
 	commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
 	forRowAtIndexPath:(NSIndexPath *)indexPath
@@ -183,6 +207,9 @@
 	if (editingStyle == UITableViewCellEditingStyleDelete) {
 		// Delete the row from the data source
 		// [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+
+		//NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:0 inSection:1];
+		//[tableView moveRowAtIndexPath:indexPath toIndexPath:new_index_path];
 
 		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
 		SharedList *selected_list = [self.shared_lists objectAtIndex:[path row]];
@@ -206,25 +233,11 @@
 	}
 }
 
-/*
-// Override to support rearranging the table view.
-- (void) tableView:(UITableView *)tableView moveRowAtIndexPath:(NSIndexPath *)fromIndexPath toIndexPath:(NSIndexPath *)toIndexPath {
-}
-*/
-
-/*
-// Override to support conditional rearranging of the table view.
-- (BOOL) tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
-    // Return NO if you do not want the item to be re-orderable.
-    return YES;
-}
-*/
-
 // In a storyboard-based application, you will often want to do a little preparation before navigation
 - (void) prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
 {
-    // Get the new view controller using [segue destinationViewController].
-    // Pass the selected object to the new view controller.
+	// Get the new view controller using [segue destinationViewController].
+	// Pass the selected object to the new view controller.
 
 	if ([[segue identifier] isEqualToString:@"show list segue"]) {
 
@@ -240,8 +253,7 @@
 		// send update list items message
 		[_server send_message:6 contents:list.list_id];
 	}
-	// DetailObject *detail = [self detailForIndexPath:path];
-
+	// DetailObject *detail = [self detailForIndexPath:path];ß
 
 	// ListDetailTableViewController *list_detail_tvc = [segue destinationViewController];
 	// list_detail_tvc.navigationItem.title = @"Test Title";

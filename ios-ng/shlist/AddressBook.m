@@ -2,14 +2,33 @@
 #include <AddressBook/AddressBook.h>
 #import <UIKit/UIKit.h>
 
+@interface AddressBook ()
+
+@end
+
+// empty implementation
+@implementation Contact
+@end
 
 @implementation AddressBook
+
++ (id)shared_address_book
+{
+	static AddressBook *address_book = nil;
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		address_book = [[self alloc] init];
+		address_book.ready = 0;
+	});
+	return address_book;
+}
 
 - (id)init
 {
 	self = [super init];
 	if (self)
 	{
+		_contacts = [[NSMutableArray alloc] init];
 		ABAuthorizationStatus status = ABAddressBookGetAuthorizationStatus();
 
 		if (status == kABAuthorizationStatusDenied || status == kABAuthorizationStatusRestricted) {
@@ -29,6 +48,8 @@
 			NSLog(@"ABAddressBookCreateWithOptions error: %@", CFBridgingRelease(error));
 			return self;
 		}
+
+		// ABAddressBookRegisterExternalChangeCallback(<#ABAddressBookRef addressBook#>, <#ABExternalChangeCallback callback#>, <#void *context#>)
 
 		ABAddressBookRequestAccessWithCompletion(addressBook, ^(bool granted, CFErrorRef error) {
 			if (error) {
@@ -60,46 +81,59 @@
 	NSArray *allPeople = CFBridgingRelease(ABAddressBookCopyArrayOfAllPeople(addressBook));
 	NSInteger numberOfPeople = [allPeople count];
 
-	_name_map = [NSMutableDictionary dictionaryWithCapacity:numberOfPeople];
-
 	for (NSInteger i = 0; i < numberOfPeople; i++) {
 		ABRecordRef person = (__bridge ABRecordRef)allPeople[i];
+		Contact *contact = [[Contact alloc] init];
 
-		NSString *firstName = CFBridgingRelease(ABRecordCopyValue(person, kABPersonFirstNameProperty));
-		// NSString *lastName  = CFBridgingRelease(ABRecordCopyValue(person, kABPersonLastNameProperty));
-		// NSLog(@"Name:%@ %@", firstName, lastName);
+		// don't enforce these existing on purpose
+		contact.first_name = CFBridgingRelease(ABRecordCopyValue(person, kABPersonFirstNameProperty));
+		contact.last_name  = CFBridgingRelease(ABRecordCopyValue(person, kABPersonLastNameProperty));
 
 		ABMultiValueRef phoneNumbers = ABRecordCopyValue(person, kABPersonPhoneProperty);
-
-		if (firstName == nil) {
-			// if we don't have a first name then we can't display it
-			continue;
-		}
-
 		CFIndex numberOfPhoneNumbers = ABMultiValueGetCount(phoneNumbers);
+		contact.phone_numbers = [[NSMutableArray alloc] init];
 		for (CFIndex i = 0; i < numberOfPhoneNumbers; i++) {
 			NSString *phoneNumber = CFBridgingRelease(ABMultiValueCopyValueAtIndex(phoneNumbers, i));
 
-			if (phoneNumber == nil) {
-				// if we have a name but no phone number, there's
-				// nothing we can do
+			if (phoneNumber == nil)
 				continue;
-			}
 
 			phoneNumber = [phoneNumber stringByReplacingOccurrencesOfString:@" " withString:@""];
 			phoneNumber = [phoneNumber stringByReplacingOccurrencesOfString:@"(" withString:@""];
 			phoneNumber = [phoneNumber stringByReplacingOccurrencesOfString:@")" withString:@""];
 			phoneNumber = [phoneNumber stringByReplacingOccurrencesOfString:@"-" withString:@""];
 
-			[_name_map setObject:firstName forKey:phoneNumber];
-
-			// NSLog(@"  phone:%@", phoneNumber);
+			[contact.phone_numbers addObject:phoneNumber];
 		}
-
 		CFRelease(phoneNumbers);
 
-		// NSLog(@"=============================================");
+		[_contacts addObject:contact];
 	}
+
+	_num_contacts = [_contacts count];
+	_ready = 1;
+
+	NSLog(@"info: address book: %i contacts found", _num_contacts);
+}
+
+- (void) wait_for_ready
+{
+	int cumulative_ms = 0;
+	int sleep_for_ms = 10;
+	// wait for the database to become ready, no upper bound
+	while (!_ready) {
+		usleep(sleep_for_ms * 1000);
+		cumulative_ms += sleep_for_ms;
+
+		// if we've spun for over a second reduce polling speed
+		if (cumulative_ms > 1 * 1000) {
+			NSLog(@"warn: address book: not ready for more than %i s",
+			      cumulative_ms / 1000);
+			sleep_for_ms = 1 * 1000;
+		}
+	}
+
+	NSLog(@"info: address book: ready after %i ms", cumulative_ms);
 }
 
 @end

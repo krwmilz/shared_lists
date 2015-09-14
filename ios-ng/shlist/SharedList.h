@@ -11,6 +11,9 @@
 @property NSString *list_members;
 @property NSDate *list_date;
 
+@property int items_ready;
+@property int items_total;
+
 @end
 
 #endif

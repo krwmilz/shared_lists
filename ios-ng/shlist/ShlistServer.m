@@ -253,6 +253,7 @@
 				if (list.list_name == output) {
 					[shlist_tvc.indirect_lists addObject:list];
 					[shlist_tvc.shared_lists removeObject:list];
+
 					break;
 				}
 			}
@@ -402,7 +403,6 @@
 	[outputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
 					 forMode:NSDefaultRunLoopMode];
 
-    
 	inputShlistStream = nil; // stream is ivar, so reinit it
 	outputShlistStream = nil; // stream is ivar, so reinit it
 }

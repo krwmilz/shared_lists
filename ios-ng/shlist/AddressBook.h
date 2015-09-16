@@ -3,14 +3,14 @@
 @interface AddressBook : NSObject
 
 @property (strong, retain) NSMutableArray *contacts;
-@property int num_contacts;
+@property unsigned long num_contacts;
 
 // returns singleton instance
 + (id) shared_address_book;
 
 - (void) wait_for_ready;
 
-@property int ready;
+@property volatile uint32_t ready;
 
 @end
 

@@ -92,31 +92,29 @@
 - (void)listPeopleInAddressBook:(ABAddressBookRef)addressBook
 {
 	NSArray *allPeople = CFBridgingRelease(ABAddressBookCopyArrayOfAllPeople(addressBook));
-	NSInteger numberOfPeople = [allPeople count];
 
-	for (NSInteger i = 0; i < numberOfPeople; i++) {
+	NSCharacterSet *want =[[NSCharacterSet characterSetWithCharactersInString:@"0123456789"] invertedSet];
+
+	for (NSInteger i = 0; i < [allPeople count]; i++) {
 		ABRecordRef person = (__bridge ABRecordRef)allPeople[i];
 		Contact *contact = [[Contact alloc] init];
 
-		// don't enforce these existing on purpose
+		// don't enforce these existing
 		contact.first_name = CFBridgingRelease(ABRecordCopyValue(person, kABPersonFirstNameProperty));
 		contact.last_name  = CFBridgingRelease(ABRecordCopyValue(person, kABPersonLastNameProperty));
+		contact.phone_numbers = [[NSMutableArray alloc] init];
 
 		ABMultiValueRef phoneNumbers = ABRecordCopyValue(person, kABPersonPhoneProperty);
 		CFIndex numberOfPhoneNumbers = ABMultiValueGetCount(phoneNumbers);
-		contact.phone_numbers = [[NSMutableArray alloc] init];
 		for (CFIndex i = 0; i < numberOfPhoneNumbers; i++) {
-			NSString *phoneNumber = CFBridgingRelease(ABMultiValueCopyValueAtIndex(phoneNumbers, i));
+			NSString *pn = CFBridgingRelease(ABMultiValueCopyValueAtIndex(phoneNumbers, i));
 
-			if (phoneNumber == nil)
+			if (pn == nil)
 				continue;
 
-			phoneNumber = [phoneNumber stringByReplacingOccurrencesOfString:@" " withString:@""];
-			phoneNumber = [phoneNumber stringByReplacingOccurrencesOfString:@"(" withString:@""];
-			phoneNumber = [phoneNumber stringByReplacingOccurrencesOfString:@")" withString:@""];
-			phoneNumber = [phoneNumber stringByReplacingOccurrencesOfString:@"-" withString:@""];
+			NSString *cleaned = [[pn componentsSeparatedByCharactersInSet: want] componentsJoinedByString:@""];
 
-			[contact.phone_numbers addObject:phoneNumber];
+			[contact.phone_numbers addObject:cleaned];
 		}
 		CFRelease(phoneNumbers);
 

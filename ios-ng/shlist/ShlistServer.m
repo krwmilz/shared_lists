@@ -236,19 +236,18 @@
 		if (msg_type == 4) {
 			NSLog(@"info: got response from join list request, '%@'", output);
 
-			for (SharedList *list in shlist_tvc.indirect_lists) {
-				if (list.list_name == output) {
-					[shlist_tvc.shared_lists addObject:list];
-					[shlist_tvc.indirect_lists removeObject:list];
-					break;
-				}
-			}
-			[shlist_tvc.tableView reloadData];
+			
+			// update the already existing row entry with fresh info
+			// [shlist_tvc.tableView reloadRowsAtIndexPaths: withRowAnimation:];
+
 		}
 
 		if (msg_type == 5) {
-			NSLog(@"info: got response from leave list request");
+			NSLog(@"info: leave list response '%@'", output);
 
+			// [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+
+			/*
 			for (SharedList *list in shlist_tvc.shared_lists) {
 				if (list.list_name == output) {
 					[shlist_tvc.indirect_lists addObject:list];
@@ -258,6 +257,7 @@
 				}
 			}
 			[shlist_tvc.tableView reloadData];
+			 */
 		}
 	}
 	break;
@@ -348,7 +348,6 @@
 
 			// try to find the list member in our address book
 			NSString *name = _phnum_to_name_map[phone_number];
-			// NSLog(@"info: %@ -> %@", phone_number, name);
 
 			if (name)
 				[members addObject:name];

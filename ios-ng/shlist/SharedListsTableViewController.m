@@ -14,19 +14,6 @@
 
 @implementation SharedListsTableViewController
 
-- (void) load_initial_data
-{
-	// create one and only server instance, this gets passed around
-	_server = [[ShlistServer alloc] init];
-	_server->shlist_tvc = self;
-
-	if ([_server prepare]) {
-		NSLog(@"info: server connection prepared");
-		// bulk update, doesn't take a payload
-		[_server send_message:3 contents:nil];
-	}
-}
-
 - (IBAction) unwindToList:(UIStoryboardSegue *)segue
 {
 	NewListViewController *source = [segue sourceViewController];
@@ -50,17 +37,21 @@
 {
 	[super viewDidLoad];
 
-	// Uncomment the following line to preserve selection between
-	// presentations.
-	// self.clearsSelectionOnViewWillAppear = NO;
-
 	// display an Edit button in the navigation bar for this view controller
 	self.navigationItem.leftBarButtonItem = self.editButtonItem;
 
 	self.shared_lists = [[NSMutableArray alloc] init];
 	self.indirect_lists = [[NSMutableArray alloc] init];
 
-	[self load_initial_data];
+	// create one and only server instance, this gets passed around
+	_server = [[ShlistServer alloc] init];
+	_server->shlist_tvc = self;
+
+	if ([_server prepare]) {
+		NSLog(@"info: server connection prepared");
+		// bulk update, doesn't take a payload
+		[_server send_message:3 contents:nil];
+	}
 }
 
 - (void) didReceiveMemoryWarning
@@ -73,6 +64,7 @@
 
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView
 {
+	// "lists you're in" and "other lists"
 	return 2;
 }
 
@@ -82,26 +74,55 @@
 		return [self.shared_lists count];
 	else if (section == 1)
 		return [self.indirect_lists count];
-
 	return 0;
 }
 
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+// major thing here is join list requests
+- (void)tableView:(UITableView *)tableView
+	didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	NSLog(@"did cell selection");
-	[tableView deselectRowAtIndexPath:indexPath animated:NO];
+	[tableView deselectRowAtIndexPath:indexPath animated:YES];
+
+	// section 0 is going to segue to the list items screen
+	if ([indexPath section] == 0)
+		return;
+
+	// we're in section 1 now, a tap down here means we're doing a join list request
+	NSIndexPath *path = [self.tableView indexPathForSelectedRow];
+	SharedList *list = [self.indirect_lists objectAtIndex:[path row]];
+	NSLog(@"info: joining '%@'", list.list_name);
+
+	// this has to be done before row moving
+	[_shared_lists addObject:list];
+	[_indirect_lists removeObject:list];
+
+	UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+
+	// compute new position and start moving row as soon as possible
+	// XXX: sorting
+	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:[_shared_lists count] - 1 inSection:0];
+	[tableView moveRowAtIndexPath:indexPath toIndexPath:new_index_path];
+
+	// add > accessory indicator
+	cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+	UILabel *fraction = (UILabel *)[cell viewWithTag:1];
+	fraction.hidden = NO;
+	fraction.text = [self fraction:list.items_ready denominator:list.items_total];
+
+	// send this last because when the response comes in the list should be in
+	// it's expected place
+	[_server send_message:4 contents:list.list_id];
 }
 
 - (UITableViewCell *) tableView:(UITableView *)tableView
 	  cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
 	UITableViewCell *cell;
+	cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell" forIndexPath:indexPath];
 
 	int row = [indexPath row];
 
 	if ([indexPath section] == 0) {
-		cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell" forIndexPath:indexPath];
-
 		SharedList *shared_list = [self.shared_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.list_name;
 		cell.detailTextLabel.text = shared_list.list_members;
@@ -111,6 +132,7 @@
 		completion_fraction = (UILabel *)[cell viewWithTag:1];
 
 		// set color based on how complete the list is
+		/*
 		float frac = (float) shared_list.items_ready / shared_list.items_total;
 		if (frac == 0.0f)
 			completion_fraction.textColor = [UIColor blackColor];
@@ -120,16 +142,25 @@
 			completion_fraction.textColor = [UIColor orangeColor];
 		else
 			completion_fraction.textColor = [UIColor greenColor];
+		 */
 
 		completion_fraction.text = [self fraction:shared_list.items_ready
 					      denominator:shared_list.items_total];
 	}
 	else if ([indexPath section] == 1) {
-		cell = [tableView dequeueReusableCellWithIdentifier:@"IndirectListPrototypeCell" forIndexPath:indexPath];
-
 		SharedList *shared_list = [self.indirect_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.list_name;
 		cell.detailTextLabel.text = shared_list.list_members;
+
+		// Modify the look of the off the shelf cell
+		// Note, a separate prototype cell isn't used here because we
+		// can potentially swap cells a large number of times, and moving
+		// is more efficient than recreating.
+
+		// remove the > accessory and the completion fraction
+		cell.accessoryType = UITableViewCellAccessoryNone;
+		UILabel *fraction = (UILabel *)[cell viewWithTag:1];
+		fraction.hidden = YES;
 	}
 
 	return cell;
@@ -137,7 +168,8 @@
 
 
 // taken from http://stackoverflow.com/questions/30859359/display-fraction-number-in-uilabel
--(NSString *)fraction:(int)numerator denominator:(int)denominator {
+-(NSString *)fraction:(int)numerator denominator:(int)denominator
+{
 
 	NSMutableString *result = [NSMutableString string];
 
@@ -168,69 +200,64 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
 {
-	if (section == 0) {
-		if ([self.shared_lists count] == 0)
-			return @"you're not in any lists";
-		else if ([self.shared_lists count] == 1)
-			return @"shared list";
-		return @"shared lists";
-	}
-	else if (section == 1) {
-		if ([self.indirect_lists count] == 0)
-			return @"no other shared lists";
-		else if ([self.indirect_lists count] == 1)
-			return @"other shared list";
-		return @"other shared lists";
-	}
+	if (section == 0)
+		return @"Lists you're in";
+	else if (section == 1)
+		return @"Other lists";
 	return @"";
 }
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView
 	   editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	if ([indexPath section] == 0)
-		return UITableViewCellEditingStyleDelete;
-
-	return UITableViewCellEditingStyleInsert;
+	// don't have to check the section here because canEditRowAtIndexPath
+	// already said the section can't be edited
+	return UITableViewCellEditingStyleDelete;
 }
 
 - (BOOL) tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	// all lists are editable
-	return YES;
+	if ([indexPath section] == 0)
+		return YES;
+	return NO;
 }
 
+- (NSString *)tableView:(UITableView *)tableView
+	titleForDeleteConfirmationButtonForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+	return @"Leave";
+}
+
+// this functions called when delete has been prompted and ok'd
 - (void) tableView:(UITableView *)tableView
 	commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
 	forRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	if (editingStyle == UITableViewCellEditingStyleDelete) {
-		// Delete the row from the data source
-		// [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+	// remove the row from the "lists you're in" section and put it in the
+	// "other lists" section
+	NSIndexPath *path = [self.tableView indexPathForSelectedRow];
+	SharedList *list = [self.shared_lists objectAtIndex:[path row]];
+	NSLog(@"info: leaving '%@'", list.list_name);
 
-		//NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:0 inSection:1];
-		//[tableView moveRowAtIndexPath:indexPath toIndexPath:new_index_path];
+	[self.indirect_lists addObject:list];
+	[self.shared_lists removeObject:list];
 
-		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
-		SharedList *selected_list = [self.shared_lists objectAtIndex:[path row]];
+	UITableViewCell *new_cell = [tableView cellForRowAtIndexPath:indexPath];
 
-		NSLog(@"info: leaving list '%@'", selected_list.list_name);
+	// perform row move, the destination is the top of "other lists"
+	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:0 inSection:1];
+	[tableView moveRowAtIndexPath:indexPath toIndexPath:new_index_path];
 
-		// send leave list message
-		[_server send_message:5 contents:selected_list.list_id];
+	// remove > accessory and hide the completion fraction
+	new_cell.accessoryType = UITableViewCellAccessoryNone;
+	UILabel *fraction = (UILabel *)[new_cell viewWithTag:1];
+	fraction.hidden = YES;
 
-		// [self.shared_lists removeObjectAtIndex:[indexPath row]];
-	} else if (editingStyle == UITableViewCellEditingStyleInsert) {
-		// Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
+	// reset editing state back to the default
+	[tableView setEditing:FALSE animated:TRUE];
 
-		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
-		SharedList *selected_list = [self.indirect_lists objectAtIndex:[path row]];
-
-		NSLog(@"info: joining list '%@'", selected_list.list_name);
-
-		// send join list message
-		[_server send_message:4 contents:selected_list.list_id];
-	}
+	// send leave list message
+	[_server send_message:5 contents:list.list_id];
 }
 
 // In a storyboard-based application, you will often want to do a little preparation before navigation
@@ -242,6 +269,7 @@
 	if ([[segue identifier] isEqualToString:@"show list segue"]) {
 
 		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
+
 		SharedList *list = [self.shared_lists objectAtIndex:[path row]];
 
 		// only list detail table view controller has this method
@@ -259,6 +287,17 @@
 	// list_detail_tvc.navigationItem.title = @"Test Title";
 
 	NSLog(@"preparing for segue");
+}
+
+// prevent segues from occurring when non member lists are selected
+// this isn't needed if we use 2 different prototype cells
+- (BOOL)shouldPerformSegueWithIdentifier:(NSString *)identifier sender:(id)sender
+{
+	NSIndexPath *path = [self.tableView indexPathForSelectedRow];
+
+	if ([path section] == 0)
+		return YES;
+	return NO;
 }
 
 @end

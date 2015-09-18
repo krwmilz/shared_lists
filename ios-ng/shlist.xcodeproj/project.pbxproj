@@ -21,8 +21,6 @@
 		27C70F2A1B33D1C900DADEB3 /* SharedList.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F291B33D1C900DADEB3 /* SharedList.m */; };
 		27C70F2D1B33F3C300DADEB3 /* NewListViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F2C1B33F3C300DADEB3 /* NewListViewController.m */; };
 		27C70F301B33F4FA00DADEB3 /* SharedListsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F2F1B33F4FA00DADEB3 /* SharedListsTableViewController.m */; };
-		27C70F321B3650CB00DADEB3 /* libsqlite3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 27C70F311B3650CB00DADEB3 /* libsqlite3.dylib */; };
-		27C70F351B36513200DADEB3 /* DBManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F341B36513200DADEB3 /* DBManager.m */; };
 		27D805731BA2649D00867494 /* ContactsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27D805721BA2649D00867494 /* ContactsTableViewController.m */; };
 		27DCC9DE1B8A98D400207340 /* dollar103-2.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9DD1B8A98D400207340 /* dollar103-2.png */; };
 		27DCC9E81B9EB4E800207340 /* information15-3.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9E71B9EB4E800207340 /* information15-3.png */; };
@@ -67,9 +65,6 @@
 		27C70F2C1B33F3C300DADEB3 /* NewListViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NewListViewController.m; sourceTree = "<group>"; };
 		27C70F2E1B33F4FA00DADEB3 /* SharedListsTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SharedListsTableViewController.h; sourceTree = "<group>"; };
 		27C70F2F1B33F4FA00DADEB3 /* SharedListsTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SharedListsTableViewController.m; sourceTree = "<group>"; };
-		27C70F311B3650CB00DADEB3 /* libsqlite3.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libsqlite3.dylib; path = usr/lib/libsqlite3.dylib; sourceTree = SDKROOT; };
-		27C70F331B36513200DADEB3 /* DBManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DBManager.h; sourceTree = "<group>"; };
-		27C70F341B36513200DADEB3 /* DBManager.m */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.objc; path = DBManager.m; sourceTree = "<group>"; tabWidth = 8; usesTabs = 1; };
 		27D805711BA2649D00867494 /* ContactsTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ContactsTableViewController.h; sourceTree = SOURCE_ROOT; };
 		27D805721BA2649D00867494 /* ContactsTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ContactsTableViewController.m; sourceTree = SOURCE_ROOT; };
 		27DCC9DD1B8A98D400207340 /* dollar103-2.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "dollar103-2.png"; path = "../../../Downloads/dollar103-2.png"; sourceTree = "<group>"; };
@@ -89,7 +84,6 @@
 			files = (
 				27B03A021B43B8660054B6D2 /* AddressBook.framework in Frameworks */,
 				27B03A031B43B8660054B6D2 /* AddressBookUI.framework in Frameworks */,
-				27C70F321B3650CB00DADEB3 /* libsqlite3.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,11 +104,8 @@
 				27AAC22B1B50ABAF00D99171 /* NewItemTableViewController.m */,
 				27B03A001B43B8660054B6D2 /* AddressBook.framework */,
 				27B03A011B43B8660054B6D2 /* AddressBookUI.framework */,
-				27C70F331B36513200DADEB3 /* DBManager.h */,
-				27C70F341B36513200DADEB3 /* DBManager.m */,
 				27C70F091B32AF8000DADEB3 /* ShlistServer.h */,
 				27C70F0A1B32AF8000DADEB3 /* ShlistServer.m */,
-				27C70F311B3650CB00DADEB3 /* libsqlite3.dylib */,
 				27C70F011B32AF8000DADEB3 /* shlist */,
 				27C70F1B1B32AF8000DADEB3 /* shlistTests */,
 				27C70F001B32AF8000DADEB3 /* Products */,
@@ -291,7 +282,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				BF7776B91B38928D00526CB0 /* ListDetailTableViewController.m in Sources */,
-				27C70F351B36513200DADEB3 /* DBManager.m in Sources */,
 				27AAC22C1B50ABAF00D99171 /* NewItemTableViewController.m in Sources */,
 				BF7776BC1B38D0DB00526CB0 /* ListItem.m in Sources */,
 				27C70F0B1B32AF8000DADEB3 /* ShlistServer.m in Sources */,

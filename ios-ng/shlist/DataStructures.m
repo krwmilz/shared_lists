@@ -1,6 +1,10 @@
 #import <Foundation/Foundation.h>
-#import "SharedList.h"
+#import "DataStructures.h"
 
 @implementation SharedList
+
+@end
+
+@implementation ListItem
 
 @end

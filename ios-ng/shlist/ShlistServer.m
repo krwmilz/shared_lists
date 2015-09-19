@@ -1,5 +1,5 @@
 #import "ShlistServer.h"
-#import "SharedList.h"
+#import "DataStructures.h"
 #import "AddressBook.h"
 
 @interface ShlistServer ()

@@ -1,5 +1,5 @@
 #import "ListDetailTableViewController.h"
-#import "ListItem.h"
+#import "DataStructures.h"
 #import "ShlistServer.h"
 
 @interface ListDetailTableViewController ()

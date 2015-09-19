@@ -1,5 +1,5 @@
 #import <UIKit/UIKit.h>
-#import "ListItem.h"
+#import "DataStructures.h"
 
 @interface NewItemTableViewController : UITableViewController
 

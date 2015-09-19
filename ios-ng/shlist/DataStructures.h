@@ -1,8 +1,5 @@
 #import <UIKit/UIKit.h>
 
-#ifndef shlist_List_h
-#define shlist_List_h
-
 @interface SharedList : NSObject
 
 // @property (weak, nonatomic) IBOutlet;
@@ -19,4 +16,12 @@
 
 @end
 
-#endif
+@interface ListItem : NSObject
+
+@property int modifier;
+@property NSString *name;
+@property int quantity;
+@property NSString *owner;
+@property int completed;
+
+@end

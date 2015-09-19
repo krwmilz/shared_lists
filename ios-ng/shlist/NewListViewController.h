@@ -1,5 +1,5 @@
 #import <UIKit/UIKit.h>
-#import "SharedList.h"
+#import "DataStructures.h"
 
 @interface NewListViewController : UIViewController
 

@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-#import "SharedList.h"
+#import "DataStructures.h"
 
 @interface MainTableViewController : UITableViewController
 

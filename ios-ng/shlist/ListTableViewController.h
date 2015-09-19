@@ -1,7 +1,7 @@
 #import <UIKit/UIKit.h>
 #import "DataStructures.h"
 
-@interface ListDetailTableViewController : UITableViewController
+@interface ListTableViewController : UITableViewController
 
 @property SharedList *list_metadata;
 @property NSMutableArray *list_items;

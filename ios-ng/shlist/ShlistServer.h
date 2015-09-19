@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 #import "MainTableViewController.h"
-#import "ListDetailTableViewController.h"
+#import "ListTableViewController.h"
 
 @interface ShlistServer : NSObject <NSStreamDelegate> {
 	NSInputStream *inputShlistStream;
@@ -9,7 +9,7 @@
 
 	@public
 	MainTableViewController *shlist_tvc;
-	ListDetailTableViewController *shlist_ldvc;
+	ListTableViewController *shlist_ldvc;
 
 }
 

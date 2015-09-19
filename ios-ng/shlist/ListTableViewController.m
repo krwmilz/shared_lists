@@ -1,15 +1,15 @@
-#import "ListDetailTableViewController.h"
+#import "ListTableViewController.h"
 #import "DataStructures.h"
 #import "ShlistServer.h"
 
-@interface ListDetailTableViewController ()
+@interface ListTableViewController ()
 
 - (void)load_initial_data;
 @property (strong, nonatomic) ShlistServer *server;
 
 @end
 
-@implementation ListDetailTableViewController
+@implementation ListTableViewController
 
 - (void) load_initial_data
 {

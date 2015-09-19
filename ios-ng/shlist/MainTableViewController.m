@@ -1,7 +1,7 @@
 #import "MainTableViewController.h"
 #import "NewListViewController.h"
 #import "ShlistServer.h"
-#import "ListDetailTableViewController.h"
+#import "ListTableViewController.h"
 
 #import <AddressBook/AddressBook.h>
 

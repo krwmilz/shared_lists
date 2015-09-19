@@ -25,7 +25,7 @@
 		27DCC9DE1B8A98D400207340 /* dollar103-2.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9DD1B8A98D400207340 /* dollar103-2.png */; };
 		27DCC9E81B9EB4E800207340 /* information15-3.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9E71B9EB4E800207340 /* information15-3.png */; };
 		27DCC9EB1B9FF89E00207340 /* AddressBook.m in Sources */ = {isa = PBXBuildFile; fileRef = 27DCC9EA1B9FF89E00207340 /* AddressBook.m */; };
-		BF7776B91B38928D00526CB0 /* ListDetailTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */; };
+		BF7776B91B38928D00526CB0 /* ListTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = BF7776B81B38928D00526CB0 /* ListTableViewController.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,8 +70,8 @@
 		27DCC9E71B9EB4E800207340 /* information15-3.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "information15-3.png"; path = "../../../Downloads/information15-3.png"; sourceTree = "<group>"; };
 		27DCC9E91B9FF89E00207340 /* AddressBook.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AddressBook.h; sourceTree = "<group>"; };
 		27DCC9EA1B9FF89E00207340 /* AddressBook.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AddressBook.m; sourceTree = "<group>"; };
-		BF7776B71B38928D00526CB0 /* ListDetailTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListDetailTableViewController.h; sourceTree = "<group>"; };
-		BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ListDetailTableViewController.m; sourceTree = "<group>"; };
+		BF7776B71B38928D00526CB0 /* ListTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListTableViewController.h; sourceTree = "<group>"; };
+		BF7776B81B38928D00526CB0 /* ListTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ListTableViewController.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,8 +135,8 @@
 				27C70F0F1B32AF8000DADEB3 /* Images.xcassets */,
 				27DCC9E71B9EB4E800207340 /* information15-3.png */,
 				27C70F111B32AF8000DADEB3 /* LaunchScreen.xib */,
-				BF7776B71B38928D00526CB0 /* ListDetailTableViewController.h */,
-				BF7776B81B38928D00526CB0 /* ListDetailTableViewController.m */,
+				BF7776B71B38928D00526CB0 /* ListTableViewController.h */,
+				BF7776B81B38928D00526CB0 /* ListTableViewController.m */,
 				27C70F0C1B32AF8000DADEB3 /* Main.storyboard */,
 				27C70F2E1B33F4FA00DADEB3 /* MainTableViewController.h */,
 				27C70F2F1B33F4FA00DADEB3 /* MainTableViewController.m */,
@@ -276,7 +276,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BF7776B91B38928D00526CB0 /* ListDetailTableViewController.m in Sources */,
+				BF7776B91B38928D00526CB0 /* ListTableViewController.m in Sources */,
 				27AAC22C1B50ABAF00D99171 /* NewItemTableViewController.m in Sources */,
 				27C70F0B1B32AF8000DADEB3 /* ShlistServer.m in Sources */,
 				27D805731BA2649D00867494 /* ContactsTableViewController.m in Sources */,

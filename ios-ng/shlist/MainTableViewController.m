@@ -1,17 +1,17 @@
-#import "SharedListsTableViewController.h"
+#import "MainTableViewController.h"
 #import "NewListViewController.h"
 #import "ShlistServer.h"
 #import "ListDetailTableViewController.h"
 
 #import <AddressBook/AddressBook.h>
 
-@interface SharedListsTableViewController ()
+@interface MainTableViewController ()
 
 @property (strong, nonatomic) ShlistServer *server;
 
 @end
 
-@implementation SharedListsTableViewController
+@implementation MainTableViewController
 
 - (IBAction) unwindToList:(UIStoryboardSegue *)segue
 {

@@ -20,7 +20,7 @@
 		27C70F1F1B32AF8000DADEB3 /* shlistTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F1E1B32AF8000DADEB3 /* shlistTests.m */; };
 		27C70F2A1B33D1C900DADEB3 /* SharedList.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F291B33D1C900DADEB3 /* SharedList.m */; };
 		27C70F2D1B33F3C300DADEB3 /* NewListViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F2C1B33F3C300DADEB3 /* NewListViewController.m */; };
-		27C70F301B33F4FA00DADEB3 /* SharedListsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F2F1B33F4FA00DADEB3 /* SharedListsTableViewController.m */; };
+		27C70F301B33F4FA00DADEB3 /* MainTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F2F1B33F4FA00DADEB3 /* MainTableViewController.m */; };
 		27D805731BA2649D00867494 /* ContactsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27D805721BA2649D00867494 /* ContactsTableViewController.m */; };
 		27DCC9DE1B8A98D400207340 /* dollar103-2.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9DD1B8A98D400207340 /* dollar103-2.png */; };
 		27DCC9E81B9EB4E800207340 /* information15-3.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9E71B9EB4E800207340 /* information15-3.png */; };
@@ -63,8 +63,8 @@
 		27C70F291B33D1C900DADEB3 /* SharedList.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SharedList.m; sourceTree = "<group>"; };
 		27C70F2B1B33F3C300DADEB3 /* NewListViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NewListViewController.h; sourceTree = "<group>"; };
 		27C70F2C1B33F3C300DADEB3 /* NewListViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NewListViewController.m; sourceTree = "<group>"; };
-		27C70F2E1B33F4FA00DADEB3 /* SharedListsTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SharedListsTableViewController.h; sourceTree = "<group>"; };
-		27C70F2F1B33F4FA00DADEB3 /* SharedListsTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SharedListsTableViewController.m; sourceTree = "<group>"; };
+		27C70F2E1B33F4FA00DADEB3 /* MainTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MainTableViewController.h; sourceTree = "<group>"; };
+		27C70F2F1B33F4FA00DADEB3 /* MainTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MainTableViewController.m; sourceTree = "<group>"; };
 		27D805711BA2649D00867494 /* ContactsTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ContactsTableViewController.h; sourceTree = SOURCE_ROOT; };
 		27D805721BA2649D00867494 /* ContactsTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ContactsTableViewController.m; sourceTree = SOURCE_ROOT; };
 		27DCC9DD1B8A98D400207340 /* dollar103-2.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "dollar103-2.png"; path = "../../../Downloads/dollar103-2.png"; sourceTree = "<group>"; };
@@ -145,8 +145,8 @@
 				27C70F2C1B33F3C300DADEB3 /* NewListViewController.m */,
 				27C70F281B33CE2500DADEB3 /* SharedList.h */,
 				27C70F291B33D1C900DADEB3 /* SharedList.m */,
-				27C70F2E1B33F4FA00DADEB3 /* SharedListsTableViewController.h */,
-				27C70F2F1B33F4FA00DADEB3 /* SharedListsTableViewController.m */,
+				27C70F2E1B33F4FA00DADEB3 /* MainTableViewController.h */,
+				27C70F2F1B33F4FA00DADEB3 /* MainTableViewController.m */,
 				27C70F021B32AF8000DADEB3 /* Supporting Files */,
 			);
 			path = shlist;
@@ -291,7 +291,7 @@
 				27C70F081B32AF8000DADEB3 /* AppDelegate.m in Sources */,
 				27B039FF1B43B6830054B6D2 /* ContactsViewController.m in Sources */,
 				27DCC9EB1B9FF89E00207340 /* AddressBook.m in Sources */,
-				27C70F301B33F4FA00DADEB3 /* SharedListsTableViewController.m in Sources */,
+				27C70F301B33F4FA00DADEB3 /* MainTableViewController.m in Sources */,
 				27C70F051B32AF8000DADEB3 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

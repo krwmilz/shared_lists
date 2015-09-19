@@ -2,7 +2,7 @@
 
 #import "SharedList.h"
 
-@interface SharedListsTableViewController : UITableViewController
+@interface MainTableViewController : UITableViewController
 
 @property NSMutableArray *shared_lists;
 @property NSMutableArray *indirect_lists;

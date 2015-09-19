@@ -248,7 +248,7 @@
         <!--Shlist-->
         <scene sceneID="hc1-Lv-WtP">
             <objects>
-                <tableViewController id="x0J-ua-E8Q" customClass="SharedListsTableViewController" sceneMemberID="viewController">
+                <tableViewController id="x0J-ua-E8Q" customClass="MainTableViewController" sceneMemberID="viewController">
                     <tableView key="view" clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" dataMode="prototypes" style="plain" separatorStyle="default" allowsSelectionDuringEditing="YES" rowHeight="44" sectionHeaderHeight="22" sectionFooterHeight="22" id="D4a-1U-mWV">
                         <rect key="frame" x="0.0" y="0.0" width="600" height="600"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>

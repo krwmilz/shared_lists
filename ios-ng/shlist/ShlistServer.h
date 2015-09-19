@@ -1,5 +1,5 @@
 #import <UIKit/UIKit.h>
-#import "SharedListsTableViewController.h"
+#import "MainTableViewController.h"
 #import "ListDetailTableViewController.h"
 
 @interface ShlistServer : NSObject <NSStreamDelegate> {
@@ -8,7 +8,7 @@
 	int *bytesRead;
 
 	@public
-	SharedListsTableViewController *shlist_tvc;
+	MainTableViewController *shlist_tvc;
 	ListDetailTableViewController *shlist_ldvc;
 
 }

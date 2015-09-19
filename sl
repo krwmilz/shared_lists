@@ -242,9 +242,7 @@ sub get_phone_number
 
 sub msg_new_device
 {
-	my $new_sock = shift;
-	my $addr = shift;
-	my $msg = shift;
+	my ($new_sock, $addr, $msg) = @_;
 
 	# single field
 	my $ph_num = $msg;
@@ -273,9 +271,7 @@ sub msg_new_device
 
 sub msg_new_list
 {
-	my $new_sock = shift;
-	my $addr = shift;
-	my $msg = shift;
+	my ($new_sock, $addr, $msg) = @_;
 
 	# expecting two fields delimited by null
 	my ($device_id, $list_name) = split("\0", $msg);
@@ -308,9 +304,7 @@ sub msg_new_list
 
 sub msg_new_list_item
 {
-    my $new_sock = shift;
-    my $addr = shift;
-    my $msg = shift;
+    my ($new_sock, $addr, $msg) = @_;
 
     # my ($list_id, $position, $text) = split ("\0", $msg);
     
@@ -328,10 +322,7 @@ sub msg_new_list_item
 
 sub msg_join_list
 {
-    my $new_sock = shift;
-    my $addr = shift;
-    my $msg = shift;
-
+    my ($new_sock, $addr, $msg) = @_;
     my ($device_id, $list_id) = split("\0", $msg);
 
     if (device_id_invalid($device_id, $addr)) {
@@ -357,9 +348,7 @@ sub msg_join_list
 
 sub msg_leave_list
 {
-    my $new_sock = shift;
-    my $addr = shift;
-    my $msg = shift;
+    my ($new_sock, $addr, $msg) = @_;
 
     my ($device_id, $list_id) = split("\0", $msg);
 
@@ -397,9 +386,7 @@ sub msg_leave_list
 
 sub msg_update_friends
 {
-	my $new_sock = shift;
-	my $addr = shift;
-	my $msg = shift;
+	my ($new_sock, $addr, $msg) = @_;
 
 	# update friend map, note this is meant to be a wholesale update
 	# of the friends that are associated with a given device id
@@ -430,10 +417,7 @@ sub msg_update_friends
 # get both lists the device is in, and lists it can see
 sub msg_list_request
 {
-	my $new_sock = shift;
-	my $addr = shift;
-	my $msg = shift;
-
+	my ($new_sock, $addr, $msg) = @_;
 
 	# check if the device id is valid
 	if (device_id_invalid($msg, $addr)) {
@@ -499,9 +483,7 @@ sub msg_list_request
 
 sub msg_list_items_request
 {
-	my $new_sock = shift;
-	my $addr = shift;
-	my $msg = shift;
+	my ($new_sock, $addr, $msg) = @_;
 
 	my ($device_id, $list_id) = split("\0", $msg);
 
@@ -535,18 +517,17 @@ sub msg_list_items_request
 
 sub device_id_invalid
 {
-	my $device_id = shift;
-	my $addr = shift;
+	my ($device_id, $addr) = @_;
 
 	# validate this at least looks like base64
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
-		print "warn: $addr: device id $device_id invalid\n";
+		print "warn: $addr: device id '$device_id' not valid base64\n";
 		return 1;
 	}
 
 	# make sure we know about this device id
 	unless ($dbh->selectrow_array($device_id_exists_sth, undef, $device_id)) {
-		print "warn: $addr: unknown device $device_id\n";
+		print "warn: $addr: unknown device '$device_id'\n";
 		return 1;
 	}
 

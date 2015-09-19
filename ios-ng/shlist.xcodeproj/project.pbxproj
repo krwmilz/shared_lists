@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		27AAC22C1B50ABAF00D99171 /* NewItemTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27AAC22B1B50ABAF00D99171 /* NewItemTableViewController.m */; };
-		27B039FF1B43B6830054B6D2 /* ContactsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27B039FE1B43B6830054B6D2 /* ContactsViewController.m */; };
 		27B03A021B43B8660054B6D2 /* AddressBook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27B03A001B43B8660054B6D2 /* AddressBook.framework */; };
 		27B03A031B43B8660054B6D2 /* AddressBookUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27B03A011B43B8660054B6D2 /* AddressBookUI.framework */; };
 		27C70F051B32AF8000DADEB3 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F041B32AF8000DADEB3 /* main.m */; };
@@ -41,8 +40,6 @@
 /* Begin PBXFileReference section */
 		27AAC22A1B50ABAF00D99171 /* NewItemTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NewItemTableViewController.h; sourceTree = "<group>"; };
 		27AAC22B1B50ABAF00D99171 /* NewItemTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NewItemTableViewController.m; sourceTree = "<group>"; };
-		27B039FD1B43B6830054B6D2 /* ContactsViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ContactsViewController.h; sourceTree = SOURCE_ROOT; };
-		27B039FE1B43B6830054B6D2 /* ContactsViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ContactsViewController.m; sourceTree = SOURCE_ROOT; };
 		27B03A001B43B8660054B6D2 /* AddressBook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AddressBook.framework; path = System/Library/Frameworks/AddressBook.framework; sourceTree = SDKROOT; };
 		27B03A011B43B8660054B6D2 /* AddressBookUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AddressBookUI.framework; path = System/Library/Frameworks/AddressBookUI.framework; sourceTree = SDKROOT; };
 		27C70EFF1B32AF8000DADEB3 /* shlist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = shlist.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -127,8 +124,6 @@
 				27C70F071B32AF8000DADEB3 /* AppDelegate.m */,
 				27D805711BA2649D00867494 /* ContactsTableViewController.h */,
 				27D805721BA2649D00867494 /* ContactsTableViewController.m */,
-				27B039FD1B43B6830054B6D2 /* ContactsViewController.h */,
-				27B039FE1B43B6830054B6D2 /* ContactsViewController.m */,
 				27C70F281B33CE2500DADEB3 /* DataStructures.h */,
 				27C70F291B33D1C900DADEB3 /* DataStructures.m */,
 				27DCC9DD1B8A98D400207340 /* dollar103-2.png */,
@@ -283,7 +278,6 @@
 				27C70F2A1B33D1C900DADEB3 /* DataStructures.m in Sources */,
 				27C70F2D1B33F3C300DADEB3 /* NewListViewController.m in Sources */,
 				27C70F081B32AF8000DADEB3 /* AppDelegate.m in Sources */,
-				27B039FF1B43B6830054B6D2 /* ContactsViewController.m in Sources */,
 				27DCC9EB1B9FF89E00207340 /* AddressBook.m in Sources */,
 				27C70F301B33F4FA00DADEB3 /* MainTableViewController.m in Sources */,
 				27C70F051B32AF8000DADEB3 /* main.m in Sources */,

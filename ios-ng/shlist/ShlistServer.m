@@ -234,7 +234,7 @@
 		}
 
 		if (msg_type == 4) {
-			NSLog(@"info: got response from join list request, '%@'", output);
+			NSLog(@"info: join list response '%@'", output);
 
 			SharedList *shlist = [[SharedList alloc] init];
 			shlist.list_id = data;
@@ -251,19 +251,22 @@
 		if (msg_type == 5) {
 			NSLog(@"info: leave list response '%@'", output);
 
-			// [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+			NSArray *fields = [output componentsSeparatedByString:@"\0"];
 
-			/*
-			for (SharedList *list in shlist_tvc.shared_lists) {
-				if (list.list_name == output) {
-					[shlist_tvc.indirect_lists addObject:list];
-					[shlist_tvc.shared_lists removeObject:list];
-
-					break;
-				}
+			if ([fields count] != 2) {
+				NSLog(@"warn: leave list response had wrong number (%i) of fields",
+				      [fields count]);
+				break;
 			}
-			[shlist_tvc.tableView reloadData];
-			 */
+
+			SharedList *shlist = [[SharedList alloc] init];
+			shlist.list_id = [[fields objectAtIndex:0] dataUsingEncoding:NSUTF8StringEncoding];
+
+			// XXX: these need to be sent from the server
+			// shlist.list_name = <network>;
+			// shlist.members = <network>;
+
+			[shlist_tvc finished_leave_list_request:shlist];
 		}
 	}
 	break;

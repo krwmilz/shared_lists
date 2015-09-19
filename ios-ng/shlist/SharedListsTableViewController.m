@@ -88,7 +88,7 @@
 
 	// we're in section 1 now, a tap down here means we're doing a join list request
 	SharedList *list = [self.indirect_lists objectAtIndex:[indexPath row]];
-	NSLog(@"info: joining list '%@' at indexPath %@", list.list_name, indexPath);
+	NSLog(@"info: joining list '%@'", list.list_name);
 
 	// the response for this does all of the heavy row moving work
 	[_server send_message:4 contents:list.list_id];
@@ -127,8 +127,43 @@
 	UILabel *fraction = (UILabel *)[needle.cell viewWithTag:1];
 	fraction.text = [self fraction:shlist.items_ready denominator:shlist.items_total];
 	fraction.hidden = NO;
+}
 
-	NSLog(@"after join list '%@' is cell %@", needle.list_name, needle.cell);
+- (void) finished_leave_list_request:(SharedList *) shlist
+{
+	SharedList *list = nil;
+	NSLog(@"target is %@", shlist.list_id);
+	for (SharedList *temp in _shared_lists) {
+		NSLog(@"comparing %@", temp.list_id);
+		if ([temp.list_id isEqualToData:shlist.list_id]) {
+			list = temp;
+			break;
+		}
+	}
+
+	NSLog(@"got here");
+
+	if (list == nil)
+		return;
+
+	NSLog(@"got here");
+
+	// insert the new object at the beginning to match gui moving below
+	[_indirect_lists insertObject:list atIndex:0];
+	[_shared_lists removeObject:list];
+
+	// perform row move, the destination is the top of "other lists"
+	NSIndexPath *old_path = [self.tableView indexPathForCell:list.cell];
+	NSIndexPath *new_path = [NSIndexPath indexPathForRow:0 inSection:1];
+	[self.tableView moveRowAtIndexPath:old_path toIndexPath:new_path];
+
+	// remove > accessory and hide the completion fraction
+	list.cell.accessoryType = UITableViewCellAccessoryNone;
+	UILabel *fraction = (UILabel *)[list.cell viewWithTag:1];
+	fraction.hidden = YES;
+
+	// reset editing state back to the default
+	[self.tableView setEditing:FALSE animated:TRUE];
 }
 
 - (UITableViewCell *) tableView:(UITableView *)tableView
@@ -144,7 +179,6 @@
 		shared_list = [self.shared_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.list_name;
 		cell.detailTextLabel.text = shared_list.list_members;
-		shared_list.cell = cell;
 
 		// fill in the completion fraction
 		UILabel *completion_fraction;
@@ -183,43 +217,16 @@
 		fraction.hidden = YES;
 	}
 
-	NSLog(@"list '%@' is cell %@", shared_list.list_name, shared_list.cell);
+	// hang on to a reference, this is needed in the networking gui callbacks
+	shared_list.cell = cell;
 	return cell;
 }
 
 
-// taken from http://stackoverflow.com/questions/30859359/display-fraction-number-in-uilabel
--(NSString *)fraction:(int)numerator denominator:(int)denominator
-{
 
-	NSMutableString *result = [NSMutableString string];
-
-	NSString *one = [NSString stringWithFormat:@"%i", numerator];
-	for (int i = 0; i < one.length; i++) {
-		[result appendString:[self superscript:[[one substringWithRange:NSMakeRange(i, 1)] intValue]]];
-	}
-	[result appendString:@"/"];
-
-	NSString *two = [NSString stringWithFormat:@"%i", denominator];
-	for (int i = 0; i < two.length; i++) {
-		[result appendString:[self subscript:[[two substringWithRange:NSMakeRange(i, 1)] intValue]]];
-	}
-	return result;
-}
-
--(NSString *)superscript:(int)num
-{
-	NSDictionary *superscripts = @{@0: @"\u2070", @1: @"\u00B9", @2: @"\u00B2", @3: @"\u00B3", @4: @"\u2074", @5: @"\u2075", @6: @"\u2076", @7: @"\u2077", @8: @"\u2078", @9: @"\u2079"};
-	return superscripts[@(num)];
-}
-
--(NSString *)subscript:(int)num
-{
-	NSDictionary *subscripts = @{@0: @"\u2080", @1: @"\u2081", @2: @"\u2082", @3: @"\u2083", @4: @"\u2084", @5: @"\u2085", @6: @"\u2086", @7: @"\u2087", @8: @"\u2088", @9: @"\u2089"};
-	return subscripts[@(num)];
-}
-
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+// section header titles
+- (NSString *)tableView:(UITableView *)tableView
+	titleForHeaderInSection:(NSInteger)section
 {
 	if (section == 0)
 		return @"Lists you're in";
@@ -228,6 +235,16 @@
 	return @"";
 }
 
+// only section 0 lists can be edited
+- (BOOL) tableView:(UITableView *)tableView
+	canEditRowAtIndexPath:(NSIndexPath *)indexPath
+{
+	if ([indexPath section] == 0)
+		return YES;
+	return NO;
+}
+
+// what editing style should be applied to this indexpath
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView
 	   editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
 {
@@ -236,49 +253,23 @@
 	return UITableViewCellEditingStyleDelete;
 }
 
-- (BOOL) tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
+// this functions called when delete has been prompted and ok'd
+- (void) tableView:(UITableView *)tableView
+	commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
+	forRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	if ([indexPath section] == 0)
-		return YES;
-	return NO;
+	// we don't need to check for !section 0 because of canEditRowAtIndexPath
+	SharedList *list = [self.shared_lists objectAtIndex:[indexPath row]];
+	NSLog(@"info: leaving '%@' id '%@'", list.list_name, list.list_id);
+
+	// send leave list message, response will do all heavy lifting
+	[_server send_message:5 contents:list.list_id];
 }
 
 - (NSString *)tableView:(UITableView *)tableView
 	titleForDeleteConfirmationButtonForRowAtIndexPath:(NSIndexPath *)indexPath
 {
 	return @"Leave";
-}
-
-// this functions called when delete has been prompted and ok'd
-- (void) tableView:(UITableView *)tableView
-	commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
-	forRowAtIndexPath:(NSIndexPath *)indexPath
-{
-	// remove the row from the "lists you're in" section and put it in the
-	// "other lists" section
-	SharedList *list = [self.shared_lists objectAtIndex:[indexPath row]];
-	NSLog(@"info: leaving '%@'", list.list_name);
-
-	// insert the new object at the beginning to match gui moving below
-	[_indirect_lists insertObject:list atIndex:0];
-	[_shared_lists removeObject:list];
-
-	// perform row move, the destination is the top of "other lists"
-	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:0 inSection:1];
-	[tableView moveRowAtIndexPath:indexPath toIndexPath:new_index_path];
-
-	// remove > accessory and hide the completion fraction
-	list.cell.accessoryType = UITableViewCellAccessoryNone;
-	UILabel *fraction = (UILabel *)[list.cell viewWithTag:1];
-	fraction.hidden = YES;
-
-	// reset editing state back to the default
-	[tableView setEditing:FALSE animated:TRUE];
-
-	// send leave list message
-	[_server send_message:5 contents:list.list_id];
-
-	NSLog(@"after leave list '%@' is cell %@", list.list_name, list.cell);
 }
 
 // In a storyboard-based application, you will often want to do a little preparation before navigation
@@ -319,6 +310,37 @@
 	if ([path section] == 0)
 		return YES;
 	return NO;
+}
+
+// taken from http://stackoverflow.com/questions/30859359/display-fraction-number-in-uilabel
+-(NSString *)fraction:(int)numerator denominator:(int)denominator
+{
+
+	NSMutableString *result = [NSMutableString string];
+
+	NSString *one = [NSString stringWithFormat:@"%i", numerator];
+	for (int i = 0; i < one.length; i++) {
+		[result appendString:[self superscript:[[one substringWithRange:NSMakeRange(i, 1)] intValue]]];
+	}
+	[result appendString:@"/"];
+
+	NSString *two = [NSString stringWithFormat:@"%i", denominator];
+	for (int i = 0; i < two.length; i++) {
+		[result appendString:[self subscript:[[two substringWithRange:NSMakeRange(i, 1)] intValue]]];
+	}
+	return result;
+}
+
+-(NSString *)superscript:(int)num
+{
+	NSDictionary *superscripts = @{@0: @"\u2070", @1: @"\u00B9", @2: @"\u00B2", @3: @"\u00B3", @4: @"\u2074", @5: @"\u2075", @6: @"\u2076", @7: @"\u2077", @8: @"\u2078", @9: @"\u2079"};
+	return superscripts[@(num)];
+}
+
+-(NSString *)subscript:(int)num
+{
+	NSDictionary *subscripts = @{@0: @"\u2080", @1: @"\u2081", @2: @"\u2082", @3: @"\u2083", @4: @"\u2084", @5: @"\u2085", @6: @"\u2086", @7: @"\u2087", @8: @"\u2088", @9: @"\u2089"};
+	return subscripts[@(num)];
 }
 
 @end

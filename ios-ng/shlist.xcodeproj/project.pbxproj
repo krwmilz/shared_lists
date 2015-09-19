@@ -11,7 +11,7 @@
 		27B03A021B43B8660054B6D2 /* AddressBook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27B03A001B43B8660054B6D2 /* AddressBook.framework */; };
 		27C70F051B32AF8000DADEB3 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F041B32AF8000DADEB3 /* main.m */; };
 		27C70F081B32AF8000DADEB3 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F071B32AF8000DADEB3 /* AppDelegate.m */; };
-		27C70F0B1B32AF8000DADEB3 /* ShlistServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F0A1B32AF8000DADEB3 /* ShlistServer.m */; };
+		27C70F0B1B32AF8000DADEB3 /* Network.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F0A1B32AF8000DADEB3 /* Network.m */; };
 		27C70F0E1B32AF8000DADEB3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 27C70F0C1B32AF8000DADEB3 /* Main.storyboard */; };
 		27C70F101B32AF8000DADEB3 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 27C70F0F1B32AF8000DADEB3 /* Images.xcassets */; };
 		27C70F131B32AF8000DADEB3 /* LaunchScreen.xib in Resources */ = {isa = PBXBuildFile; fileRef = 27C70F111B32AF8000DADEB3 /* LaunchScreen.xib */; };
@@ -45,8 +45,8 @@
 		27C70F041B32AF8000DADEB3 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; tabWidth = 8; usesTabs = 1; };
 		27C70F061B32AF8000DADEB3 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		27C70F071B32AF8000DADEB3 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
-		27C70F091B32AF8000DADEB3 /* ShlistServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ShlistServer.h; sourceTree = "<group>"; };
-		27C70F0A1B32AF8000DADEB3 /* ShlistServer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ShlistServer.m; sourceTree = "<group>"; };
+		27C70F091B32AF8000DADEB3 /* Network.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Network.h; sourceTree = "<group>"; };
+		27C70F0A1B32AF8000DADEB3 /* Network.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Network.m; sourceTree = "<group>"; };
 		27C70F0D1B32AF8000DADEB3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		27C70F0F1B32AF8000DADEB3 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		27C70F121B32AF8000DADEB3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/LaunchScreen.xib; sourceTree = "<group>"; };
@@ -127,12 +127,12 @@
 				27C70F0C1B32AF8000DADEB3 /* Main.storyboard */,
 				27C70F2E1B33F4FA00DADEB3 /* MainTableViewController.h */,
 				27C70F2F1B33F4FA00DADEB3 /* MainTableViewController.m */,
+				27C70F091B32AF8000DADEB3 /* Network.h */,
+				27C70F0A1B32AF8000DADEB3 /* Network.m */,
 				27AAC22A1B50ABAF00D99171 /* NewItemTableViewController.h */,
 				27AAC22B1B50ABAF00D99171 /* NewItemTableViewController.m */,
 				27C70F2B1B33F3C300DADEB3 /* NewListViewController.h */,
 				27C70F2C1B33F3C300DADEB3 /* NewListViewController.m */,
-				27C70F091B32AF8000DADEB3 /* ShlistServer.h */,
-				27C70F0A1B32AF8000DADEB3 /* ShlistServer.m */,
 				27C70F021B32AF8000DADEB3 /* Supporting Files */,
 			);
 			path = shlist;
@@ -269,7 +269,7 @@
 			files = (
 				BF7776B91B38928D00526CB0 /* ListTableViewController.m in Sources */,
 				27AAC22C1B50ABAF00D99171 /* NewItemTableViewController.m in Sources */,
-				27C70F0B1B32AF8000DADEB3 /* ShlistServer.m in Sources */,
+				27C70F0B1B32AF8000DADEB3 /* Network.m in Sources */,
 				27D805731BA2649D00867494 /* ContactsTableViewController.m in Sources */,
 				27C70F2A1B33D1C900DADEB3 /* DataStructures.m in Sources */,
 				27C70F2D1B33F3C300DADEB3 /* NewListViewController.m in Sources */,

@@ -1,11 +1,11 @@
 #import "ListTableViewController.h"
 #import "DataStructures.h"
-#import "ShlistServer.h"
+#import "Network.h"
 
 @interface ListTableViewController ()
 
 - (void)load_initial_data;
-@property (strong, nonatomic) ShlistServer *server;
+@property (strong, nonatomic) Network *server;
 
 @end
 

@@ -2,7 +2,7 @@
 #import "MainTableViewController.h"
 #import "ListTableViewController.h"
 
-@interface ShlistServer : NSObject <NSStreamDelegate> {
+@interface Network : NSObject <NSStreamDelegate> {
 	NSInputStream *inputShlistStream;
 	NSOutputStream *outputShlistStream;
 	int *bytesRead;

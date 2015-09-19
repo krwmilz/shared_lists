@@ -1,8 +1,8 @@
-#import "ShlistServer.h"
+#import "Network.h"
 #import "DataStructures.h"
 #import "AddressBook.h"
 
-@interface ShlistServer ()
+@interface Network ()
 
 @property (strong, retain) NSMutableData *data;
 @property (strong, retain) AddressBook *address_book;
@@ -14,7 +14,7 @@
 
 @end
 
-@implementation ShlistServer
+@implementation Network
 
 - (id) init
 {
@@ -176,13 +176,13 @@
 			break;
 		}
 
-		NSLog(@"info: read: received message type %i", msg_type);
-
 		if (msg_length > 1024) {
 			NSLog(@"warn: read: message too large: %i bytes", msg_length);
 			break;
 		}
-		NSLog(@"info: read: message size is %i bytes", msg_length);
+
+		// guaranteed valid message type and size from here forward
+		NSLog(@"info: read: got msg type %i (%i bytes)", msg_type, msg_length);
 
 		uint8_t *buffer = malloc(msg_length);
 		if (buffer == nil) {

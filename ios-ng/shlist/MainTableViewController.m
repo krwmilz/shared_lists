@@ -1,13 +1,13 @@
 #import "MainTableViewController.h"
 #import "NewListViewController.h"
-#import "ShlistServer.h"
+#import "Network.h"
 #import "ListTableViewController.h"
 
 #import <AddressBook/AddressBook.h>
 
 @interface MainTableViewController ()
 
-@property (strong, nonatomic) ShlistServer *server;
+@property (strong, nonatomic) Network *server;
 
 @end
 
@@ -43,7 +43,7 @@
 	self.indirect_lists = [[NSMutableArray alloc] init];
 
 	// create one and only server instance, this gets passed around
-	_server = [[ShlistServer alloc] init];
+	_server = [[Network alloc] init];
 	_server->shlist_tvc = self;
 
 	if ([_server prepare]) {

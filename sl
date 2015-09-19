@@ -421,8 +421,6 @@ sub msg_list_request
 
 	# check if the device id is valid
 	if (device_id_invalid($msg, $addr)) {
-		# XXX: i don't think $msg is null terminated
-		print "warn: device id $msg invalid\n";
 		close $new_sock;
 		return;
 	}
@@ -488,7 +486,6 @@ sub msg_list_items_request
 	my ($device_id, $list_id) = split("\0", $msg);
 
 	if (device_id_invalid($device_id, $addr)) {
-		print "warn: $addr: device id $device_id invalid\n";
 		close $new_sock;
 		return;
 	}

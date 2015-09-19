@@ -1,5 +1,4 @@
 #import "SharedListsTableViewController.h"
-#import "SharedList.h"
 #import "NewListViewController.h"
 #import "ShlistServer.h"
 #import "ListDetailTableViewController.h"
@@ -88,30 +87,48 @@
 		return;
 
 	// we're in section 1 now, a tap down here means we're doing a join list request
-	NSIndexPath *path = [self.tableView indexPathForSelectedRow];
-	SharedList *list = [self.indirect_lists objectAtIndex:[path row]];
-	NSLog(@"info: joining '%@'", list.list_name);
+	SharedList *list = [self.indirect_lists objectAtIndex:[indexPath row]];
+	NSLog(@"info: joining list '%@' at indexPath %@", list.list_name, indexPath);
+
+	// the response for this does all of the heavy row moving work
+	[_server send_message:4 contents:list.list_id];
+}
+
+- (void) finished_join_list_request:(SharedList *) shlist
+{
+	SharedList *needle = nil;
+	for (SharedList *temp in _indirect_lists) {
+		if ([temp.list_id isEqualToData:shlist.list_id]) {
+			needle = temp;
+			break;
+		}
+	}
+
+	// if we received an update from a list id we don't know about, do nothing
+	if (needle == nil)
+		return;
 
 	// this has to be done before row moving
-	[_shared_lists addObject:list];
-	[_indirect_lists removeObject:list];
+	[_shared_lists addObject:needle];
+	[_indirect_lists removeObject:needle];
 
-	UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+	// get the original cells index path from the matched cell
+	NSIndexPath *orig_index_path = [self.tableView indexPathForCell:needle.cell];
 
 	// compute new position and start moving row as soon as possible
 	// XXX: sorting
 	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:[_shared_lists count] - 1 inSection:0];
-	[tableView moveRowAtIndexPath:indexPath toIndexPath:new_index_path];
+	NSLog(@"index paths: %@/%@", orig_index_path, new_index_path);
 
-	// add > accessory indicator
-	cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-	UILabel *fraction = (UILabel *)[cell viewWithTag:1];
+	[self.tableView moveRowAtIndexPath:orig_index_path toIndexPath:new_index_path];
+
+	// add > accessory indicator, fill in and show completion fraction
+	needle.cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+	UILabel *fraction = (UILabel *)[needle.cell viewWithTag:1];
+	fraction.text = [self fraction:shlist.items_ready denominator:shlist.items_total];
 	fraction.hidden = NO;
-	fraction.text = [self fraction:list.items_ready denominator:list.items_total];
 
-	// send this last because when the response comes in the list should be in
-	// it's expected place
-	[_server send_message:4 contents:list.list_id];
+	NSLog(@"after join list '%@' is cell %@", needle.list_name, needle.cell);
 }
 
 - (UITableViewCell *) tableView:(UITableView *)tableView
@@ -121,11 +138,13 @@
 	cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell" forIndexPath:indexPath];
 
 	int row = [indexPath row];
+	SharedList *shared_list;
 
 	if ([indexPath section] == 0) {
-		SharedList *shared_list = [self.shared_lists objectAtIndex:row];
+		shared_list = [self.shared_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.list_name;
 		cell.detailTextLabel.text = shared_list.list_members;
+		shared_list.cell = cell;
 
 		// fill in the completion fraction
 		UILabel *completion_fraction;
@@ -148,9 +167,10 @@
 					      denominator:shared_list.items_total];
 	}
 	else if ([indexPath section] == 1) {
-		SharedList *shared_list = [self.indirect_lists objectAtIndex:row];
+		shared_list = [self.indirect_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.list_name;
 		cell.detailTextLabel.text = shared_list.list_members;
+		shared_list.cell = cell;
 
 		// Modify the look of the off the shelf cell
 		// Note, a separate prototype cell isn't used here because we
@@ -163,6 +183,7 @@
 		fraction.hidden = YES;
 	}
 
+	NSLog(@"list '%@' is cell %@", shared_list.list_name, shared_list.cell);
 	return cell;
 }
 
@@ -235,22 +256,20 @@
 {
 	// remove the row from the "lists you're in" section and put it in the
 	// "other lists" section
-	NSIndexPath *path = [self.tableView indexPathForSelectedRow];
-	SharedList *list = [self.shared_lists objectAtIndex:[path row]];
+	SharedList *list = [self.shared_lists objectAtIndex:[indexPath row]];
 	NSLog(@"info: leaving '%@'", list.list_name);
 
-	[self.indirect_lists addObject:list];
-	[self.shared_lists removeObject:list];
-
-	UITableViewCell *new_cell = [tableView cellForRowAtIndexPath:indexPath];
+	// insert the new object at the beginning to match gui moving below
+	[_indirect_lists insertObject:list atIndex:0];
+	[_shared_lists removeObject:list];
 
 	// perform row move, the destination is the top of "other lists"
 	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:0 inSection:1];
 	[tableView moveRowAtIndexPath:indexPath toIndexPath:new_index_path];
 
 	// remove > accessory and hide the completion fraction
-	new_cell.accessoryType = UITableViewCellAccessoryNone;
-	UILabel *fraction = (UILabel *)[new_cell viewWithTag:1];
+	list.cell.accessoryType = UITableViewCellAccessoryNone;
+	UILabel *fraction = (UILabel *)[list.cell viewWithTag:1];
 	fraction.hidden = YES;
 
 	// reset editing state back to the default
@@ -258,6 +277,8 @@
 
 	// send leave list message
 	[_server send_message:5 contents:list.list_id];
+
+	NSLog(@"after leave list '%@' is cell %@", list.list_name, list.cell);
 }
 
 // In a storyboard-based application, you will often want to do a little preparation before navigation

@@ -236,10 +236,16 @@
 		if (msg_type == 4) {
 			NSLog(@"info: got response from join list request, '%@'", output);
 
-			
-			// update the already existing row entry with fresh info
-			// [shlist_tvc.tableView reloadRowsAtIndexPaths: withRowAnimation:];
+			SharedList *shlist = [[SharedList alloc] init];
+			shlist.list_id = data;
 
+			// XXX: these need to be sent from the server
+			shlist.items_ready = 0;
+			shlist.items_total = 99;
+			// shlist.list_name = <network>;
+			// shlist.members = <network>;
+
+			[shlist_tvc finished_join_list_request:shlist];
 		}
 
 		if (msg_type == 5) {

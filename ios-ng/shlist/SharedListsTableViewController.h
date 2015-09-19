@@ -1,10 +1,13 @@
 #import <UIKit/UIKit.h>
 
+#import "SharedList.h"
+
 @interface SharedListsTableViewController : UITableViewController
 
 @property NSMutableArray *shared_lists;
 @property NSMutableArray *indirect_lists;
 
+- (void) finished_join_list_request:(SharedList *) shlist;
 
 - (IBAction)unwindToList:(UIStoryboardSegue *)segue;
 

@@ -237,7 +237,7 @@
 			NSLog(@"info: join list response '%@'", output);
 
 			SharedList *shlist = [[SharedList alloc] init];
-			shlist.list_id = data;
+			shlist.id = data;
 
 			// XXX: these need to be sent from the server
 			shlist.items_ready = 0;
@@ -260,7 +260,7 @@
 			}
 
 			SharedList *shlist = [[SharedList alloc] init];
-			shlist.list_id = [[fields objectAtIndex:0] dataUsingEncoding:NSUTF8StringEncoding];
+			shlist.id = [[fields objectAtIndex:0] dataUsingEncoding:NSUTF8StringEncoding];
 
 			// XXX: these need to be sent from the server
 			// shlist.list_name = <network>;
@@ -385,9 +385,9 @@
 		// we've got everything we need
 		SharedList *shared_list = [[SharedList alloc] init];
 
-		shared_list.list_name = [list_fields objectAtIndex:0];
-		shared_list.list_id = [[list_fields objectAtIndex:1] dataUsingEncoding:NSUTF8StringEncoding];
-		shared_list.list_members = members_str;
+		shared_list.name = [list_fields objectAtIndex:0];
+		shared_list.id = [[list_fields objectAtIndex:1] dataUsingEncoding:NSUTF8StringEncoding];
+		shared_list.members = members_str;
 
 		// we don't currently get this information back
 		// XXX: lists your not in will not return this information

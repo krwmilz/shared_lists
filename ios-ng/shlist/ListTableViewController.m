@@ -69,7 +69,7 @@
 - (void) setMetadata:(SharedList *)metadata
 {
 	_list_metadata = metadata;
-	self.title = _list_metadata.list_name;
+	self.title = _list_metadata.name;
 
 }
 

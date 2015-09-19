@@ -33,9 +33,9 @@
 
 	if (self.textField.text.length > 0) {
 		self.shared_list = [[SharedList alloc] init];
-		self.shared_list.list_name = self.textField.text;
+		self.shared_list.name = self.textField.text;
 		// self.shared_list.list_date = self.datePicker.date;
-		self.shared_list.list_members = @"You";
+		self.shared_list.members = @"You";
 
 		NSLog(@"NewListViewController::prepareForSegue(): %@", self.textField.text);
 	}

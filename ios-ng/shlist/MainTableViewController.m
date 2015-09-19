@@ -26,7 +26,7 @@
 	[self.tableView reloadData];
 
 	// send new list message with new list name as payload
-	NSData *payload = [list.list_name dataUsingEncoding:NSUTF8StringEncoding];
+	NSData *payload = [list.name dataUsingEncoding:NSUTF8StringEncoding];
 	[_server send_message:1 contents:payload];
 
 	NSLog(@"unwindToList(): done");
@@ -88,17 +88,17 @@
 
 	// we're in section 1 now, a tap down here means we're doing a join list request
 	SharedList *list = [self.indirect_lists objectAtIndex:[indexPath row]];
-	NSLog(@"info: joining list '%@'", list.list_name);
+	NSLog(@"info: joining list '%@'", list.name);
 
 	// the response for this does all of the heavy row moving work
-	[_server send_message:4 contents:list.list_id];
+	[_server send_message:4 contents:list.id];
 }
 
 - (void) finished_join_list_request:(SharedList *) shlist
 {
 	SharedList *needle = nil;
 	for (SharedList *temp in _indirect_lists) {
-		if ([temp.list_id isEqualToData:shlist.list_id]) {
+		if ([temp.id isEqualToData:shlist.id]) {
 			needle = temp;
 			break;
 		}
@@ -118,7 +118,6 @@
 	// compute new position and start moving row as soon as possible
 	// XXX: sorting
 	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:[_shared_lists count] - 1 inSection:0];
-	NSLog(@"index paths: %@/%@", orig_index_path, new_index_path);
 
 	[self.tableView moveRowAtIndexPath:orig_index_path toIndexPath:new_index_path];
 
@@ -132,21 +131,15 @@
 - (void) finished_leave_list_request:(SharedList *) shlist
 {
 	SharedList *list = nil;
-	NSLog(@"target is %@", shlist.list_id);
 	for (SharedList *temp in _shared_lists) {
-		NSLog(@"comparing %@", temp.list_id);
-		if ([temp.list_id isEqualToData:shlist.list_id]) {
+		if ([temp.id isEqualToData:shlist.id]) {
 			list = temp;
 			break;
 		}
 	}
 
-	NSLog(@"got here");
-
 	if (list == nil)
 		return;
-
-	NSLog(@"got here");
 
 	// insert the new object at the beginning to match gui moving below
 	[_indirect_lists insertObject:list atIndex:0];
@@ -177,8 +170,8 @@
 
 	if ([indexPath section] == 0) {
 		shared_list = [self.shared_lists objectAtIndex:row];
-		cell.textLabel.text = shared_list.list_name;
-		cell.detailTextLabel.text = shared_list.list_members;
+		cell.textLabel.text = shared_list.name;
+		cell.detailTextLabel.text = shared_list.members;
 
 		// fill in the completion fraction
 		UILabel *completion_fraction;
@@ -202,8 +195,8 @@
 	}
 	else if ([indexPath section] == 1) {
 		shared_list = [self.indirect_lists objectAtIndex:row];
-		cell.textLabel.text = shared_list.list_name;
-		cell.detailTextLabel.text = shared_list.list_members;
+		cell.textLabel.text = shared_list.name;
+		cell.detailTextLabel.text = shared_list.members;
 		shared_list.cell = cell;
 
 		// Modify the look of the off the shelf cell
@@ -260,10 +253,10 @@
 {
 	// we don't need to check for !section 0 because of canEditRowAtIndexPath
 	SharedList *list = [self.shared_lists objectAtIndex:[indexPath row]];
-	NSLog(@"info: leaving '%@' id '%@'", list.list_name, list.list_id);
+	NSLog(@"info: leaving '%@' id '%@'", list.name, list.id);
 
 	// send leave list message, response will do all heavy lifting
-	[_server send_message:5 contents:list.list_id];
+	[_server send_message:5 contents:list.id];
 }
 
 - (NSString *)tableView:(UITableView *)tableView
@@ -291,7 +284,7 @@
 		_server->shlist_ldvc = segue.destinationViewController;
 
 		// send update list items message
-		[_server send_message:6 contents:list.list_id];
+		[_server send_message:6 contents:list.id];
 	}
 	// DetailObject *detail = [self detailForIndexPath:path];ß
 

@@ -17,6 +17,7 @@
 
 	NSData		*device_id;
 	NSString	*device_id_file;
+	bool		 connected;
 }
 
 @end
@@ -48,6 +49,7 @@
 
 		msg_type = 0;
 		msg_type_pos = 0;
+		connected = 0;
 		[self connect];
 	}
 
@@ -57,6 +59,7 @@
 - (void) connect
 {
 	NSLog(@"info: network: connecting");
+	connected = 1;
 
 	CFReadStreamRef readStream;
 	CFWriteStreamRef writeStream;
@@ -80,6 +83,7 @@
 - (void) disconnect
 {
 	NSLog(@"info: network: disconnecting");
+	connected = 0;
 
 	[inputShlistStream close];
 	[outputShlistStream close];
@@ -126,6 +130,9 @@
 
 - (void) send_message:(uint16_t)send_msg_type contents:(NSData *)payload
 {
+	if (!connected)
+		[self connect];
+
 	NSMutableData *msg = [NSMutableData data];
 	NSLog(@"info: network: send_message: msg type %i", send_msg_type);
 
@@ -194,15 +201,13 @@
 		break;
 	case NSStreamEventErrorOccurred:
 		// I saw this case when trying to connect to a down server
-
 		NSLog(@"info: network: stream error occurred");
 		[self disconnect];
 
 		// fall through on purpose
 	case NSStreamEventEndEncountered:
-
 		// close both sides of the connection on end
-		NSLog(@"ShlistServer::NSStreamEventEndEncountered");
+		NSLog(@"info: Network::NSStreamEventEndEncountered");
 		[self disconnect];
 
 		break;

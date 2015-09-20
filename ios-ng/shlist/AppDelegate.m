@@ -52,7 +52,6 @@
 	// background.
 
 	NSLog(@"info: app: entering foreground, reconnecting...");
-	[network_connection connect];
 	[network_connection send_message:3 contents:nil];
 }
 

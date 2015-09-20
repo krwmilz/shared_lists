@@ -23,12 +23,23 @@
 
 @implementation Network
 
++ (id) shared_network_connection
+{
+	static Network *network_connection = nil;
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		network_connection = [[self alloc] init];
+	});
+	return network_connection;
+}
+
 - (id) init
 {
 	if (self = [super init]) {
 		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
 		NSString *documentsDirectory = [paths objectAtIndex:0];
 		device_id_file = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
+		device_id = nil;
 
 		msg_buf_position = 0;
 
@@ -45,6 +56,8 @@
 
 - (void) connect
 {
+	NSLog(@"info: network: connecting");
+
 	CFReadStreamRef readStream;
 	CFWriteStreamRef writeStream;
 
@@ -62,12 +75,12 @@
 
 	[inputShlistStream open];
 	[outputShlistStream open];
-
-	NSLog(@"info: network: bound to amp.ca");
 }
 
 - (void) disconnect
 {
+	NSLog(@"info: network: disconnecting");
+
 	[inputShlistStream close];
 	[outputShlistStream close];
 
@@ -114,6 +127,7 @@
 - (void) send_message:(uint16_t)send_msg_type contents:(NSData *)payload
 {
 	NSMutableData *msg = [NSMutableData data];
+	NSLog(@"info: network: send_message: msg type %i", send_msg_type);
 
 	uint16_t msg_type_network = htons(send_msg_type);
 	[msg appendBytes:&msg_type_network length:2];
@@ -126,6 +140,10 @@
 	uint16_t msg_len_network = htons([device_id length] + payload_length);
 	[msg appendBytes:&msg_len_network length:2];
 
+	if (device_id == nil) {
+		NSLog(@"warn: network: send_message called before device_id was ready");
+		return;
+	}
 	[msg appendData:device_id];
 
 	if (payload) {
@@ -142,6 +160,7 @@
 			NSLog(@"warn: network: resend failed after reconnect, giving up");
 		}
 	}
+	NSLog(@"info: network: send_message: msg type %i done", send_msg_type);
 }
 
 - (void)stream:(NSStream *)stream handleEvent:(NSStreamEvent)eventCode
@@ -154,6 +173,7 @@
 
 	switch (eventCode) {
 	case NSStreamEventNone:
+		NSLog(@"NSStreamEventNone");
 		break;
 	case NSStreamEventOpenCompleted:
 		NSLog(@"info: network: %@ stream opened", stream_name);
@@ -187,6 +207,7 @@
 
 		break;
 	default:
+		NSLog(@"handleEvent: default case");
 		break;
 	}
 }
@@ -357,12 +378,15 @@
 
 		NSLog(@"info: network: response for new list '%@' has %i fields",
 		      shlist.name, [fields count]);
-		[shlist_tvc finished_new_list_request:shlist];
+		if ([self check_tvc:shlist_tvc])
+			[shlist_tvc finished_new_list_request:shlist];
 	}
 
 	else if (msg_type == 3) {
 		[self handle_bulk_list_update:msg_string];
-		[shlist_tvc.tableView reloadData];
+
+		if ([self check_tvc:shlist_tvc])
+			[shlist_tvc.tableView reloadData];
 	}
 
 	else if (msg_type == 4) {
@@ -377,7 +401,8 @@
 		// shlist.list_name = <network>;
 		// shlist.members = <network>;
 
-		[shlist_tvc finished_join_list_request:shlist];
+		if ([self check_tvc:shlist_tvc])
+			[shlist_tvc finished_join_list_request:shlist];
 	}
 
 	else if (msg_type == 5) {
@@ -398,13 +423,25 @@
 		// shlist.list_name = <network>;
 		// shlist.members = <network>;
 
-		[shlist_tvc finished_leave_list_request:shlist];
+		if ([self check_tvc:shlist_tvc])
+			[shlist_tvc finished_leave_list_request:shlist];
 	}
+}
+
+- (bool) check_tvc:(MainTableViewController *) tvc
+{
+	if (tvc)
+		return true;
+	NSLog(@"warn: network: trying to update main_tvc before it's ready, ignoring!");
+	return false;
 }
 
 - (void) handle_bulk_list_update:(NSString *)raw_data
 {
 	NSLog(@"info: handling bulk list update message");
+
+	if (![self check_tvc:shlist_tvc])
+		return;
 
 	// split over double \0
 	NSArray *list_types = [raw_data componentsSeparatedByString:@"\0\0"];

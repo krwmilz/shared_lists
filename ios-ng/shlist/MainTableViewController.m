@@ -8,18 +8,17 @@
 #include "libkern/OSAtomic.h"
 
 @interface MainTableViewController () {
+	NSString *phone_number;
+	Network *network_connection;
 	NSString *phone_num_file;
 }
 
-@property (strong, nonatomic) Network *server;
 @property NSMutableDictionary *phnum_to_name_map;
 @property (strong, retain) AddressBook *address_book;
-@property (strong, nonatomic) NSString *phone_number;
 
 @end
 
 @implementation MainTableViewController
-
 
 - (void) viewDidLoad
 {
@@ -27,6 +26,10 @@
 
 	// display an Edit button in the navigation bar for this view controller
 	self.navigationItem.leftBarButtonItem = self.editButtonItem;
+
+	// there's a race here when assigning self
+	network_connection = [Network shared_network_connection];
+	network_connection->shlist_tvc = self;
 
 	// main lists
 	self.shared_lists = [[NSMutableArray alloc] init];
@@ -37,21 +40,19 @@
 	NSString *documentsDirectory = [paths objectAtIndex:0];
 	phone_num_file = [documentsDirectory stringByAppendingPathComponent:@"phone_num"];
 
-	_server = [[Network alloc] init];
-	_server->shlist_tvc = self;
-
-	_phnum_to_name_map = [[NSMutableDictionary alloc] init];
-	_phone_number = nil;
+	phone_number = nil;
 	if ([self load_phone_number]) {
 		// phone number loaded, try loading device id
-		if ([_server load_device_id:[_phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
+		if ([network_connection load_device_id:[phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
 			NSLog(@"info: network: connection ready");
 			// bulk update, doesn't take a payload
-			[_server send_message:3 contents:nil];
+			[network_connection send_message:3 contents:nil];
 		}
 		// else, device id request sent
 	}
 	// else, phone number entry is on screen
+
+	_phnum_to_name_map = [[NSMutableDictionary alloc] init];
 
 	// get instance and wait for privacy window to clear
 	_address_book = [AddressBook shared_address_book];
@@ -63,7 +64,7 @@
 	if ([[NSFileManager defaultManager] fileExistsAtPath:phone_num_file]) {
 		// file exists, read what it has
 		// XXX: validate length of file too
-		_phone_number = [NSString stringWithContentsOfFile:phone_num_file];
+		phone_number = [NSString stringWithContentsOfFile:phone_num_file];
 		return true;
 	}
 
@@ -83,7 +84,7 @@
 }
 
 - (void)alertView:(UIAlertView *)alertView
-	clickedButtonAtIndex:(NSInteger)buttonIndex
+clickedButtonAtIndex:(NSInteger)buttonIndex
 {
 	NSString *entered_phone_num = [[alertView textFieldAtIndex:0] text];
 	NSLog(@"warn: main: writing phone num '%@' to disk", entered_phone_num);
@@ -97,12 +98,12 @@
 		NSLog(@"warn: load phone number: entered emtpy phone number");
 	}
 
-	_phone_number = entered_phone_num;
+	phone_number = entered_phone_num;
 
-	if ([_server load_device_id:[_phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
+	if ([network_connection load_device_id:[phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
 		NSLog(@"info: network: connection ready");
 		// bulk update, doesn't take a payload
-		[_server send_message:3 contents:nil];
+		[network_connection send_message:3 contents:nil];
 	}
 	// else, device id request sent
 }
@@ -129,8 +130,8 @@
 			disp_name = @"No Name";
 
 		// map the persons known phone number to their massaged name
-		for (NSString *phone_number in contact.phone_numbers)
-			[_phnum_to_name_map setObject:disp_name forKey:phone_number];
+		for (NSString *tmp_phone_number in contact.phone_numbers)
+			[_phnum_to_name_map setObject:disp_name forKey:tmp_phone_number];
 	}
 }
 
@@ -169,12 +170,16 @@
 
 	// good to save
 	NSData *payload = [list.name dataUsingEncoding:NSUTF8StringEncoding];
-	[_server send_message:1 contents:payload];
+	[network_connection send_message:1 contents:payload];
 }
 
 - (void) finished_new_list_request:(SharedList *) shlist
 {
+	// shlist.cell = [self.tableView cellForRowAtIndexPath:]
 	[self.shared_lists addObject:shlist];
+
+	// [self.tableView insertRowsAtIndexPaths:index_path withRowAnimation:UITableViewRowAnimationMiddle];
+
 	[self.tableView reloadData];
 }
 
@@ -193,7 +198,7 @@
 	NSLog(@"info: joining list '%@'", list.name);
 
 	// the response for this does all of the heavy row moving work
-	[_server send_message:4 contents:list.id];
+	[network_connection send_message:4 contents:list.id];
 }
 
 - (void) finished_join_list_request:(SharedList *) shlist
@@ -323,13 +328,13 @@
 	if (!OSAtomicAnd32(0xffff, &_address_book->ready)) {
 		// not ready
 		NSMutableString *output = [[NSMutableString alloc] init];
-		for (id phone_number in phnum_array) {
-			if ([phone_number compare:_phone_number] == NSOrderedSame) {
+		for (id tmp_phone_number in phnum_array) {
+			if ([tmp_phone_number compare:phone_number] == NSOrderedSame) {
 				[output appendString:@"You"];
 				continue;
 			}
 
-			[output appendFormat:@", %@", phone_number];
+			[output appendFormat:@", %@", tmp_phone_number];
 		}
 		return output;
 	}
@@ -339,14 +344,14 @@
 	int others = 0;
 
 	// anything past the second field are list members
-	for (id phone_number in phnum_array) {
+	for (id tmp_phone_number in phnum_array) {
 
 		// try to find the list member in our address book
-		NSString *name = _phnum_to_name_map[phone_number];
+		NSString *name = _phnum_to_name_map[tmp_phone_number];
 
 		if (name)
 			[members addObject:name];
-		else if (_phone_number && ([_phone_number compare:phone_number] == NSOrderedSame))
+		else if (phone_number && ([phone_number compare:tmp_phone_number] == NSOrderedSame))
 			[members addObject:@"You"];
 		else
 			// didn't find it, you don't know this person
@@ -409,7 +414,7 @@
 	NSLog(@"info: leaving '%@' id '%@'", list.name, list.id);
 
 	// send leave list message, response will do all heavy lifting
-	[_server send_message:5 contents:list.id];
+	[network_connection send_message:5 contents:list.id];
 }
 
 - (NSString *)tableView:(UITableView *)tableView
@@ -434,10 +439,10 @@
 		[segue.destinationViewController setMetadata:list];
 
 		// has to be done before issuing network request
-		_server->shlist_ldvc = segue.destinationViewController;
+		network_connection->shlist_ldvc = segue.destinationViewController;
 
 		// send update list items message
-		[_server send_message:6 contents:list.id];
+		[network_connection send_message:6 contents:list.id];
 	}
 	// DetailObject *detail = [self detailForIndexPath:path];ß
 

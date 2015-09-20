@@ -1,6 +1,9 @@
 #import "AppDelegate.h"
+#import "Network.h"
 
-@interface AppDelegate ()
+@interface AppDelegate () {
+	Network *network_connection;
+}
 
 @end
 
@@ -9,6 +12,9 @@
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+	// we need to issue connect/reconnects from here
+	network_connection = [Network shared_network_connection];
+
 	// customization after application launch
 	return YES;
 }
@@ -34,6 +40,9 @@
 	// terminated later.
 	// If your application supports background execution, this method is
 	// called instead of applicationWillTerminate: when the user quits.
+
+	NSLog(@"info: app: entering background, disconnecting network");
+	[network_connection disconnect];
 }
 
 - (void) applicationWillEnterForeground:(UIApplication *)application
@@ -41,6 +50,10 @@
 	// Called as part of the transition from the background to the inactive
 	// state; here you can undo many of the changes made on entering the
 	// background.
+
+	NSLog(@"info: app: entering foreground, reconnecting...");
+	[network_connection connect];
+	[network_connection send_message:3 contents:nil];
 }
 
 - (void) applicationDidBecomeActive:(UIApplication *)application
@@ -54,6 +67,9 @@
 {
 	// Called when the application is about to terminate. Save data if
 	// appropriate. See also applicationDidEnterBackground:.
+
+	NSLog(@"info: app: teminating, disconnecting network");
+	[network_connection disconnect];
 }
 
 @end

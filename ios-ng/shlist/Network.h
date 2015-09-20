@@ -14,7 +14,14 @@
 
 }
 
+- (void) connect;
+- (void) disconnect;
+
+// only networking really cares about the device id
 - (bool) load_device_id:(NSData*)phone_number;
 - (void) send_message:(uint16_t)msg_type contents:(NSData *)data;
+
+// returns singleton instance
++ (id) shared_network_connection;
 
 @end

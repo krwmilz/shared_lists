@@ -16,10 +16,8 @@
 	unsigned int msg_type_pos;
 
 	int connected;
+	NSData *device_id;
 }
-
-// @property (strong, retain) NSMutableData *data;
-@property (strong, nonatomic) NSData *device_id;
 
 @end
 
@@ -100,7 +98,7 @@
 	}
 
 	// read device id from filesystem into memory
-	_device_id = [NSData dataWithContentsOfFile:device_id_file];
+	device_id = [NSData dataWithContentsOfFile:device_id_file];
 
 	return true;
 }
@@ -117,10 +115,10 @@
 		// include null separator in this length
 		payload_length = [payload length] + 1;
 
-	uint16_t msg_len_network = htons([_device_id length] + payload_length);
+	uint16_t msg_len_network = htons([device_id length] + payload_length);
 	[msg appendBytes:&msg_len_network length:2];
 
-	[msg appendData:_device_id];
+	[msg appendData:device_id];
 
 	if (payload) {
 		[msg appendBytes:"\0" length:1];
@@ -167,7 +165,8 @@
 	case NSStreamEventErrorOccurred:
 		NSLog(@"info: network: stream error occurred");
 		    // I saw this case when trying to connect to a down server
-		break;
+
+		// fall through on purpose
 	case NSStreamEventEndEncountered:
 
 		// close both sides of the connection on end
@@ -184,7 +183,7 @@
 
 		inputShlistStream = nil; // stream is ivar, so reinit it
 		outputShlistStream = nil; // stream is ivar, so reinit it
-			connected = 0;
+		connected = 0;
 
 		break;
 	default:
@@ -297,7 +296,7 @@
 			msg_data = [[NSData alloc] initWithBytes:msg_buffer length:msg_total_bytes];
 			msg_string = [[NSString alloc] initWithBytes:msg_buffer length:msg_total_bytes encoding:NSASCIIStringEncoding];
 
-			[self handle_message];
+			[self handle_complete_message];
 
 			// reset parsing fields, leave buffer position fields alone though
 			msg_buf_position = 0;
@@ -317,30 +316,34 @@
 	free(buffer);
 }
 
-- (void) handle_message
+- (void) handle_complete_message
 {
 	// assert msg_type_pos == 2 and msg_total_bytes_pos == 2 and msg_buf_position == msg_total_bytes
 
 	if (msg_type == 0) {
-		// write key to file
-		NSLog(@"info: read: writing new keyfile to disk");
+		// registration response message
 
 		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
 		NSString *documentsDirectory = [paths objectAtIndex:0];
-
 		NSString *destinationPath = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
-		// if (![[NSFileManager defaultManager] fileExistsAtPath:destinationPath]) {
+		if ([[NSFileManager defaultManager] fileExistsAtPath:destinationPath]) {
+			// it would be strange if we got back a registration
+			// message type when we already have a key file
+			NSLog(@"error: network: register: not overwriting key file with '%@'", msg_string);
+			return;
+		}
+
+		NSLog(@"info: network: register: writing new key '%@' to disk", msg_string);
 		[msg_data writeToFile:destinationPath atomically:YES];
-		// }
 
 		// set this so we're ready to send other message types
-		_device_id = msg_data;
+		device_id = msg_data;
 
 		// do a bulk list update
 		[self send_message:3 contents:nil];
 	}
 
-	if (msg_type == 1) {
+	else if (msg_type == 1) {
 		NSArray *fields = [msg_string componentsSeparatedByString:@"\0"];
 
 		if ([fields count] != 3) {
@@ -356,15 +359,16 @@
 		shlist.items_ready = 0;
 		shlist.items_total = 0;
 
-		NSLog(@"info: network: new list response for '%@'", shlist.name);
+		NSLog(@"info: network: response for new list '%@' has %i fields",
+		      shlist.name, [fields count]);
 		[shlist_tvc finished_new_list_request:shlist];
 	}
 
-	if (msg_type == 3) {
+	else if (msg_type == 3) {
 		[self handle_bulk_list_update:msg_string];
 	}
 
-	if (msg_type == 4) {
+	else if (msg_type == 4) {
 		NSLog(@"info: join list response '%@'", msg_string);
 
 		SharedList *shlist = [[SharedList alloc] init];
@@ -379,7 +383,7 @@
 		[shlist_tvc finished_join_list_request:shlist];
 	}
 
-	if (msg_type == 5) {
+	else if (msg_type == 5) {
 		NSLog(@"info: leave list response '%@'", msg_string);
 
 		NSArray *fields = [msg_string componentsSeparatedByString:@"\0"];

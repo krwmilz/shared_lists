@@ -379,7 +379,23 @@
 	}
 
 	if (msg_type == 1) {
-		NSLog(@"info: got new list response, not doing anything with it");
+		NSArray *fields = [msg_string componentsSeparatedByString:@"\0"];
+
+		if ([fields count] != 2) {
+			NSLog(@"warn: network: new list response has invalid number of fields %i",
+			      [fields count]);
+			return;
+		}
+
+		SharedList *shlist = [[SharedList alloc] init];
+		shlist.id = [[fields objectAtIndex:0] dataUsingEncoding:NSUTF8StringEncoding];
+		shlist.name = [fields objectAtIndex:1];
+		shlist.members = @"You";
+		shlist.items_ready = 0;
+		shlist.items_total = 0;
+
+		NSLog(@"info: network: new list response for '%@'", shlist.name);
+		[shlist_tvc finished_new_list_request:shlist];
 	}
 
 	if (msg_type == 3) {

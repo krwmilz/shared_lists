@@ -13,24 +13,6 @@
 
 @implementation MainTableViewController
 
-- (IBAction) unwindToList:(UIStoryboardSegue *)segue
-{
-	NewListViewController *source = [segue sourceViewController];
-	SharedList *list = source.shared_list;
-
-	if (list == nil) {
-		return;
-	}
-
-	[self.shared_lists addObject:list];
-	[self.tableView reloadData];
-
-	// send new list message with new list name as payload
-	NSData *payload = [list.name dataUsingEncoding:NSUTF8StringEncoding];
-	[_server send_message:1 contents:payload];
-
-	NSLog(@"unwindToList(): done");
-}
 
 - (void) viewDidLoad
 {
@@ -74,6 +56,27 @@
 	else if (section == 1)
 		return [self.indirect_lists count];
 	return 0;
+}
+
+// new list dialogue has been cancelled or saved
+- (IBAction) unwindToList:(UIStoryboardSegue *)segue
+{
+	NewListViewController *source = [segue sourceViewController];
+	SharedList *list = source.shared_list;
+
+	if (list == nil) {
+		return;
+	}
+
+	// good to save
+	NSData *payload = [list.name dataUsingEncoding:NSUTF8StringEncoding];
+	[_server send_message:1 contents:payload];
+}
+
+- (void) finished_new_list_request:(SharedList *) shlist
+{
+	[self.shared_lists addObject:shlist];
+	[self.tableView reloadData];
 }
 
 // major thing here is join list requests

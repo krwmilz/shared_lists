@@ -1,6 +1,5 @@
 #import "Network.h"
 #import "DataStructures.h"
-#import "AddressBook.h"
 
 @interface Network () {
 	NSData *msg_data;
@@ -19,11 +18,7 @@
 	int connected;
 }
 
-@property (strong, retain) NSMutableData *data;
-@property (strong, retain) AddressBook *address_book;
-@property NSMutableDictionary *phnum_to_name_map;
-
-@property (strong, nonatomic) NSString *phone_number;
+// @property (strong, retain) NSMutableData *data;
 @property (strong, nonatomic) NSData *device_id;
 
 @end
@@ -41,37 +36,6 @@
 
 		msg_type = 0;
 		msg_type_pos = 0;
-
-		// [self connect];
-
-		// get instance and wait for privacy window to clear
-		_address_book = [AddressBook shared_address_book];
-		[_address_book wait_for_ready];
-
-		// the capacity here assumes one phone number per person
-		_phnum_to_name_map = [NSMutableDictionary
-				      dictionaryWithCapacity:_address_book.num_contacts];
-
-		for (Contact *contact in _address_book.contacts) {
-			NSString *disp_name;
-			// show first name and last initial if possible, otherwise
-			// just show the first name or the last name or the phone number
-			if (contact.first_name && contact.last_name)
-				disp_name = [NSString stringWithFormat:@"%@ %@",
-					     contact.first_name, [contact.last_name substringToIndex:1]];
-			else if (contact.first_name)
-				disp_name = contact.first_name;
-			else if (contact.last_name)
-				disp_name = contact.last_name;
-			else if ([contact.phone_numbers count])
-				disp_name = [contact.phone_numbers objectAtIndex:0];
-			else
-				disp_name = @"No Name";
-
-			// map the persons known phone number to their massaged name
-			for (NSString *phone_number in contact.phone_numbers)
-				[_phnum_to_name_map setObject:disp_name forKey:phone_number];
-		}
 	}
 
 	return self;
@@ -105,8 +69,6 @@
 	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
 	NSString *documentsDirectory = [paths objectAtIndex:0];
 
-	// NSString *phone_num_file = [documentsDirectory stringByAppendingPathComponent:@"phone_num"];
-	_phone_number = @"4037082094";
 	NSString *device_id_file = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
 
 	// NSError *error = nil;
@@ -381,7 +343,7 @@
 	if (msg_type == 1) {
 		NSArray *fields = [msg_string componentsSeparatedByString:@"\0"];
 
-		if ([fields count] != 2) {
+		if ([fields count] != 3) {
 			NSLog(@"warn: network: new list response has invalid number of fields %i",
 			      [fields count]);
 			return;
@@ -390,7 +352,7 @@
 		SharedList *shlist = [[SharedList alloc] init];
 		shlist.id = [[fields objectAtIndex:0] dataUsingEncoding:NSUTF8StringEncoding];
 		shlist.name = [fields objectAtIndex:1];
-		shlist.members = @"You";
+		shlist.members_phone_nums = [NSArray arrayWithObjects:[fields objectAtIndex:2], nil];
 		shlist.items_ready = 0;
 		shlist.items_total = 0;
 
@@ -487,46 +449,13 @@
 		NSLog(@"info: parse_list: '%@' has %i fields",
 		      [list_fields objectAtIndex:0], field_count);
 
-		NSMutableArray *members = [[NSMutableArray alloc] init];
-		int others = 0;
-
-		// anything past the second field are list members
-		NSArray *phone_numbers = [list_fields subarrayWithRange:NSMakeRange(2, field_count - 2)];
-		for (id phone_number in phone_numbers) {
-
-			// try to find the list member in our address book
-			NSString *name = _phnum_to_name_map[phone_number];
-
-			if (name)
-				[members addObject:name];
-			else if ([phone_number compare:_phone_number])
-				[members addObject:@"You"];
-			else
-				// didn't find it, you don't know this person
-				others++;
-		}
-
-		NSMutableString *members_str =
-			[[members componentsJoinedByString:@", "] mutableCopy];
-
-		if (others) {
-			char *plural;
-			if (others == 1)
-				plural = "other";
-			else
-				plural = "others";
-
-			NSString *buf = [NSString stringWithFormat:@" + %i %s",
-					 others, plural];
-			[members_str appendString:buf];
-		}
 
 		// we've got everything we need
 		SharedList *shared_list = [[SharedList alloc] init];
 
 		shared_list.name = [list_fields objectAtIndex:0];
 		shared_list.id = [[list_fields objectAtIndex:1] dataUsingEncoding:NSUTF8StringEncoding];
-		shared_list.members = members_str;
+		shared_list.members_phone_nums = [list_fields subarrayWithRange:NSMakeRange(2, field_count - 2)];
 
 		// we don't currently get this information back
 		// XXX: lists your not in will not return this information

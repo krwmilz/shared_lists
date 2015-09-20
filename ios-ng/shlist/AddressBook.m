@@ -1,12 +1,11 @@
 #import "AddressBook.h"
+
 #include <AddressBook/AddressBook.h>
 #import <UIKit/UIKit.h>
 
 #include "libkern/OSAtomic.h"
 
 @interface AddressBook ()
-
-// - (void) get_contacts_or_fail;
 
 @end
 
@@ -32,7 +31,7 @@
 	if (self)
 	{
 		_contacts = [[NSMutableArray alloc] init];
-		_ready = 0;
+		ready = 0;
 		[self get_contacts_or_fail];
 	}
 	return self;
@@ -70,10 +69,14 @@
 		if (granted) {
 			// if they gave you permission, then just carry on
 			[self listPeopleInAddressBook:addressBook];
+			if (_main_tvc)
+				[_main_tvc update_address_book];
+			else
+				NSLog(@"warn: address book: address book ready before main_tvc assigned!");
 
 			// atomically set the ready flag; this completion handler
 			// can be run on an arbitrary thread
-			OSAtomicIncrement32((volatile int32_t *)&_ready);
+			OSAtomicIncrement32((volatile int32_t *)&ready);
 		} else {
 			// however, if they didn't give you permission, handle it gracefully, for example...
 
@@ -123,27 +126,6 @@
 
 	_num_contacts = [_contacts count];
 	NSLog(@"info: address book: %lu contacts found", _num_contacts);
-}
-
-// call this to make the address book authorization block
-- (void) wait_for_ready
-{
-	int cumulative_ms = 0;
-	int sleep_for_ms = 10;
-	// wait for the database to become ready, no upper bound
-	while (!OSAtomicAnd32(0xffff, &_ready)) {
-		usleep(sleep_for_ms * 1000);
-		cumulative_ms += sleep_for_ms;
-
-		// if we've spun for over a second reduce polling speed
-		if (cumulative_ms > 1 * 1000) {
-			NSLog(@"warn: address book: not ready for more than %i s",
-			      cumulative_ms / 1000);
-			sleep_for_ms = 1 * 1000;
-		}
-	}
-
-	NSLog(@"info: address book: ready after %i ms", cumulative_ms);
 }
 
 @end

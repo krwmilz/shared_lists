@@ -1,13 +1,18 @@
+#import "AddressBook.h"
 #import "MainTableViewController.h"
 #import "NewListViewController.h"
 #import "Network.h"
 #import "ListTableViewController.h"
 
 #import <AddressBook/AddressBook.h>
+#include "libkern/OSAtomic.h"
 
 @interface MainTableViewController ()
 
 @property (strong, nonatomic) Network *server;
+@property NSMutableDictionary *phnum_to_name_map;
+@property (strong, retain) AddressBook *address_book;
+@property (strong, nonatomic) NSString *phone_number;
 
 @end
 
@@ -24,6 +29,12 @@
 	self.shared_lists = [[NSMutableArray alloc] init];
 	self.indirect_lists = [[NSMutableArray alloc] init];
 
+	// first thing we need is a phone number, can't even send registration without it
+	// NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+	// NSString *documentsDirectory = [paths objectAtIndex:0];
+	// NSString *phone_num_file = [documentsDirectory stringByAppendingPathComponent:@"phone_num"];
+	_phone_number = @"4037082094";
+
 	// create one and only server instance, this gets passed around
 	_server = [[Network alloc] init];
 	_server->shlist_tvc = self;
@@ -32,6 +43,41 @@
 		NSLog(@"info: server connection prepared");
 		// bulk update, doesn't take a payload
 		[_server send_message:3 contents:nil];
+	}
+
+	// the capacity here assumes one phone number per person
+	_phnum_to_name_map = [[NSMutableDictionary alloc] init];
+
+	// get instance and wait for privacy window to clear
+	_address_book = [AddressBook shared_address_book];
+	_address_book.main_tvc = self;
+	// [_address_book wait_for_ready];
+}
+
+- (void) update_address_book
+{
+	[_phnum_to_name_map removeAllObjects];
+	// XXX: it'd be nice to resize the mutable array to num_contacts here
+
+	for (Contact *contact in _address_book.contacts) {
+		NSString *disp_name;
+		// show first name and last initial if possible, otherwise
+		// just show the first name or the last name or the phone number
+		if (contact.first_name && contact.last_name)
+			disp_name = [NSString stringWithFormat:@"%@ %@",
+				     contact.first_name, [contact.last_name substringToIndex:1]];
+		else if (contact.first_name)
+			disp_name = contact.first_name;
+		else if (contact.last_name)
+			disp_name = contact.last_name;
+		else if ([contact.phone_numbers count])
+			disp_name = [contact.phone_numbers objectAtIndex:0];
+		else
+			disp_name = @"No Name";
+
+		// map the persons known phone number to their massaged name
+		for (NSString *phone_number in contact.phone_numbers)
+			[_phnum_to_name_map setObject:disp_name forKey:phone_number];
 	}
 }
 
@@ -58,7 +104,7 @@
 	return 0;
 }
 
-// new list dialogue has been cancelled or saved
+// new list dialogue has been saved
 - (IBAction) unwindToList:(UIStoryboardSegue *)segue
 {
 	NewListViewController *source = [segue sourceViewController];
@@ -162,6 +208,7 @@
 	[self.tableView setEditing:FALSE animated:TRUE];
 }
 
+
 - (UITableViewCell *) tableView:(UITableView *)tableView
 	  cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
@@ -174,7 +221,7 @@
 	if ([indexPath section] == 0) {
 		shared_list = [self.shared_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.name;
-		cell.detailTextLabel.text = shared_list.members;
+		cell.detailTextLabel.text = [self process_members_array:shared_list.members_phone_nums];
 
 		// fill in the completion fraction
 		UILabel *completion_fraction;
@@ -199,7 +246,7 @@
 	else if ([indexPath section] == 1) {
 		shared_list = [self.indirect_lists objectAtIndex:row];
 		cell.textLabel.text = shared_list.name;
-		cell.detailTextLabel.text = shared_list.members;
+		cell.detailTextLabel.text = [self process_members_array:shared_list.members_phone_nums];
 		shared_list.cell = cell;
 
 		// Modify the look of the off the shelf cell
@@ -218,7 +265,57 @@
 	return cell;
 }
 
+- (NSString *) process_members_array:(NSArray *)phnum_array
+{
+	if (!OSAtomicAnd32(0xffff, &_address_book->ready)) {
+		// not ready
+		NSMutableString *output = [[NSMutableString alloc] init];
+		for (id phone_number in phnum_array) {
+			if ([phone_number compare:_phone_number] == NSOrderedSame) {
+				[output appendString:@"You"];
+				continue;
+			}
 
+			[output appendFormat:@", %@", phone_number];
+		}
+		return output;
+	}
+
+	// we can do phone number to name mappings
+	NSMutableArray *members = [[NSMutableArray alloc] init];
+	int others = 0;
+
+	// anything past the second field are list members
+	for (id phone_number in phnum_array) {
+
+		// try to find the list member in our address book
+		NSString *name = _phnum_to_name_map[phone_number];
+
+		if (name)
+			[members addObject:name];
+		else if ([phone_number compare:_phone_number] == NSOrderedSame)
+			[members addObject:@"You"];
+		else
+			// didn't find it, you don't know this person
+			others++;
+	}
+
+	NSMutableString *members_str =
+	[[members componentsJoinedByString:@", "] mutableCopy];
+
+	if (others) {
+		char *plural;
+		if (others == 1)
+			plural = "other";
+		else
+			plural = "others";
+
+		NSString *buf = [NSString stringWithFormat:@" + %i %s",
+				 others, plural];
+		[members_str appendString:buf];
+	}
+	return members_str;
+}
 
 // section header titles
 - (NSString *)tableView:(UITableView *)tableView

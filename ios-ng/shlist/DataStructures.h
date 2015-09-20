@@ -9,7 +9,7 @@
 
 @property NSString	*name;
 @property NSData	*id;
-@property NSString	*members;
+@property NSArray	*members_phone_nums;
 @property NSDate	*date;
 @property int		 items_ready;
 @property int		 items_total;

@@ -2,21 +2,21 @@
 #import "DataStructures.h"
 
 @interface Network () {
-	NSData *msg_data;
-	NSString *msg_string;
-	uint8_t msg_buffer[1024];
-	unsigned int msg_buf_position;
+	NSData		*msg_data;
+	NSString	*msg_string;
+	uint8_t		 msg_buffer[1024];
+	unsigned int	 msg_buf_position;
 
-	uint8_t msg_total_bytes_tmp[2];
-	unsigned short msg_total_bytes;
-	unsigned int msg_total_bytes_pos;
+	uint8_t		 msg_total_bytes_tmp[2];
+	unsigned short	 msg_total_bytes;
+	unsigned int	 msg_total_bytes_pos;
 
-	uint8_t msg_type_tmp[2];
-	unsigned short msg_type;
-	unsigned int msg_type_pos;
+	uint8_t		 msg_type_tmp[2];
+	unsigned short	 msg_type;
+	unsigned int	 msg_type_pos;
 
-	int connected;
-	NSData *device_id;
+	NSData		*device_id;
+	NSString	*device_id_file;
 }
 
 @end
@@ -26,7 +26,10 @@
 - (id) init
 {
 	if (self = [super init]) {
-		connected = 0;
+		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+		NSString *documentsDirectory = [paths objectAtIndex:0];
+		device_id_file = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
+
 		msg_buf_position = 0;
 
 		msg_total_bytes = 0;
@@ -34,6 +37,7 @@
 
 		msg_type = 0;
 		msg_type_pos = 0;
+		[self connect];
 	}
 
 	return self;
@@ -59,48 +63,52 @@
 	[inputShlistStream open];
 	[outputShlistStream open];
 
-	NSLog(@"info: network: finished connecting to absentmindedproductions.ca");
+	NSLog(@"info: network: bound to amp.ca");
 }
 
-- (bool) prepare
+- (void) disconnect
 {
-	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-	NSString *documentsDirectory = [paths objectAtIndex:0];
+	[inputShlistStream close];
+	[outputShlistStream close];
 
-	NSString *device_id_file = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
+	[inputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
+				     forMode:NSDefaultRunLoopMode];
+	[outputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
+				      forMode:NSDefaultRunLoopMode];
 
-	// NSError *error = nil;
-	// [[NSFileManager defaultManager] removeItemAtPath:destinationPath error:&error];
+	inputShlistStream = nil; // stream is ivar, so reinit it
+	outputShlistStream = nil; // stream is ivar, so reinit it
+}
 
-	// TODO: also check the length of the file
-	if (![[NSFileManager defaultManager] fileExistsAtPath:device_id_file]) {
-		// no device id file found, send a registration message
-		NSMutableData *msg = [NSMutableData data];
+- (bool) load_device_id:(NSData *)phone_number;
+{
+	if ([[NSFileManager defaultManager] fileExistsAtPath:device_id_file]) {
+		// TODO: also check the length of the file
+		// read device id from filesystem into memory
+		device_id = [NSData dataWithContentsOfFile:device_id_file];
 
-		// message type 0
-		[msg appendBytes:"\x00\x00" length:2];
-
-		// phone number length is 10
-		uint16_t length_network = htons(10);
-		[msg appendBytes:&length_network length:2];
-
-		// actual phone number
-		const char *phone_number = "4037082094";
-		[msg appendBytes:phone_number length:10];
-
-		if (connected == 0)
-			[self connect];
-		[outputShlistStream write:[msg bytes] maxLength:[msg length]];
-		NSLog(@"info: sent registration message");
-
-		// we don't have a device id so we can't do anything yet
-		return false;
+		return true;
 	}
 
-	// read device id from filesystem into memory
-	device_id = [NSData dataWithContentsOfFile:device_id_file];
+	// no device id file found, send a registration message
+	NSMutableData *msg = [NSMutableData data];
 
-	return true;
+	// message type 0
+	uint16_t msg_type_network = htons(0);
+	[msg appendBytes:&msg_type_network length:2];
+
+	// phone number length is 10
+	uint16_t length_network = htons(10);
+	[msg appendBytes:&length_network length:2];
+
+	// append phone number
+	[msg appendData:phone_number];
+
+	[outputShlistStream write:[msg bytes] maxLength:[msg length]];
+	NSLog(@"info: sent registration message");
+
+	// we don't have a device id so we can't do anything yet
+	return false;
 }
 
 - (void) send_message:(uint16_t)send_msg_type contents:(NSData *)payload
@@ -125,12 +133,15 @@
 		[msg appendData:payload];
 	}
 
-	if (connected == 0) {
-		NSLog(@"info: network: not connected in send_message, reconnecting...");
+	if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
+		NSLog(@"warn: network: write error occurred, reconnecting");
+		[self disconnect];
 		[self connect];
+
+		if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
+			NSLog(@"warn: network: resend failed after reconnect, giving up");
+		}
 	}
-	if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1)
-		NSLog(@"warn: network: write error occurred");
 }
 
 - (void)stream:(NSStream *)stream handleEvent:(NSStreamEvent)eventCode
@@ -146,7 +157,6 @@
 		break;
 	case NSStreamEventOpenCompleted:
 		NSLog(@"info: network: %@ stream opened", stream_name);
-		connected = 1;
 	break;
 	case NSStreamEventHasBytesAvailable:
 	if (stream == inputShlistStream) {
@@ -163,27 +173,17 @@
 		NSLog(@"info: network: stream has space available");
 		break;
 	case NSStreamEventErrorOccurred:
+		// I saw this case when trying to connect to a down server
+
 		NSLog(@"info: network: stream error occurred");
-		    // I saw this case when trying to connect to a down server
+		[self disconnect];
 
 		// fall through on purpose
 	case NSStreamEventEndEncountered:
 
 		// close both sides of the connection on end
 		NSLog(@"ShlistServer::NSStreamEventEndEncountered");
-		[inputShlistStream close];
-		[outputShlistStream close];
-
-		[inputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
-			forMode:NSDefaultRunLoopMode];
-		[outputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
-			forMode:NSDefaultRunLoopMode];
-		// [inputShlistStream release];
-		// [outputShlistStream release];
-
-		inputShlistStream = nil; // stream is ivar, so reinit it
-		outputShlistStream = nil; // stream is ivar, so reinit it
-		connected = 0;
+		[self disconnect];
 
 		break;
 	default:
@@ -322,11 +322,7 @@
 
 	if (msg_type == 0) {
 		// registration response message
-
-		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-		NSString *documentsDirectory = [paths objectAtIndex:0];
-		NSString *destinationPath = [documentsDirectory stringByAppendingPathComponent:@"shlist_key"];
-		if ([[NSFileManager defaultManager] fileExistsAtPath:destinationPath]) {
+		if ([[NSFileManager defaultManager] fileExistsAtPath:device_id_file]) {
 			// it would be strange if we got back a registration
 			// message type when we already have a key file
 			NSLog(@"error: network: register: not overwriting key file with '%@'", msg_string);
@@ -334,7 +330,7 @@
 		}
 
 		NSLog(@"info: network: register: writing new key '%@' to disk", msg_string);
-		[msg_data writeToFile:destinationPath atomically:YES];
+		[msg_data writeToFile:device_id_file atomically:YES];
 
 		// set this so we're ready to send other message types
 		device_id = msg_data;
@@ -366,6 +362,7 @@
 
 	else if (msg_type == 3) {
 		[self handle_bulk_list_update:msg_string];
+		[shlist_tvc.tableView reloadData];
 	}
 
 	else if (msg_type == 4) {
@@ -430,8 +427,6 @@
 		NSArray *indirect_lists = [self parse_lists:my_friends_lists];
 		[shlist_tvc.indirect_lists addObjectsFromArray:indirect_lists];
 	}
-
-	[shlist_tvc.tableView reloadData];
 }
 
 - (NSArray *) parse_lists:(NSString *)raw_lists
@@ -452,7 +447,6 @@
 		}
 		NSLog(@"info: parse_list: '%@' has %i fields",
 		      [list_fields objectAtIndex:0], field_count);
-
 
 		// we've got everything we need
 		SharedList *shared_list = [[SharedList alloc] init];
@@ -475,16 +469,7 @@
 
 - (void) dealloc
 {
-	[inputShlistStream close];
-	[outputShlistStream close];
-
-	[inputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
-				 forMode:NSDefaultRunLoopMode];
-	[outputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
-					 forMode:NSDefaultRunLoopMode];
-
-	inputShlistStream = nil; // stream is ivar, so reinit it
-	outputShlistStream = nil; // stream is ivar, so reinit it
+	[self disconnect];
 }
 
 @end

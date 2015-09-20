@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+
 #import "MainTableViewController.h"
 #import "ListTableViewController.h"
 
@@ -13,7 +14,7 @@
 
 }
 
-- (bool) prepare;
+- (bool) load_device_id:(NSData*)phone_number;
 - (void) send_message:(uint16_t)msg_type contents:(NSData *)data;
 
 @end

@@ -7,7 +7,9 @@
 #import <AddressBook/AddressBook.h>
 #include "libkern/OSAtomic.h"
 
-@interface MainTableViewController ()
+@interface MainTableViewController () {
+	NSString *phone_num_file;
+}
 
 @property (strong, nonatomic) Network *server;
 @property NSMutableDictionary *phnum_to_name_map;
@@ -26,37 +28,89 @@
 	// display an Edit button in the navigation bar for this view controller
 	self.navigationItem.leftBarButtonItem = self.editButtonItem;
 
+	// main lists
 	self.shared_lists = [[NSMutableArray alloc] init];
 	self.indirect_lists = [[NSMutableArray alloc] init];
 
-	// first thing we need is a phone number, can't even send registration without it
-	// NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-	// NSString *documentsDirectory = [paths objectAtIndex:0];
-	// NSString *phone_num_file = [documentsDirectory stringByAppendingPathComponent:@"phone_num"];
-	_phone_number = @"4037082094";
+	// store the path to the phone number file
+	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+	NSString *documentsDirectory = [paths objectAtIndex:0];
+	phone_num_file = [documentsDirectory stringByAppendingPathComponent:@"phone_num"];
 
-	// create one and only server instance, this gets passed around
 	_server = [[Network alloc] init];
 	_server->shlist_tvc = self;
 
-	if ([_server prepare]) {
-		NSLog(@"info: server connection prepared");
-		// bulk update, doesn't take a payload
-		[_server send_message:3 contents:nil];
-	}
-
-	// the capacity here assumes one phone number per person
 	_phnum_to_name_map = [[NSMutableDictionary alloc] init];
+	_phone_number = nil;
+	if ([self load_phone_number]) {
+		// phone number loaded, try loading device id
+		if ([_server load_device_id:[_phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
+			NSLog(@"info: network: connection ready");
+			// bulk update, doesn't take a payload
+			[_server send_message:3 contents:nil];
+		}
+		// else, device id request sent
+	}
+	// else, phone number entry is on screen
 
 	// get instance and wait for privacy window to clear
 	_address_book = [AddressBook shared_address_book];
 	_address_book.main_tvc = self;
 }
 
+- (bool) load_phone_number
+{
+	if ([[NSFileManager defaultManager] fileExistsAtPath:phone_num_file]) {
+		// file exists, read what it has
+		// XXX: validate length of file too
+		_phone_number = [NSString stringWithContentsOfFile:phone_num_file];
+		return true;
+	}
+
+	UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Important"
+		message:@"In order for us to calculate your mutual contacts, your phone number is needed."
+		delegate:self cancelButtonTitle:@"Nope" otherButtonTitles:@"Ok", nil];
+
+	alert.alertViewStyle = UIAlertViewStylePlainTextInput;
+
+	// it's a phone number, so only show the number pad
+	UITextField * alertTextField = [alert textFieldAtIndex:0];
+	alertTextField.keyboardType = UIKeyboardTypeNumberPad;
+	alertTextField.placeholder = @"Enter your phone number";
+
+	[alert show];
+	return false;
+}
+
+- (void)alertView:(UIAlertView *)alertView
+	clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+	NSString *entered_phone_num = [[alertView textFieldAtIndex:0] text];
+	NSLog(@"warn: main: writing phone num '%@' to disk", entered_phone_num);
+	NSError *error;
+	[entered_phone_num writeToFile:phone_num_file atomically:YES encoding:NSASCIIStringEncoding error:&error];
+
+	if (error)
+		NSLog(@"warn: main: writing phone number file: %@", error);
+
+	if ([entered_phone_num compare:@""] == NSOrderedSame) {
+		NSLog(@"warn: load phone number: entered emtpy phone number");
+	}
+
+	_phone_number = entered_phone_num;
+
+	if ([_server load_device_id:[_phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
+		NSLog(@"info: network: connection ready");
+		// bulk update, doesn't take a payload
+		[_server send_message:3 contents:nil];
+	}
+	// else, device id request sent
+}
+
 - (void) update_address_book
 {
 	[_phnum_to_name_map removeAllObjects];
-	// XXX: it'd be nice to resize the mutable array to num_contacts here
+	// XXX: it'd be nice to resize phnum_to_name_map to num_contacts here
 
 	for (Contact *contact in _address_book.contacts) {
 		NSString *disp_name;
@@ -292,7 +346,7 @@
 
 		if (name)
 			[members addObject:name];
-		else if ([phone_number compare:_phone_number] == NSOrderedSame)
+		else if (_phone_number && ([_phone_number compare:phone_number] == NSOrderedSame))
 			[members addObject:@"You"];
 		else
 			// didn't find it, you don't know this person

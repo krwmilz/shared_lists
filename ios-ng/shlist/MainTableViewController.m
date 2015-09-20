@@ -44,7 +44,6 @@
 	if ([self load_phone_number]) {
 		// phone number loaded, try loading device id
 		if ([network_connection load_device_id:[phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
-			NSLog(@"info: network: connection ready");
 			// bulk update, doesn't take a payload
 			[network_connection send_message:3 contents:nil];
 		}

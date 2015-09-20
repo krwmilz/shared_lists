@@ -1,6 +1,8 @@
 #import "Network.h"
 #import "DataStructures.h"
 
+// #import <NSAlert.h>
+
 @interface Network () {
 	NSData		*msg_data;
 	NSString	*msg_string;
@@ -58,7 +60,7 @@
 
 - (void) connect
 {
-	NSLog(@"info: network: connecting");
+	[self info:@"network: connect()"];
 	connected = 1;
 
 	CFReadStreamRef readStream;
@@ -82,7 +84,7 @@
 
 - (void) disconnect
 {
-	NSLog(@"info: network: disconnecting");
+	[self info:@"network: disconnect()"];
 	connected = 0;
 
 	[inputShlistStream close];
@@ -103,6 +105,7 @@
 		// TODO: also check the length of the file
 		// read device id from filesystem into memory
 		device_id = [NSData dataWithContentsOfFile:device_id_file];
+		[self debug:@"network: device id loaded"];
 
 		return true;
 	}
@@ -122,19 +125,20 @@
 	[msg appendData:phone_number];
 
 	[outputShlistStream write:[msg bytes] maxLength:[msg length]];
-	NSLog(@"info: sent registration message");
+	[self info:@"register: sent request"];
 
 	// we don't have a device id so we can't do anything yet
 	return false;
 }
 
-- (void) send_message:(uint16_t)send_msg_type contents:(NSData *)payload
+- (bool) send_message:(uint16_t)send_msg_type contents:(NSData *)payload
 {
 	if (!connected)
 		[self connect];
 
 	NSMutableData *msg = [NSMutableData data];
-	NSLog(@"info: network: send_message: msg type %i", send_msg_type);
+	[self info:@"network: send_message: msg type %i, %i bytes payload",
+		send_msg_type, [payload length]];
 
 	uint16_t msg_type_network = htons(send_msg_type);
 	[msg appendBytes:&msg_type_network length:2];
@@ -148,8 +152,8 @@
 	[msg appendBytes:&msg_len_network length:2];
 
 	if (device_id == nil) {
-		NSLog(@"warn: network: send_message called before device_id was ready");
-		return;
+		[self warn:@"network: send_message: called before device_id was ready"];
+		return false;
 	}
 	[msg appendData:device_id];
 
@@ -159,15 +163,19 @@
 	}
 
 	if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
-		NSLog(@"warn: network: write error occurred, reconnecting");
-		[self disconnect];
+		[self warn:@"network: write error occurred, trying reconnect"];
+		if (connected)
+			[self disconnect];
 		[self connect];
 
 		if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
-			NSLog(@"warn: network: resend failed after reconnect, giving up");
+			[self warn:@"network: resend failed after reconnect, giving up"];
+			return false;
 		}
 	}
-	NSLog(@"info: network: send_message: msg type %i done", send_msg_type);
+
+	// sent successfully
+	return true;
 }
 
 - (void)stream:(NSStream *)stream handleEvent:(NSStreamEvent)eventCode
@@ -179,40 +187,56 @@
 		stream_name = @"output";
 
 	switch (eventCode) {
-	case NSStreamEventNone:
-		NSLog(@"NSStreamEventNone");
+	case NSStreamEventNone: {
+		[self debug:@"debug: NSStreamEventNone"];
 		break;
-	case NSStreamEventOpenCompleted:
-		NSLog(@"info: network: %@ stream opened", stream_name);
-	break;
-	case NSStreamEventHasBytesAvailable:
-	if (stream == inputShlistStream) {
-		if (![inputShlistStream hasBytesAvailable]) {
-			NSLog(@"warn: network: input stream had no bytes available");
+	}
+	case NSStreamEventOpenCompleted: {
+		[self debug:@"debug: network: %@ stream opened", stream_name];
+		break;
+	}
+	case NSStreamEventHasBytesAvailable: {
+		if (stream == inputShlistStream) {
+			if (![inputShlistStream hasBytesAvailable]) {
+				[self warn:@"network: input stream had no bytes available"];
 			break;
 		}
 
 		// advance the message state machine by at least one byte
 		[self process_response_bytes];
+		}
+		break;
 	}
-	break;
-	case NSStreamEventHasSpaceAvailable:
-		NSLog(@"info: network: stream has space available");
+	case NSStreamEventHasSpaceAvailable: {
+		[self debug:@"debug: network: stream has space available"];
 		break;
-	case NSStreamEventErrorOccurred:
-		// I saw this case when trying to connect to a down server
-		NSLog(@"info: network: stream error occurred");
+	}
+	case NSStreamEventErrorOccurred: {
+		// happens when trying to connect to a down server
+		NSStream *error_stream;
+		if (stream == inputShlistStream)
+			error_stream = inputShlistStream;
+		else if (stream == outputShlistStream)
+			error_stream = outputShlistStream;
+		else
+			// don't try to do operations on null stream
+			break;
+
+		NSError *theError = [error_stream streamError];
+		[self info:@"network: %@", [NSString stringWithFormat:@"%@ error %i: %@",
+				stream_name, [theError code], [theError localizedDescription]]];
+
 		[self disconnect];
 
-		// fall through on purpose
-	case NSStreamEventEndEncountered:
-		// close both sides of the connection on end
-		NSLog(@"info: Network::NSStreamEventEndEncountered");
+		break;
+	}
+	case NSStreamEventEndEncountered: {
+		[self debug:@"Network::NSStreamEventEndEncountered"];
 		[self disconnect];
 
 		break;
+	}
 	default:
-		NSLog(@"handleEvent: default case");
 		break;
 	}
 }
@@ -227,17 +251,17 @@
 
 		buffer_length = [inputShlistStream read:buffer maxLength:1024];
 		if (buffer_length < 0) {
-			NSLog(@"warn: network: read returned < 0: %i", buffer_length);
+			[self info:@"network: read returned < 0: %i", buffer_length];
 			// XXX: should this be break instead?
 			continue;
 		}
 
 		if (buffer_length == 0) {
-			NSLog(@"warn: network: buffer length was zero!");
+			[self info:@"network: buffer length was zero!"];
 			// maybe break here instead?
 			continue;
 		}
-		NSLog(@"info: network: processing %i bytes", buffer_length);
+		[self debug:@"network: processing %i bytes", buffer_length];
 
 		// start receiving a new message
 		if (msg_type_pos == 0) {
@@ -261,7 +285,7 @@
 			// both bytes are available for reading
 			msg_type = ntohs(*(uint16_t *)msg_type_tmp);
 			if (msg_type > 7) {
-				NSLog(@"warn: network: out of range msg type %i", buffer[0]);
+				[self warn:@"network: out of range msg type %i", msg_type];
 
 				// bad message type, reset message buffer
 				msg_type_pos = 0;
@@ -269,7 +293,7 @@
 				msg_total_bytes_pos = 0;
 				continue;
 			}
-			NSLog(@"info: network: got message type %i", msg_type);
+			[self debug:@"network: parsed message type %i", msg_type];
 
 			if (buffer_pos == buffer_length)
 				// we've run out of bytes to process
@@ -294,8 +318,8 @@
 
 			msg_total_bytes = ntohs(*(uint16_t *)msg_total_bytes_tmp);
 			if (msg_total_bytes > 1024 || msg_total_bytes == 0) {
-				NSLog(@"warn: network: out of range message length: 0 < %i < 1024",
-				      msg_total_bytes);
+				[self warn:@"network: out of range message length: 0 < %i < 1024",
+				      msg_total_bytes];
 
 				// bad message type, reset message buffer
 				msg_type_pos = 0;
@@ -303,7 +327,7 @@
 				msg_total_bytes_pos = 0;
 				continue;
 			}
-			NSLog(@"info: network: message length is %i bytes", msg_total_bytes);
+			[self debug:@"network: message length is %i bytes", msg_total_bytes];
 
 			if (buffer_pos == buffer_length)
 				// no more bytes to process
@@ -313,7 +337,7 @@
 		unsigned int remaining_bytes = buffer_length - buffer_pos;
 
 		if (msg_buf_position + remaining_bytes >= msg_total_bytes) {
-			NSLog(@"info: network: buffer length has enough space to read complete message");
+			[self info:@"network: buffer length has enough space to read complete message"];
 
 			unsigned int bytes_for_complete_message = msg_total_bytes - msg_buf_position;
 			memcpy(msg_buffer + msg_buf_position, &buffer[buffer_pos], bytes_for_complete_message);
@@ -351,11 +375,11 @@
 		if ([[NSFileManager defaultManager] fileExistsAtPath:device_id_file]) {
 			// it would be strange if we got back a registration
 			// message type when we already have a key file
-			NSLog(@"error: network: register: not overwriting key file with '%@'", msg_string);
+			[self error:@"network: register: not overwriting key file with '%@'", msg_string];
 			return;
 		}
 
-		NSLog(@"info: network: register: writing new key '%@' to disk", msg_string);
+		[self info:@"network: register: writing new key '%@' to disk", msg_string];
 		[msg_data writeToFile:device_id_file atomically:YES];
 
 		// set this so we're ready to send other message types
@@ -367,10 +391,9 @@
 
 	else if (msg_type == 1) {
 		NSArray *fields = [msg_string componentsSeparatedByString:@"\0"];
-
 		if ([fields count] != 3) {
-			NSLog(@"warn: network: new list response has invalid number of fields %i",
-			      [fields count]);
+			[self warn:@"network: new list response has invalid number of fields %i",
+			      [fields count]];
 			return;
 		}
 
@@ -381,10 +404,11 @@
 		shlist.items_ready = 0;
 		shlist.items_total = 0;
 
-		NSLog(@"info: network: response for new list '%@' has %i fields",
-		      shlist.name, [fields count]);
 		if ([self check_tvc:shlist_tvc])
 			[shlist_tvc finished_new_list_request:shlist];
+
+		[self info:@"network: response for new list '%@' has %i fields",
+		 shlist.name, [fields count]];
 	}
 
 	else if (msg_type == 3) {
@@ -395,9 +419,8 @@
 	}
 
 	else if (msg_type == 4) {
-		NSLog(@"info: join list response '%@'", msg_string);
-
 		SharedList *shlist = [[SharedList alloc] init];
+		// XXX: sanitize msg_data, should be base64 and 43 bytes long
 		shlist.id = msg_data;
 
 		// XXX: these need to be sent from the server
@@ -408,16 +431,15 @@
 
 		if ([self check_tvc:shlist_tvc])
 			[shlist_tvc finished_join_list_request:shlist];
+		[self info:@"join list: response '%@' acknowledgedd", msg_string];
 	}
 
 	else if (msg_type == 5) {
-		NSLog(@"info: leave list response '%@'", msg_string);
 
 		NSArray *fields = [msg_string componentsSeparatedByString:@"\0"];
-
 		if ([fields count] != 2) {
-			NSLog(@"warn: leave list response had wrong number (%i) of fields",
-			      [fields count]);
+			[self warn:@"leave list: response had wrong number (%i) of fields",
+			      [fields count]];
 			return;
 		}
 
@@ -430,6 +452,7 @@
 
 		if ([self check_tvc:shlist_tvc])
 			[shlist_tvc finished_leave_list_request:shlist];
+		[self info:@"leave list: response '%@' acknowledgedd", msg_string];
 	}
 }
 
@@ -437,13 +460,12 @@
 {
 	if (tvc)
 		return true;
-	NSLog(@"warn: network: trying to update main_tvc before it's ready, ignoring!");
+	[self warn:@"network: trying to update main_tvc before it's ready, ignoring!"];
 	return false;
 }
 
 - (void) handle_bulk_list_update:(NSString *)raw_data
 {
-	NSLog(@"info: handling bulk list update message");
 
 	if (![self check_tvc:shlist_tvc])
 		return;
@@ -451,7 +473,8 @@
 	// split over double \0
 	NSArray *list_types = [raw_data componentsSeparatedByString:@"\0\0"];
 	if ([list_types count] != 2) {
-		NSLog(@"warn: wrong number if \\0\\0 found: %i", [list_types count]);
+		[self warn:@"bulk list update: wrong number if \\0\\0 found: %i",
+			[list_types count]];
 		return;
 	}
 
@@ -469,6 +492,9 @@
 		NSArray *indirect_lists = [self parse_lists:my_friends_lists];
 		[shlist_tvc.indirect_lists addObjectsFromArray:indirect_lists];
 	}
+
+	[self info:@"bulk list update: %i/%i your lists/other lists",
+		[shlist_tvc.shared_lists count], [shlist_tvc.indirect_lists count]];
 }
 
 - (NSArray *) parse_lists:(NSString *)raw_lists
@@ -482,13 +508,13 @@
 		int field_count = [list_fields count];
 
 		if (field_count < 3) {
-			NSLog(@"warn: less than 3 fields found: %i", field_count);
+			[self warn:@"parse list: less than 3 fields found: %i", field_count];
 
 			// can't do anything with this list
 			continue;
 		}
-		NSLog(@"info: parse_list: '%@' has %i fields",
-		      [list_fields objectAtIndex:0], field_count);
+		[self debug:@"parse_list: '%@' has %i fields",
+			[list_fields objectAtIndex:0], field_count];
 
 		// we've got everything we need
 		SharedList *shared_list = [[SharedList alloc] init];
@@ -507,6 +533,61 @@
 	}
 
 	return output;
+}
+
+#define LOG_LEVEL_ERROR	0
+#define LOG_LEVEL_WARN	1
+#define LOG_LEVEL_INFO	2
+#define LOG_LEVEL_DEBUG	3
+
+#define LOG_LEVEL LOG_LEVEL_INFO
+
+- (void) debug:(NSString *)fmt, ...
+{
+	va_list va;
+	va_start(va, fmt);
+	NSString *string = [[NSString alloc] initWithFormat:fmt
+						  arguments:va];
+	va_end(va);
+	if (LOG_LEVEL < LOG_LEVEL_DEBUG)
+		return;
+	NSLog(@"debug: %@", string);
+}
+
+- (void) info:(NSString *)fmt, ...
+{
+	va_list va;
+	va_start(va, fmt);
+	NSString *string = [[NSString alloc] initWithFormat:fmt
+						  arguments:va];
+	va_end(va);
+	if (LOG_LEVEL < LOG_LEVEL_INFO)
+		return;
+	NSLog(@"info: %@", string);
+}
+
+- (void) warn:(NSString *)fmt, ...
+{
+	va_list va;
+	va_start(va, fmt);
+	NSString *string = [[NSString alloc] initWithFormat:fmt
+						  arguments:va];
+	va_end(va);
+	if (LOG_LEVEL < LOG_LEVEL_WARN)
+		return;
+	NSLog(@"warn: %@", string);
+}
+
+- (void) error:(NSString *)fmt, ...
+{
+	va_list va;
+	va_start(va, fmt);
+	NSString *string = [[NSString alloc] initWithFormat:fmt
+						  arguments:va];
+	va_end(va);
+	if (LOG_LEVEL < LOG_LEVEL_ERROR)
+		return;
+	NSLog(@"error: %@", string);
 }
 
 - (void) dealloc

@@ -77,6 +77,7 @@
 			// atomically set the ready flag; this completion handler
 			// can be run on an arbitrary thread
 			OSAtomicIncrement32((volatile int32_t *)&ready);
+			[_main_tvc.tableView reloadData];
 		} else {
 			// however, if they didn't give you permission, handle it gracefully, for example...
 

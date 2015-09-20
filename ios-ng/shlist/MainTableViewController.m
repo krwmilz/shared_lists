@@ -51,7 +51,6 @@
 	// get instance and wait for privacy window to clear
 	_address_book = [AddressBook shared_address_book];
 	_address_book.main_tvc = self;
-	// [_address_book wait_for_ready];
 }
 
 - (void) update_address_book

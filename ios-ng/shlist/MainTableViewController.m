@@ -175,12 +175,11 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 - (void) finished_new_list_request:(SharedList *) shlist
 {
-	// shlist.cell = [self.tableView cellForRowAtIndexPath:]
 	[self.shared_lists addObject:shlist];
 
-	// [self.tableView insertRowsAtIndexPaths:index_path withRowAnimation:UITableViewRowAnimationMiddle];
-
-	[self.tableView reloadData];
+	// response looks good, insert the new list
+	NSIndexPath *index_path = [NSIndexPath indexPathForRow:[self.shared_lists count] - 1 inSection:0];
+	[self.tableView insertRowsAtIndexPaths:@[index_path] withRowAnimation:UITableViewRowAnimationFade];
 }
 
 // major thing here is join list requests

@@ -1,6 +1,6 @@
-#import "NewListViewController.h"
+#import "NewListTableViewController.h"
 
-@interface NewListViewController ()
+@interface NewListTableViewController ()
 
 @property (weak, nonatomic) IBOutlet UIBarButtonItem *saveButton;
 @property (weak, nonatomic) IBOutlet UITextField *textField;
@@ -8,7 +8,7 @@
 
 @end
 
-@implementation NewListViewController
+@implementation NewListTableViewController
 
 
 - (void) viewDidLoad {

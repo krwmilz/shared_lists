@@ -1,7 +1,7 @@
 #import <UIKit/UIKit.h>
 #import "DataStructures.h"
 
-@interface NewListViewController : UIViewController
+@interface NewListTableViewController : UITableViewController
 
 @property SharedList *shared_list;
 

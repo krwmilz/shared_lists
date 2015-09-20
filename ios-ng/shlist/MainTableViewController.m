@@ -1,6 +1,6 @@
 #import "AddressBook.h"
 #import "MainTableViewController.h"
-#import "NewListViewController.h"
+#import "NewListTableViewController.h"
 #import "Network.h"
 #import "ListTableViewController.h"
 
@@ -160,7 +160,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 // new list dialogue has been saved
 - (IBAction) unwindToList:(UIStoryboardSegue *)segue
 {
-	NewListViewController *source = [segue sourceViewController];
+	NewListTableViewController *source = [segue sourceViewController];
 	SharedList *list = source.shared_list;
 
 	if (list == nil) {

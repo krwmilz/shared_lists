@@ -188,27 +188,29 @@
 
 	switch (eventCode) {
 	case NSStreamEventNone: {
-		[self debug:@"debug: NSStreamEventNone"];
+		[self debug:@"network: NSStreamEventNone occurred"];
 		break;
 	}
 	case NSStreamEventOpenCompleted: {
-		[self debug:@"debug: network: %@ stream opened", stream_name];
+		[self debug:@"network: %@ opened", stream_name];
 		break;
 	}
 	case NSStreamEventHasBytesAvailable: {
+		[self debug:@"network: %@ has bytes available", stream_name];
+
 		if (stream == inputShlistStream) {
 			if (![inputShlistStream hasBytesAvailable]) {
 				[self warn:@"network: input stream had no bytes available"];
-			break;
-		}
+				break;
+			}
 
-		// advance the message state machine by at least one byte
-		[self process_response_bytes];
+			// advance the message state machine by at least one byte
+			[self process_response_bytes];
 		}
 		break;
 	}
 	case NSStreamEventHasSpaceAvailable: {
-		[self debug:@"debug: network: stream has space available"];
+		[self debug:@"network: %@ has space available", stream_name];
 		break;
 	}
 	case NSStreamEventErrorOccurred: {
@@ -231,7 +233,7 @@
 		break;
 	}
 	case NSStreamEventEndEncountered: {
-		[self debug:@"Network::NSStreamEventEndEncountered"];
+		[self debug:@"network: %@ end encountered", stream_name];
 		[self disconnect];
 
 		break;

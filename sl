@@ -11,6 +11,12 @@ use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
 use Scalar::Util qw(looks_like_number);
 use Socket;
 
+my $LOG_LEVEL_ERROR = 0;
+my $LOG_LEVEL_WARN = 1;
+my $LOG_LEVEL_INFO = 2;
+my $LOG_LEVEL_DEBUG = 3;
+my $LOG_LEVEL = $LOG_LEVEL_INFO;
+
 do 'msg_types.pl';
 
 # print ">>> " . $MSG_NEW_LIST . "\n";
@@ -24,6 +30,9 @@ my $dbh = DBI->connect(
 	"",
 	{ RaiseError => 1 }
 ) or die $DBI::errstr;
+
+# enable transactions, if possible
+$dbh->{AutoCommit} = 0;
 
 $dbh->do(qq{create table if not exists devices(
 		token text not null primary key,
@@ -151,6 +160,7 @@ my @msg_handlers = (
 	\&msg_list_request,
 	\&msg_join_list,
 	\&msg_leave_list,
+	\&msg_list_items_request,
 	\&msg_new_list_item
 );
 
@@ -167,18 +177,19 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
 	my $pid = fork();
 	if (! defined $pid ) {
-		die "Can't fork: $!\n";
+		die "error: can't fork: $!\n";
 	}
 
 	if ($pid) {
 		# parent goes back to listening for more connections
-		print "debug: forked child $pid\n";
+		info("forked child $pid\n");
 		close $new_sock;
 		next;
 	}
 
 	# child
 	my $child_dbh = $dbh->clone();
+	$child_dbh->{AutoCommit} = 0;
 	$dbh->{InactiveDestroy} = 1;
 	undef $dbh;
 
@@ -237,8 +248,17 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			# we read more bytes than we were expecting, keep going
 		}
 
-		# call the appropriate handlers
+		# call the appropriate handler
 		$msg_handlers[$msg_type]->($child_dbh, $new_sock, $addr, $msg);
+
+		$child_dbh->commit;   # commit the changes if we get this far
+		if ($@) {
+			warn "Transaction aborted because $@";
+			# now rollback to undo the incomplete changes
+			# but do it in an eval{} as it may also fail
+			eval { $child_dbh->rollback };
+			# add other application on-error-clean-up code here
+		}
 	}
 
 	print "info: $addr: done with connection!\n";
@@ -541,4 +561,24 @@ sub device_id_invalid
 	}
 
 	return 0;
+}
+
+sub error {
+	return if ($LOG_LEVEL < $LOG_LEVEL_ERROR);
+	print "error: " . sprintf @_;
+}
+
+sub warn {
+	return if ($LOG_LEVEL < $LOG_LEVEL_WARN);
+	print "warn: " . sprintf @_;
+}
+
+sub info {
+	return if ($LOG_LEVEL < $LOG_LEVEL_INFO);
+	print "info: " . sprintf @_;
+}
+
+sub debug {
+	return if ($LOG_LEVEL < $LOG_LEVEL_DEBUG);
+	print "debug: " . sprintf @_;
 }

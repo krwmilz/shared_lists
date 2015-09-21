@@ -228,7 +228,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 	// add > accessory indicator, fill in and show completion fraction
 	needle.cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-	UILabel *fraction = (UILabel *)[needle.cell viewWithTag:1];
+	UILabel *fraction = (UILabel *)[needle.cell viewWithTag:4];
 	fraction.text = [self fraction:shlist.items_ready denominator:shlist.items_total];
 	fraction.hidden = NO;
 }
@@ -257,7 +257,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 	// remove > accessory and hide the completion fraction
 	list.cell.accessoryType = UITableViewCellAccessoryNone;
-	UILabel *fraction = (UILabel *)[list.cell viewWithTag:1];
+	UILabel *fraction = (UILabel *)[list.cell viewWithTag:4];
 	fraction.hidden = YES;
 
 	// reset editing state back to the default
@@ -274,35 +274,39 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	int row = [indexPath row];
 	SharedList *shared_list;
 
+	UILabel *main_label = (UILabel *)[cell viewWithTag:1];
+	UILabel *members_label = (UILabel *)[cell viewWithTag:2];
+	UILabel *deadline_label = (UILabel *)[cell viewWithTag:3];
+	UILabel *fraction_label = (UILabel *)[cell viewWithTag:4];
+
 	if ([indexPath section] == 0) {
 		shared_list = [self.shared_lists objectAtIndex:row];
-		cell.textLabel.text = shared_list.name;
-		cell.detailTextLabel.text = [self process_members_array:shared_list.members_phone_nums];
 
-		// fill in the completion fraction
-		UILabel *completion_fraction;
-		completion_fraction = (UILabel *)[cell viewWithTag:1];
+		main_label.text = shared_list.name;
+		members_label.text = [self process_members_array:shared_list.members_phone_nums];
+		deadline_label.text = @"in 3 days";
 
 		// set color based on how complete the list is
 		/*
 		float frac = (float) shared_list.items_ready / shared_list.items_total;
 		if (frac == 0.0f)
-			completion_fraction.textColor = [UIColor blackColor];
+			fraction_label.textColor = [UIColor blackColor];
 		else if (frac < 0.5f)
-			completion_fraction.textColor = [UIColor redColor];
+			fraction_label.textColor = [UIColor redColor];
 		else if (frac < 0.75f)
-			completion_fraction.textColor = [UIColor orangeColor];
+			fraction_label.textColor = [UIColor orangeColor];
 		else
-			completion_fraction.textColor = [UIColor greenColor];
+			fraction_label.textColor = [UIColor greenColor];
 		 */
 
-		completion_fraction.text = [self fraction:shared_list.items_ready
+		fraction_label.text = [self fraction:shared_list.items_ready
 					      denominator:shared_list.items_total];
 	}
 	else if ([indexPath section] == 1) {
 		shared_list = [self.indirect_lists objectAtIndex:row];
-		cell.textLabel.text = shared_list.name;
-		cell.detailTextLabel.text = [self process_members_array:shared_list.members_phone_nums];
+		main_label.text = shared_list.name;
+		members_label.text = [self process_members_array:shared_list.members_phone_nums];
+		deadline_label.text = @"";
 		shared_list.cell = cell;
 
 		// Modify the look of the off the shelf cell
@@ -312,8 +316,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 		// remove the > accessory and the completion fraction
 		cell.accessoryType = UITableViewCellAccessoryNone;
-		UILabel *fraction = (UILabel *)[cell viewWithTag:1];
-		fraction.hidden = YES;
+		fraction_label.hidden = YES;
 	}
 
 	// hang on to a reference, this is needed in the networking gui callbacks

@@ -11,6 +11,10 @@ use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
 use Scalar::Util qw(looks_like_number);
 use Socket;
 
+do 'msg_types.pl';
+
+# print ">>> " . $MSG_NEW_LIST . "\n";
+
 my %args;
 getopts("p:", \%args);
 
@@ -140,8 +144,43 @@ my $get_list_items_sth = $dbh->prepare($sql);
 $sql = qq{insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)};
 my $new_list_item_sth = $dbh->prepare($sql);
 
+my @msg_handlers = (
+	\&msg_new_device,
+	\&msg_new_list,
+	\&msg_update_friends,
+	\&msg_list_request,
+	\&msg_join_list,
+	\&msg_leave_list,
+	\&msg_new_list_item
+);
+
+# make sure children get reaped :)
+$SIG{CHLD} = 'IGNORE';
+
 print "info: ready for connections on $local_addr_port\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
+
+	if (!$new_sock) {
+		print "warn: accepted empty socket";
+		next;
+	}
+
+	my $pid = fork();
+	if (! defined $pid ) {
+		die "Can't fork: $!\n";
+	}
+
+	if ($pid) {
+		# parent goes back to listening for more connections
+		print "debug: forked child $pid\n";
+		close $new_sock;
+		next;
+	}
+
+	# child
+	my $child_dbh = $dbh->clone();
+	$dbh->{InactiveDestroy} = 1;
+	undef $dbh;
 
 	# don't try and resolve ip address or port
 	my ($err, $addr, $port) = getnameinfo($bin_addr, NI_NUMERICHOST | NI_NUMERICSERV);
@@ -151,75 +190,62 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	# put socket into binary mode
 	binmode($new_sock);
 
-	# read and unpack message type
-	# XXX: i think we should loop until we read the number of bytes we expect
-	my $bread = read $new_sock, my $raw_msg_type, 2;
-	my ($msg_type) = unpack("n", $raw_msg_type);
+	my $done = 0;
+	while ($new_sock->connected() && !$done) {
 
-	# validate message type
-	if (!defined $msg_type) {
-		print "warn: $addr: error unpacking msg type\n";
-		close $new_sock;
-		next;
-	}
-	if ($msg_type > 10) {
-		print "warn: $addr: unknown message type " . sprintf "0x%x\n", $msg_type;
-		close $new_sock;
-		next;
-	}
-	print "info: $addr: message type $msg_type\n";
+		# read and unpack message type
+		my $bread = read $new_sock, my $metadata, 4;
+		if ($bread == 0) {
+			$done = 1;
+			next;
+		} elsif ($bread != 4) {
+			print "warn: $addr: read $bread instead of 4 bytes\n";
+			next;
+		}
+		my ($msg_type, $msg_size) = unpack("nn", $metadata);
 
-	# read and unpack message size
-	$bread = read($new_sock, my $raw_msg_size, 2);
-	my ($msg_size) = unpack("n", $raw_msg_size);
+		# validate message type
+		if (!defined $msg_type) {
+			print "warn: $addr: error unpacking msg type\n";
+			next;
+		} elsif ($msg_type > @msg_handlers) {
+			print "warn: $addr: unknown message type " . sprintf "0x%x\n", $msg_type;
+			next;
+		}
 
-	# validate message size
-	if (!defined $msg_size) {
-		print "warn: $addr: error unpacking msg type\n";
-		close $new_sock;
-		next;
-	}
-	if ($msg_size == 0) {
-		print "warn: $addr: size zero message\n";
-		close($new_sock);
-		next;
-	}
-	if ($msg_size > 1024) {
-		print "warn: $addr: message too large: $msg_size\n";
-		close($new_sock);
-		next;
-	}
-	print "info: $addr: message size = $msg_size\n";
+		# validate message size
+		if (!defined $msg_size) {
+			print "warn: $addr: error unpacking msg size\n";
+			next;
+		}
+		if ($msg_size == 0 || $msg_size > 1024) {
+			print "warn: $addr: message size not 0 < $msg_size <= 1024\n";
+			next;
+		}
+		print "info: $addr: received msg type $msg_type, $msg_size bytes\n";
 
-	# read message
-	$bread = read($new_sock, my $msg, $msg_size);
+		# read message
+		# XXX: this is brittle, if $msg_size is > num bytes avail, it
+		# blocks
+		$bread = read($new_sock, my $msg, $msg_size);
+		if ($bread != $msg_size) {
+			print "warn: $addr: read $bread instead of msg size\n";
 
-	if ($msg_type == 0) {
-		msg_new_device($new_sock, $addr, $msg);
-	}
-	elsif ($msg_type == 1) {
-		msg_new_list($new_sock, $addr, $msg);
-	}
-	elsif ($msg_type == 2) {
-		msg_update_friends($new_sock, $addr, $msg);
-	}
-	elsif ($msg_type == 3) {
-		msg_list_request($new_sock, $addr, $msg);
-	}
-    elsif ($msg_type == 4) {
-		msg_join_list($new_sock, $addr, $msg);
-    }
-    elsif ($msg_type == 5) {
-        msg_leave_list($new_sock, $addr, $msg);
-    }
-	elsif ($msg_type == 6) {
-		msg_list_items_request($new_sock, $addr, $msg);
-	}
-    elsif ($msg_type == 7) {
-        msg_new_list_item($new_sock, $addr, $msg);
-    }
+			if ($bread < $msg_size) {
+				next;
+			}
+			# we read more bytes than we were expecting, keep going
+		}
 
+		# call the appropriate handlers
+		$msg_handlers[$msg_type]->($child_dbh, $new_sock, $addr, $msg);
+	}
+
+	print "info: $addr: done with connection!\n";
 	close($new_sock);
+	$child_dbh->disconnect();
+
+	exit 0;
 }
 
 $dbh->disconnect();
@@ -227,7 +253,7 @@ close($sock);
 
 sub get_phone_number
 {
-	my $device_id = shift;
+	my ($dbh, $device_id) = @_;
 
 	#print "info: get_phone_number() unimplemented, returning device id!\n";
 	#return $device_id;
@@ -242,19 +268,17 @@ sub get_phone_number
 
 sub msg_new_device
 {
-	my ($new_sock, $addr, $msg) = @_;
+	my ($dbh, $new_sock, $addr, $msg) = @_;
 
 	# single field
 	my $ph_num = $msg;
 
 	if (!looks_like_number($ph_num)) {
 		print "warn: $addr: device phone number $ph_num invalid\n";
-		close $new_sock;
 		return;
 	}
 	if ($dbh->selectrow_array($ph_num_exists_sth, undef, $ph_num)) {
 		print "warn: $addr: phone number $ph_num already exists\n";
-		close $new_sock;
 		return;
 	}
 
@@ -271,19 +295,15 @@ sub msg_new_device
 
 sub msg_new_list
 {
-	my ($new_sock, $addr, $msg) = @_;
+	my ($dbh, $new_sock, $addr, $msg) = @_;
 
 	# expecting two fields delimited by null
 	my ($device_id, $list_name) = split("\0", $msg);
 
 	# validate input
-	if (device_id_invalid($device_id, $addr)) {
-		close $new_sock;
-		return;
-	}
+	return if (device_id_invalid($dbh, $device_id, $addr));
 	unless ($list_name) {
 		print "warn: $addr: list name missing\n";
-		close($new_sock);
 		return;
 	}
 
@@ -298,13 +318,16 @@ sub msg_new_list
 	$new_list_sth->execute($list_id, $list_name, $time, $time);
 	$new_list_member_sth->execute($list_id, $device_id, $time);
 
-	print $new_sock pack("nn", 1, length($list_id));
-	print $new_sock $list_id;
+	# XXX: also send back the date and all that stuff
+	my $phone_number = get_phone_number($dbh, $device_id);
+	my $out = $list_id . "\0" . $list_name . "\0" . $phone_number;
+	print $new_sock pack("nn", 1, length($out));
+	print $new_sock $out;
 }
 
 sub msg_new_list_item
 {
-    my ($new_sock, $addr, $msg) = @_;
+    my ($dbh, $new_sock, $addr, $msg) = @_;
 
     # my ($list_id, $position, $text) = split ("\0", $msg);
     
@@ -322,13 +345,11 @@ sub msg_new_list_item
 
 sub msg_join_list
 {
-    my ($new_sock, $addr, $msg) = @_;
+    my ($dbh, $new_sock, $addr, $msg) = @_;
     my ($device_id, $list_id) = split("\0", $msg);
 
-    if (device_id_invalid($device_id, $addr)) {
-        close $new_sock;
-        return;
-    }
+    return if (device_id_invalid($dbh, $device_id, $addr));
+
     print "info: $addr: device $device_id\n";
     print "info: $addr: list $list_id\n";
     
@@ -348,14 +369,11 @@ sub msg_join_list
 
 sub msg_leave_list
 {
-    my ($new_sock, $addr, $msg) = @_;
+    my ($dbh, $new_sock, $addr, $msg) = @_;
 
     my ($device_id, $list_id) = split("\0", $msg);
 
-    if (device_id_invalid($device_id, $addr)) {
-        close $new_sock;
-	return;
-    }
+    return if (device_id_invalid($dbh, $device_id, $addr));
     
     print "info: $addr: device $device_id\n";
     print "info: $addr: list $list_id\n";
@@ -386,7 +404,7 @@ sub msg_leave_list
 
 sub msg_update_friends
 {
-	my ($new_sock, $addr, $msg) = @_;
+	my ($dbh, $new_sock, $addr, $msg) = @_;
 
 	# update friend map, note this is meant to be a wholesale update
 	# of the friends that are associated with a given device id
@@ -394,10 +412,7 @@ sub msg_update_friends
 	# device id followed by 0 or more friends numbers
 	my ($device_id, @friends) = split("\0", $msg);
 
-	if (device_id_invalid($device_id, $addr)) {
-		close $new_sock;
-		return;
-	}
+	return if (device_id_invalid($dbh, $device_id, $addr));
 	print "info: $addr: device $device_id, " . @friends . " friends\n";
 
 	# delete all friends, remove mutual friend references
@@ -417,13 +432,9 @@ sub msg_update_friends
 # get both lists the device is in, and lists it can see
 sub msg_list_request
 {
-	my ($new_sock, $addr, $msg) = @_;
+	my ($dbh, $new_sock, $addr, $msg) = @_;
 
-	# check if the device id is valid
-	if (device_id_invalid($msg, $addr)) {
-		close $new_sock;
-		return;
-	}
+	return if (device_id_invalid($dbh, $msg, $addr));
 
 	print "info: $addr: gathering lists for $msg\n";
 
@@ -438,7 +449,7 @@ sub msg_list_request
 		my @list_members;
 		$get_list_members_sth->execute($list_id);
 		while (my ($member_device_id) = $get_list_members_sth->fetchrow_array()) {
-			push @list_members, get_phone_number($member_device_id);
+			push @list_members, get_phone_number($dbh, $member_device_id);
 			print "info: $addr: direct list: found member $member_device_id\n";
 		}
         push @direct_list_ids, $list_id;
@@ -459,7 +470,7 @@ sub msg_list_request
 		$get_lists_sth->execute($friend);
 
 		# we can't send device id's back to the client
-		my $friend_ph_num = get_phone_number($friend);
+		my $friend_ph_num = get_phone_number($dbh, $friend);
 
 		while (my ($list_id, $list_name) =
 			$get_lists_sth->fetchrow_array()) {
@@ -481,18 +492,19 @@ sub msg_list_request
 
 sub msg_list_items_request
 {
-	my ($new_sock, $addr, $msg) = @_;
+	my ($dbh, $new_sock, $addr, $msg) = @_;
 
 	my ($device_id, $list_id) = split("\0", $msg);
 
-	if (device_id_invalid($device_id, $addr)) {
-		close $new_sock;
+	return if (device_id_invalid($dbh, $device_id, $addr));
+
+	if (!$list_id) {
+		print "warn: $addr: received null list id";
 		return;
 	}
 	unless ($dbh->selectrow_array($check_list_member_sth, undef, $list_id, $device_id)) {
 		# XXX: table list_members list_id's should always exist in table lists
 		print "warn: $addr: $device_id not a member of $list_id\n";
-		close $new_sock;
 		return;
 	}
 	print "info: $addr: $device_id request items for $list_id\n";
@@ -514,7 +526,7 @@ sub msg_list_items_request
 
 sub device_id_invalid
 {
-	my ($device_id, $addr) = @_;
+	my ($dbh, $device_id, $addr) = @_;
 
 	# validate this at least looks like base64
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {

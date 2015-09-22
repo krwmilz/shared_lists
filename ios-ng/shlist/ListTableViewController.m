@@ -13,31 +13,79 @@
 
 - (void) load_initial_data
 {
-	// NSLog(@"ListDetailTableViewController::load_initial_data()");
+	ListItem *item = [[ListItem alloc] init];
+	item.name = @"Cheese Pizza";
+	item.owner = @"Dave";
+	item.committed = 1;
+	[self.list_items addObject:item];
 
-	ListItem *item1 = [[ListItem alloc] init];
-	item1.modifier = 1;
-	item1.name = @"cheese";
-	item1.quantity = 3;
-	item1.owner = @"Kyle";
-	item1.completed = 0;
-	[self.list_items addObject:item1];
+	item = [[ListItem alloc] init];
+	item.modifier = 0;
+	item.name = @"Camp stove";
+	item.owner = @"Steve";
+	item.committed = 1;
+	[self.list_items addObject:item];
 
-	ListItem *item2 = [[ListItem alloc] init];
-	item2.modifier = 0;
-	item2.name = @"camp stove";
-	item2.quantity = 1;
-	item2.owner = @"";
-	item2.completed = 1;
-	[self.list_items addObject:item2];
+	item = [[ListItem alloc] init];
+	item.name = @"Ear Plugs";
+	item.quantity = 10;
+	item.owner = @"";
+	item.committed = 0;
+	[self.list_items addObject:item];
 
-	ListItem *item3 = [[ListItem alloc] init];
-	item3.modifier = 2;
-	item3.name = @"ear plugs";
-	item3.quantity = 1;
-	item3.owner = @"";
-	item3.completed = 0;
-	[self.list_items addObject:item3];
+	item = [[ListItem alloc] init];
+	item.name = @"Fruit by the Foot";
+	item.quantity = 1;
+	item.owner = @"You";
+	item.committed = 1;
+	[self.list_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"Well used matress";
+	item.quantity = 1;
+	item.owner = @"";
+	item.committed = 0;
+	[self.list_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"Rifle and Ammo";
+	item.quantity = 1;
+	item.owner = @"Greg";
+	item.committed = 1;
+	[self.list_items addObject:item];
+
+
+	item = [[ListItem alloc] init];
+	item.name = @"Deoderant";
+	[self.private_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"Toothbrush";
+	[self.private_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"Pillow";
+	[self.private_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"Brass knuckles";
+	[self.private_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"Soldering Iron";
+	[self.private_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"8mm wrench";
+	[self.private_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"Fuzzy Dice";
+	[self.private_items addObject:item];
+
+	item = [[ListItem alloc] init];
+	item.name = @"Jerry Can";
+	[self.private_items addObject:item];
 }
 
 - (void) viewDidLoad
@@ -52,7 +100,8 @@
 	// navigation bar for this view controller.
 	// self.navigationItem.leftBarButtonItem = self.editButtonItem;
 
-	self.list_items = [[NSMutableArray alloc] init];
+	_list_items = [[NSMutableArray alloc] init];
+	_private_items = [[NSMutableArray alloc] init];
 	[self load_initial_data];
 }
 
@@ -70,7 +119,6 @@
 {
 	_list_metadata = metadata;
 	self.title = _list_metadata.name;
-
 }
 
 #pragma mark - Table view data source
@@ -82,17 +130,19 @@
 
 - (NSInteger) tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-	return [self.list_items count];
+	if (section == 0)
+		return [_list_items count];
+	else if (section == 1)
+		return [_private_items count];
+	return 0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
 {
-	if (section == 0) {
-		return @"shared items";
-	}
-	else if (section == 1) {
-		return @"personal items";
-	}
+	if (section == 0)
+		return [NSString stringWithFormat:@"Shared Items (%i)", [_list_items count]];
+	else if (section == 1)
+		return [NSString stringWithFormat:@"Private Items (%i)", [_private_items count]];
 	return @"";
 }
 
@@ -102,9 +152,6 @@
 	UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ListDetailPrototypeCell"
 		forIndexPath:indexPath];
 
-	NSUInteger section = [indexPath section];
-    
-	// NSLog(@"ListDetailTableViewController::cellForRowAtIndexPath()");
 	// Tags:
 	// 1) modifier -- ie $, info, etc
 	// 2) item name
@@ -112,42 +159,56 @@
 	// 4) owners name
 	// 5) completion/packing of item
 
-	UILabel *label;
-	ListItem *item = [self.list_items objectAtIndex:indexPath.row];
+	UILabel *item_name = (UILabel *)[cell viewWithTag:2];
+	UILabel *quantity = (UILabel *)[cell viewWithTag:3];
+	UILabel *owner = (UILabel *)[cell viewWithTag:4];
+	UISwitch *commit_switch = (UISwitch *)[cell viewWithTag:5];
 
+	/*
 	if (item.modifier == 1) {
 		UIImageView *image_view;
 		image_view = (UIImageView *)[cell viewWithTag:1];
 		image_view.image = [UIImage imageNamed: @"dollar103-2.png"];
-	}
-	else if (item.modifier == 2) {
+	 }
+	 else if (item.modifier == 2) {
 		UIImageView *image_view;
 		image_view = (UIImageView *)[cell viewWithTag:1];
 		image_view.image = [UIImage imageNamed: @"information15-3.png"];
+	 }
+	 */
+
+	ListItem *item;
+	if ([indexPath section] == 0) {
+		// "shared items" section
+		item = [self.list_items objectAtIndex:indexPath.row];
+
+		owner.text = @"";
+		[commit_switch setOn:item.committed animated:YES];
+
+		if (item.committed) {
+			if ([item.owner compare:@"You"] == NSOrderedSame)
+				owner.text = @"";
+			else {
+				owner.text = item.owner;
+				[commit_switch setEnabled:NO];
+			}
+		}
+	}
+	else if ([indexPath section] == 1) {
+		// "private items" section
+		item = [self.private_items objectAtIndex:indexPath.row];
+
+		// no owner or commit fields here
+		owner.hidden = true;
+		commit_switch.hidden = true;
 	}
 
-	label = (UILabel *)[cell viewWithTag:2];
-	label.text = item.name;
+	item_name.text = item.name;
 
-	label = (UILabel *)[cell viewWithTag:3];
-	if (item.quantity > 1) {
-		label.text = [NSString stringWithFormat:@"(x%d)", item.quantity];
-	} else {
-		label.text = @"";
-	}
-
-	label = (UILabel *)[cell viewWithTag:4];
-	if (section == 0)
-		// XXX: this should go to N/A when item doesn't have an owner
-		label.text = item.owner;
+	if (item.quantity > 1)
+		quantity.text = [NSString stringWithFormat:@"(x%d)", item.quantity];
 	else
-		label.hidden = true;
-
-	label = (UILabel *)[cell viewWithTag:5];
-	if (section == 0)
-		;
-	else
-		label.hidden = true;
+		quantity.hidden = true;
 
 	return cell;
 }

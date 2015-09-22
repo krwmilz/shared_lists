@@ -25,6 +25,7 @@
 @property NSString	*name;
 @property int		 quantity;
 @property NSString	*owner;
+@property bool		 committed;
 @property int		 completed;
 
 @end

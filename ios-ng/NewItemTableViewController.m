@@ -2,6 +2,11 @@
 
 @interface NewItemTableViewController ()
 
+
+@property (weak, nonatomic) IBOutlet UILabel *item_name;
+@property (weak, nonatomic) IBOutlet UISwitch *purchase_switch;
+@property (weak, nonatomic) IBOutlet UISwitch *shared_sw;
+
 @end
 
 @implementation NewItemTableViewController
@@ -9,8 +14,15 @@
 // called when shared switch is toggled
 - (IBAction)shared_switch:(id)sender
 {
+	NSIndexSet *index_set = [NSIndexSet indexSetWithIndex:1];
+
+	if ([self.tableView numberOfSections] == 1)
+		[self.tableView insertSections:index_set withRowAnimation:UITableViewRowAnimationMiddle];
+	else
+		[self.tableView deleteSections:index_set withRowAnimation:UITableViewRowAnimationMiddle];
+
 	// hide/unhide the shared status group
-	[self.tableView reloadData];
+	//  [self.tableView reloadData];
 }
 
 - (void)viewDidLoad {
@@ -28,30 +40,27 @@
     // Dispose of any resources that can be recreated.
 }
 
-#pragma mark - Table view data source
-
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
 {
 	// get the shared switch state to see if the shared properties should
 	// be shown
-	NSIndexPath *index_path = [NSIndexPath indexPathForRow:1 inSection:0];
+	// NSIndexPath *index_path = [NSIndexPath indexPathForRow:1 inSection:0];
 
-	UITableViewCell *cell = [super tableView:tableView
-			   cellForRowAtIndexPath:index_path];
+	// UITableViewCell *cell = [super tableView:tableView
+	// 		   cellForRowAtIndexPath:index_path];
 
-	UISwitch *shared_switch = (UISwitch *)[cell viewWithTag:1];
+	// UISwitch *shared_switch = (UISwitch *)[cell viewWithTag:1];
 
-	if (shared_switch.isOn) {
+
+	if (_shared_sw.isOn)
 		return 2;
-	} else {
+	else
 		return 1;
-	}
 }
 
 - (NSInteger)tableView:(UITableView *)tableView
 	numberOfRowsInSection:(NSInteger)section
 {
-
 	// NSLog(@"info: reloading rows in table view");
 
 	if (section == 0)

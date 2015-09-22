@@ -140,8 +140,6 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	// Dispose of any resources that can be recreated.
 }
 
-#pragma mark - Table view data source
-
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView
 {
 	// "lists you're in" and "other lists"
@@ -274,16 +272,14 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	int row = [indexPath row];
 	SharedList *shared_list;
 
-	UILabel *main_label = (UILabel *)[cell viewWithTag:1];
-	UILabel *members_label = (UILabel *)[cell viewWithTag:2];
 	UILabel *deadline_label = (UILabel *)[cell viewWithTag:3];
 	UILabel *fraction_label = (UILabel *)[cell viewWithTag:4];
 
 	if ([indexPath section] == 0) {
+		// "lists you're in" section
 		shared_list = [self.shared_lists objectAtIndex:row];
 
-		main_label.text = shared_list.name;
-		members_label.text = [self process_members_array:shared_list.members_phone_nums];
+		// XXX: needs to be stored on/sent from the server
 		deadline_label.text = @"in 3 days";
 
 		// set color based on how complete the list is
@@ -303,21 +299,23 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 					      denominator:shared_list.items_total];
 	}
 	else if ([indexPath section] == 1) {
+		// "other lists" section
 		shared_list = [self.indirect_lists objectAtIndex:row];
-		main_label.text = shared_list.name;
-		members_label.text = [self process_members_array:shared_list.members_phone_nums];
-		deadline_label.text = @"";
-		shared_list.cell = cell;
 
-		// Modify the look of the off the shelf cell
-		// Note, a separate prototype cell isn't used here because we
-		// can potentially swap cells a large number of times, and moving
-		// is more efficient than recreating.
+		// no deadline
+		deadline_label.text = @"";
 
 		// remove the > accessory and the completion fraction
 		cell.accessoryType = UITableViewCellAccessoryNone;
 		fraction_label.hidden = YES;
 	}
+
+	UILabel *main_label = (UILabel *)[cell viewWithTag:1];
+	UILabel *members_label = (UILabel *)[cell viewWithTag:2];
+
+	// show name and members
+	main_label.text = shared_list.name;
+	members_label.text = [self process_members_array:shared_list.members_phone_nums];
 
 	// hang on to a reference, this is needed in the networking gui callbacks
 	shared_list.cell = cell;
@@ -381,9 +379,9 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	titleForHeaderInSection:(NSInteger)section
 {
 	if (section == 0)
-		return @"Lists you're in";
+		return [NSString stringWithFormat:@"Lists you're in (%i)", [_shared_lists count]];
 	else if (section == 1)
-		return @"Other lists";
+		return [NSString stringWithFormat:@"Other lists (%i)", [_indirect_lists count]];
 	return @"";
 }
 
@@ -418,6 +416,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	[network_connection send_message:5 contents:list.id];
 }
 
+// customize deletion label text
 - (NSString *)tableView:(UITableView *)tableView
 	titleForDeleteConfirmationButtonForRowAtIndexPath:(NSIndexPath *)indexPath
 {

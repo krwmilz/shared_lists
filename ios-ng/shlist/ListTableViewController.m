@@ -124,11 +124,22 @@
 	// Dispose of any resources that can be recreated.
 }
 
+// called when commit switch is toggled, section 0 only
 - (IBAction)commit_toggled:(id)sender
 {
-	NSIndexPath *path = [self.tableView indexPathForCell:sender];
+	// XXX: This is an iOS 7+ hack only!
+	// http://stackoverflow.com/questions/13014592/how-to-get-indexpath-over-touched-button
+	UITableViewCell *cell = [(UITableViewCell *)[[sender superview] superview] superview];
+	NSIndexPath *path = [self.tableView indexPathForCell:cell];
 
-	NSLog(@"debug: toggled commit at %@", path);
+	ListItem *item = [_list_items objectAtIndex:[path row]];
+
+	// UISwitch *shared_sw = (UISwitch *)sender;
+	NSLog(@"debug: %@: commit toggled", item.name);
+
+	// send an update list item message
+	// device_id:list_id:item_id:item_name:item_shared:item_owner:...
+	// [network_connection send_message:7 contents:];
 }
 
 // called when previous segue's are unwinding
@@ -141,8 +152,6 @@
 	_list_metadata = metadata;
 	self.title = _list_metadata.name;
 }
-
-#pragma mark - Table view data source
 
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView
 {
@@ -214,7 +223,7 @@
 				[commit_switch setEnabled:NO];
 			}
 		}
-		
+
 		commit_switch.hidden = false;
 		owner.hidden = false;
 	}
@@ -239,24 +248,15 @@
 	return cell;
 }
 
-// Override to support conditional editing of the table view.
-- (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
-    // Return NO if you do not want the specified item to be editable.
-    return YES;
-}
-
-
 // Override to support editing the table view.
 - (void) tableView:(UITableView *)tableView
 	commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
 	forRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    if (editingStyle == UITableViewCellEditingStyleDelete) {
-        // Delete the row from the data source
-        [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
-    } else if (editingStyle == UITableViewCellEditingStyleInsert) {
-        // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
-    }   
+	if (editingStyle == UITableViewCellEditingStyleDelete) {
+		// Delete the row from the data source
+		// [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+	}
 }
 
 // In a storyboard-based application, you will often want to do a little preparation before navigation

@@ -137,8 +137,7 @@
 		[self connect];
 
 	NSMutableData *msg = [NSMutableData data];
-	[self info:@"network: send_message: msg type %i, %i bytes payload",
-		send_msg_type, [payload length]];
+
 
 	uint16_t msg_type_network = htons(send_msg_type);
 	[msg appendBytes:&msg_type_network length:2];
@@ -161,6 +160,9 @@
 		[msg appendBytes:"\0" length:1];
 		[msg appendData:payload];
 	}
+
+	[self info:@"network: send_message: type %i, %i bytes",
+		send_msg_type, [msg length]];
 
 	if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
 		[self warn:@"network: write error occurred, trying reconnect"];

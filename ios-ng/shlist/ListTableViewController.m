@@ -1,11 +1,14 @@
+#import "EditItemTableViewController.h"
 #import "ListTableViewController.h"
+
 #import "DataStructures.h"
 #import "Network.h"
 
-@interface ListTableViewController ()
+@interface ListTableViewController () {
+	Network *network_connection;
+}
 
 - (void)load_initial_data;
-@property (strong, nonatomic) Network *server;
 
 @end
 
@@ -17,6 +20,7 @@
 	item.name = @"Cheese Pizza";
 	item.owner = @"Dave";
 	item.committed = 1;
+	item.shared = 1;
 	[self.list_items addObject:item];
 
 	item = [[ListItem alloc] init];
@@ -24,6 +28,7 @@
 	item.name = @"Camp stove";
 	item.owner = @"Steve";
 	item.committed = 1;
+	item.shared = 1;
 	[self.list_items addObject:item];
 
 	item = [[ListItem alloc] init];
@@ -31,6 +36,7 @@
 	item.quantity = 10;
 	item.owner = @"";
 	item.committed = 0;
+	item.shared = 1;
 	[self.list_items addObject:item];
 
 	item = [[ListItem alloc] init];
@@ -38,6 +44,7 @@
 	item.quantity = 1;
 	item.owner = @"You";
 	item.committed = 1;
+	item.shared = 1;
 	[self.list_items addObject:item];
 
 	item = [[ListItem alloc] init];
@@ -45,6 +52,7 @@
 	item.quantity = 1;
 	item.owner = @"";
 	item.committed = 0;
+	item.shared = 1;
 	[self.list_items addObject:item];
 
 	item = [[ListItem alloc] init];
@@ -52,15 +60,18 @@
 	item.quantity = 1;
 	item.owner = @"Greg";
 	item.committed = 1;
+	item.shared = 1;
 	[self.list_items addObject:item];
 
 
 	item = [[ListItem alloc] init];
 	item.name = @"Deoderant";
+	item.shared = 0;
 	[self.private_items addObject:item];
 
 	item = [[ListItem alloc] init];
 	item.name = @"Toothbrush";
+	item.shared = 0;
 	[self.private_items addObject:item];
 
 	item = [[ListItem alloc] init];
@@ -102,6 +113,8 @@
 
 	_list_items = [[NSMutableArray alloc] init];
 	_private_items = [[NSMutableArray alloc] init];
+
+	network_connection = [Network shared_network_connection];
 	[self load_initial_data];
 }
 
@@ -111,8 +124,16 @@
 	// Dispose of any resources that can be recreated.
 }
 
-- (IBAction)unwindToList:(UIStoryboardSegue *)segue {
+- (IBAction)commit_toggled:(id)sender
+{
+	NSIndexPath *path = [self.tableView indexPathForCell:sender];
 
+	NSLog(@"debug: toggled commit at %@", path);
+}
+
+// called when previous segue's are unwinding
+- (IBAction)unwindToList:(UIStoryboardSegue *)segue
+{
 }
 
 - (void) setMetadata:(SharedList *)metadata
@@ -193,6 +214,9 @@
 				[commit_switch setEnabled:NO];
 			}
 		}
+		
+		commit_switch.hidden = false;
+		owner.hidden = false;
 	}
 	else if ([indexPath section] == 1) {
 		// "private items" section
@@ -202,13 +226,15 @@
 		owner.hidden = true;
 		commit_switch.hidden = true;
 	}
+	else
+		return nil;
 
 	item_name.text = item.name;
 
 	if (item.quantity > 1)
-		quantity.text = [NSString stringWithFormat:@"(x%d)", item.quantity];
+		quantity.text = [NSString stringWithFormat:@"x%d", item.quantity];
 	else
-		quantity.hidden = true;
+		quantity.text = @"";
 
 	return cell;
 }
@@ -221,7 +247,10 @@
 
 
 // Override to support editing the table view.
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+- (void) tableView:(UITableView *)tableView
+	commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
+	forRowAtIndexPath:(NSIndexPath *)indexPath
+{
     if (editingStyle == UITableViewCellEditingStyleDelete) {
         // Delete the row from the data source
         [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
@@ -230,29 +259,38 @@
     }   
 }
 
-
-/*
-// Override to support rearranging the table view.
-- (void)tableView:(UITableView *)tableView moveRowAtIndexPath:(NSIndexPath *)fromIndexPath toIndexPath:(NSIndexPath *)toIndexPath {
-}
-*/
-
-/*
-// Override to support conditional rearranging of the table view.
-- (BOOL)tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
-    // Return NO if you do not want the item to be re-orderable.
-    return YES;
-}
-*/
-
-/*
-#pragma mark - Navigation
-
 // In a storyboard-based application, you will often want to do a little preparation before navigation
-- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
-    // Get the new view controller using [segue destinationViewController].
-    // Pass the selected object to the new view controller.
+- (void) prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
+{
+	// This guys answer here saved my ass once
+	// http://stackoverflow.com/questions/9727549/unrecognized-selector-sent-to-instance-using-storyboards
+
+	// I like the two line version from above but it gives warnings :(
+	EditItemTableViewController *tvc = (EditItemTableViewController *)[[segue destinationViewController] topViewController];
+
+	if ([[segue identifier] isEqualToString:@"edit item segue"]) {
+		// NSIndexPath *path = [self.tableView indexPathForSelectedRow];
+		
+		NSIndexPath *path = [self.tableView indexPathForCell:sender];
+		ListItem *item;
+		if ([path section] == 0)
+			item = [self.list_items objectAtIndex:[path row]];
+		else if ([path section] == 1)
+			item = [self.private_items objectAtIndex:[path row]];
+		else
+			// segue from unknown section
+			return;
+
+		// make sure incoming view controller knows about itself
+		[tvc set_item:item for_list:_list_metadata];
+		[tvc set_edit_or_new:@"Edit Item"];
+
+		NSLog(@"debug: %@: edit item segue", _list_metadata.name);
+	}
+	else if ([[segue identifier] isEqualToString:@"add item segue"]) {
+		[tvc set_edit_or_new:@"Add Item"];
+		NSLog(@"debug: %@: add item segue", _list_metadata.name);
+	}
 }
-*/
 
 @end

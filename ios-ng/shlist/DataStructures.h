@@ -10,6 +10,7 @@
 @property NSString	*name;
 @property NSData	*id;
 @property NSArray	*members_phone_nums;
+@property bool		 deadline;
 @property NSDate	*date;
 @property int		 items_ready;
 @property int		 items_total;
@@ -24,8 +25,9 @@
 @property int		 modifier;
 @property NSString	*name;
 @property int		 quantity;
+@property bool		 shared;
 @property NSString	*owner;
 @property bool		 committed;
-@property int		 completed;
+@property bool		 completed;
 
 @end

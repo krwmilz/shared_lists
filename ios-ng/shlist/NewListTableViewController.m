@@ -1,15 +1,16 @@
 #import "NewListTableViewController.h"
 #import "EditTableViewController.h"
+#import "Network.h"
 
 @interface NewListTableViewController () {
-	int num_sections;
+	Network *network_connection;
 }
 
 @property (weak, nonatomic) IBOutlet UIBarButtonItem	*saveButton;
 @property (weak, nonatomic) IBOutlet UISwitch		*deadline_switch;
 @property (weak, nonatomic) IBOutlet UILabel		*list_name;
 
-@property (weak, nonatomic) IBOutlet UITextField	*textField;
+// @property (weak, nonatomic) IBOutlet UITextField	*textField;
 @property (weak, nonatomic) IBOutlet UIDatePicker	*datePicker;
 
 @end
@@ -37,8 +38,7 @@
 	// Do any additional setup after loading the view.
 
 	_list_name.text = @"New List";
-
-	num_sections = 1;
+	network_connection = [Network shared_network_connection];
 }
 
 - (void) didReceiveMemoryWarning {
@@ -48,39 +48,40 @@
 
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView
 {
-	if (_deadline_switch.isOn) {
+	if (_deadline_switch.isOn)
 		return 2;
-	} else {
+	else
 		return 1;
-	}
-	// default with deadline turned off
-	return num_sections;
+	return 0;
 }
-
-#pragma mark - Navigation
 
 // preparation before navigation
 - (void) prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
 {
 	if ([[segue identifier] isEqualToString:@"edit name segue"]) {
-		NSLog(@"info: new list: edit name segue");
+		// segue forwards to name editor
+		NSLog(@"debug: %@: editing name", _list_name.text);
 
 		// EditTableViewController *edit = [segue destinationViewController];
 		// edit.list_name.text = @"New List";
 		return;
 	}
 
+	// jump backwards to previous view controller
 	if (sender != self.saveButton)
 		return;
 
-	// if (self.textField.text.length > 0) {
-		self.shared_list = [[SharedList alloc] init];
-		self.shared_list.name = self.list_name.text;
-		// self.shared_list.list_date = self.datePicker.date;
-		// self.shared_list.members = @"You";
+	SharedList *shared_list = [[SharedList alloc] init];
 
-		NSLog(@"NewListViewController::prepareForSegue(): %@", self.textField.text);
-	// }
+	// saving, copy form fields into shared list object
+	shared_list.name = _list_name.text;
+	shared_list.deadline = _deadline_switch.isOn;
+	// _shared_list.filters = ???
+
+	NSLog(@"debug: %@: saving", shared_list.name);
+
+	NSData *payload = [shared_list.name dataUsingEncoding:NSUTF8StringEncoding];
+	[network_connection send_message:1 contents:payload];
 }
 
 @end

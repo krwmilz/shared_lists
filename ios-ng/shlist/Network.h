@@ -11,7 +11,6 @@
 	@public
 	MainTableViewController *shlist_tvc;
 	ListTableViewController *shlist_ldvc;
-
 }
 
 - (void) connect;

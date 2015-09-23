@@ -3,6 +3,5 @@
 
 @interface NewListTableViewController : UITableViewController
 
-@property SharedList *shared_list;
 
 @end

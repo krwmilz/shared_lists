@@ -158,16 +158,6 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 // new list dialogue has been saved
 - (IBAction) unwindToList:(UIStoryboardSegue *)segue
 {
-	NewListTableViewController *source = [segue sourceViewController];
-	SharedList *list = source.shared_list;
-
-	if (list == nil) {
-		return;
-	}
-
-	// good to save
-	NSData *payload = [list.name dataUsingEncoding:NSUTF8StringEncoding];
-	[network_connection send_message:1 contents:payload];
 }
 
 - (void) finished_new_list_request:(SharedList *) shlist
@@ -423,37 +413,28 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	return @"Leave";
 }
 
-// In a storyboard-based application, you will often want to do a little preparation before navigation
+// tell incoming controllers about their environment
 - (void) prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
 {
-	// Get the new view controller using [segue destinationViewController].
-	// Pass the selected object to the new view controller.
-
 	if ([[segue identifier] isEqualToString:@"show list segue"]) {
+		// a shared list was selected, transfer into detailed view
 
 		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
-
 		SharedList *list = [self.shared_lists objectAtIndex:[path row]];
 
-		// only list detail table view controller has this method
+		// make sure incoming view controller knows about itself
 		[segue.destinationViewController setMetadata:list];
 
-		// has to be done before issuing network request
-		network_connection->shlist_ldvc = segue.destinationViewController;
-
 		// send update list items message
+		network_connection->shlist_ldvc = segue.destinationViewController;
 		[network_connection send_message:6 contents:list.id];
 	}
-	// DetailObject *detail = [self detailForIndexPath:path];ß
 
-	// ListDetailTableViewController *list_detail_tvc = [segue destinationViewController];
-	// list_detail_tvc.navigationItem.title = @"Test Title";
-
-	NSLog(@"preparing for segue");
+	// DetailObject *detail = [self detailForIndexPath:path];
+	NSLog(@"info: main: preparing for segue");
 }
 
 // prevent segues from occurring when non member lists are selected
-// this isn't needed if we use 2 different prototype cells
 - (BOOL)shouldPerformSegueWithIdentifier:(NSString *)identifier sender:(id)sender
 {
 	NSIndexPath *path = [self.tableView indexPathForSelectedRow];

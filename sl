@@ -170,30 +170,30 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		my $bread = read $new_sock, my $metadata, 4;
 		if ($bread == 0) {
 			$done = 1;
-			next;
+			last;
 		} elsif ($bread != 4) {
 			print "warn: $addr: read $bread instead of 4 bytes\n";
-			next;
+			last;
 		}
 		my ($msg_type, $msg_size) = unpack("nn", $metadata);
 
 		# validate message type
 		if (!defined $msg_type) {
 			print "warn: $addr: error unpacking msg type\n";
-			next;
+			last;
 		} elsif ($msg_type > @msg_handlers) {
 			print "warn: $addr: unknown message type " . sprintf "0x%x\n", $msg_type;
-			next;
+			last;
 		}
 
 		# validate message size
 		if (!defined $msg_size) {
 			print "warn: $addr: error unpacking msg size\n";
-			next;
+			last;
 		}
 		if ($msg_size == 0 || $msg_size > 1024) {
 			print "warn: $addr: message size not 0 < $msg_size <= 1024\n";
-			next;
+			last;
 		}
 		print "info: $addr: received msg type $msg_type, $msg_size bytes\n";
 
@@ -205,7 +205,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			print "warn: $addr: read $bread instead of msg size\n";
 
 			if ($bread < $msg_size) {
-				next;
+				last;
 			}
 			# we read more bytes than we were expecting, keep going
 		}

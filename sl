@@ -34,54 +34,7 @@ my $dbh = DBI->connect(
 # enable transactions, if possible
 $dbh->{AutoCommit} = 0;
 
-$dbh->do(qq{create table if not exists devices(
-		token text not null primary key,
-		phone_num int not null,
-		type text,
-		first_seen int not null)
-}) or die $DBI::errstr;
-
-$dbh->do(qq{create table if not exists list_data(
-	list_id int not null,
-	name text not null,
-	quantity non null,
-	status int not null default 0,
-	owner text not null,
-	last_updated int not null,
-	primary key(list_id, name, owner),
-	foreign key(list_id) references lists(list_id),
-	foreign key(owner) references devices(token))
-}) or die $DBI::errstr;
-
-$dbh->do(qq{create table if not exists lists(
-	list_id int not null primary key,
-	name text not null,
-	first_created int not null,
-	last_updated int not null)
-}) or die $DBI::errstr;
-
-$dbh->do(qq{create table if not exists list_members(
-	list_id int not null,
-	device_id text not null,
-	joined_date int not null,
-	primary key(list_id, device_id),
-	foreign key(list_id) references lists(list_id),
-	foreign key(device_id) references devices(token))
-}) or die $DBI::errstr;
-
-$dbh->do(qq{create table if not exists friends_map(
-	device_id text not null,
-	friend int not null,
-	primary key(device_id, friend),
-	foreign key(device_id) references devices(token))
-}) or die $DBI::errstr;
-
-$dbh->do(qq{create table if not exists mutual_friends(
-	device_id text not null,
-	mutual_friend text not null,
-	primary key(device_id, mutual_friend),
-	foreign key(device_id) references devices(device_id))
-}) or die $DBI::errstr;
+create_tables($dbh);
 
 my $sock = new IO::Socket::INET (
 	LocalHost => '0.0.0.0',
@@ -94,16 +47,26 @@ my $sock = new IO::Socket::INET (
 die "Could not create socket: $!\n" unless $sock;
 my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
 
+# list table queries
 my $sql = qq{insert into lists (list_id, name, first_created, last_updated)
 	values (?, ?, ?, ?)};
 my $new_list_sth = $dbh->prepare($sql);
 
-$sql = qq{delete from lists where list_id=?};
-my $remove_list_sth = $dbh->prepare($sql);
+$sql = qq{delete from lists where list_id = ?};
+my $delete_list_sth = $dbh->prepare($sql);
 
+
+# devices table queries
 $sql = qq{insert into devices (token, phone_num, first_seen) values (?, ?, ?)};
 my $new_device_sth = $dbh->prepare($sql);
 
+$sql = qq{select * from devices where phone_num = ?};
+my $ph_num_exists_sth = $dbh->prepare($sql);
+
+$sql = qq{select * from devices where token = ?};
+my $device_id_exists_sth = $dbh->prepare($sql);
+
+# friends_map table queries
 $sql = qq{insert into friends_map (device_id, friend) values (?, ?)};
 my $friends_map_sth = $dbh->prepare($sql);
 
@@ -113,22 +76,22 @@ my $friends_map_select_sth = $dbh->prepare($sql);
 $sql = qq{delete from friends_map where device_id = ?};
 my $friends_map_delete_sth = $dbh->prepare($sql);
 
+
+# mutual_friends table
 $sql = qq{select mutual_friend from mutual_friends where device_id = ?};
 my $mutual_friend_select_sth = $dbh->prepare($sql);
 
 $sql = qq{delete from mutual_friends where device_id = ? or mutual_friend = ?};
 my $mutual_friends_delete_sth = $dbh->prepare($sql);
 
-$sql = qq{select * from devices where phone_num = ?};
-my $ph_num_exists_sth = $dbh->prepare($sql);
 
-$sql = qq{select * from devices where token = ?};
-my $device_id_exists_sth = $dbh->prepare($sql);
-
+# lists/list_members compound queries
 $sql = qq{select lists.list_id, lists.name from lists, list_members where
 	lists.list_id = list_members.list_id and device_id = ?};
 my $get_lists_sth = $dbh->prepare($sql);
 
+
+# list_members table
 $sql = qq{select device_id from list_members where list_id = ?};
 my $get_list_members_sth = $dbh->prepare($sql);
 
@@ -141,11 +104,10 @@ my $remove_list_member_sth = $dbh->prepare($sql);
 $sql = qq{select device_id from list_members where list_id = ? and device_id = ?};
 my $check_list_member_sth = $dbh->prepare($sql);
 
+
+# list_data table
 $sql = qq{delete from list_data where list_id = ?};
 my $delete_list_data_sth = $dbh->prepare($sql);
-
-$sql = qq{delete from lists where list_id = ?};
-my $delete_list_sth = $dbh->prepare($sql);
 
 $sql = qq{select * from list_data where list_id = ?};
 my $get_list_items_sth = $dbh->prepare($sql);
@@ -562,6 +524,61 @@ sub device_id_invalid
 
 	return 0;
 }
+
+sub create_tables {
+
+	my $db_handle = shift;
+
+	$db_handle->do(qq{create table if not exists lists(
+		list_id int not null primary key,
+		name text not null,
+		first_created int not null,
+		last_updated int not null)
+	}) or die $DBI::errstr;
+
+	$db_handle->do(qq{create table if not exists devices(
+		token text not null primary key,
+		phone_num int not null,
+		type text,
+		first_seen int not null)
+	}) or die $DBI::errstr;
+
+	$db_handle->do(qq{create table if not exists friends_map(
+		device_id text not null,
+		friend int not null,
+		primary key(device_id, friend),
+		foreign key(device_id) references devices(token))
+	}) or die $DBI::errstr;
+
+	$db_handle->do(qq{create table if not exists mutual_friends(
+		device_id text not null,
+		mutual_friend text not null,
+		primary key(device_id, mutual_friend),
+		foreign key(device_id) references devices(device_id))
+	}) or die $DBI::errstr;
+
+	$db_handle->do(qq{create table if not exists list_members(
+		list_id int not null,
+		device_id text not null,
+		joined_date int not null,
+		primary key(list_id, device_id),
+		foreign key(list_id) references lists(list_id),
+		foreign key(device_id) references devices(token))
+	}) or die $DBI::errstr;
+
+	$db_handle->do(qq{create table if not exists list_data(
+		list_id int not null,
+		name text not null,
+		quantity non null,
+		status int not null default 0,
+		owner text not null,
+		last_updated int not null,
+		primary key(list_id, name, owner),
+		foreign key(list_id) references lists(list_id),
+		foreign key(owner) references devices(token))
+	}) or die $DBI::errstr;
+}
+
 
 sub error {
 	return if ($LOG_LEVEL < $LOG_LEVEL_ERROR);

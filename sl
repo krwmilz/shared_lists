@@ -123,7 +123,8 @@ my @msg_handlers = (
 	\&msg_join_list,
 	\&msg_leave_list,
 	\&msg_list_items_request,
-	\&msg_new_list_item
+	\&msg_new_list_item,
+	\&msg_ok
 );
 
 # make sure children get reaped :)
@@ -138,6 +139,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	}
 
 	my $pid = fork();
+
 	if (! defined $pid ) {
 		die "error: can't fork: $!\n";
 	}
@@ -149,32 +151,28 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		next;
 	}
 
-	# child
+	# after here we know we're in the child
+	# supposed to do this for db connections across forks
 	my $child_dbh = $dbh->clone();
 	$child_dbh->{AutoCommit} = 1;
+
+	# afaict unreferences the parents db handle
 	$dbh->{InactiveDestroy} = 1;
 	undef $dbh;
 
-	# don't try and resolve ip address or port
+	# NI_NUMERIC* mean don't try and resolve ip address or port
 	my ($err, $addr, $port) = getnameinfo($bin_addr, NI_NUMERICHOST | NI_NUMERICSERV);
 	print "warn: getnameinfo() failed: $err\n" if ($err);
 	print "info: $addr: new connection on port $port\n";
 
-	# put socket into binary mode
-	binmode($new_sock);
-
-	my $done = 0;
-	while ($new_sock->connected() && !$done) {
-
-		# read and unpack message type
-		my $bread = read $new_sock, my $metadata, 4;
-		if ($bread == 0) {
-			$done = 1;
-			last;
-		} elsif ($bread != 4) {
+	# read will be 0 when there's nothing else to read
+	while (my $bread = read $new_sock, my $metadata, 4) {
+		# i'm not sure if read is guaranteed to read all 4 bytes
+		if ($bread != 4) {
 			print "warn: $addr: read $bread instead of 4 bytes\n";
 			last;
 		}
+		# try to extract msg type and size to two unsigned shorts
 		my ($msg_type, $msg_size) = unpack("nn", $metadata);
 
 		# validate message type
@@ -195,20 +193,20 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			print "warn: $addr: message size not 0 < $msg_size <= 1024\n";
 			last;
 		}
-		print "info: $addr: received msg type $msg_type, $msg_size bytes\n";
 
-		# read message
-		# XXX: this is brittle, if $msg_size is > num bytes avail, it
-		# blocks
+		# read exact amount of bytes the message should be
+		# XXX: not sure if this is optimal
 		$bread = read($new_sock, my $msg, $msg_size);
 		if ($bread != $msg_size) {
-			print "warn: $addr: read $bread instead of msg size\n";
+			print "warn: $addr: read $bread instead of $msg_size\n";
 
 			if ($bread < $msg_size) {
+				print "warn: $addr: $bread too small, scrapping msg\n";
 				last;
 			}
 			# we read more bytes than we were expecting, keep going
 		}
+		print "info: $addr: received msg type $msg_type, $msg_size bytes\n";
 
 		$child_dbh->begin_work;
 		# call the appropriate handler
@@ -505,6 +503,17 @@ sub msg_list_items_request
 	my $out = join("\0", @items);
 	print $new_sock pack("nn", 6, length($out));
 	print $new_sock $out;
+}
+
+sub msg_ok
+{
+	my ($dbh, $new_sock, $addr, $msg) = @_;
+
+	return if (device_id_invalid($dbh, $msg, $addr));
+
+	# send message type 8, 0 bytes payload
+	print $new_sock pack("nn", 8, 1);
+	print $new_sock '!';
 }
 
 sub device_id_invalid

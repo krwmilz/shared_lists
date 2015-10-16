@@ -32,7 +32,7 @@ my $dbh = DBI->connect(
 ) or die $DBI::errstr;
 
 # enable transactions, if possible
-$dbh->{AutoCommit} = 0;
+$dbh->{AutoCommit} = 1;
 
 create_tables($dbh);
 
@@ -151,7 +151,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
 	# child
 	my $child_dbh = $dbh->clone();
-	$child_dbh->{AutoCommit} = 0;
+	$child_dbh->{AutoCommit} = 1;
 	$dbh->{InactiveDestroy} = 1;
 	undef $dbh;
 
@@ -210,6 +210,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			# we read more bytes than we were expecting, keep going
 		}
 
+		$child_dbh->begin_work;
 		# call the appropriate handler
 		$msg_handlers[$msg_type]->($child_dbh, $new_sock, $addr, $msg);
 
@@ -223,7 +224,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		}
 	}
 
-	print "info: $addr: done with connection!\n";
+	print "info: $addr: disconnected!\n";
 	close($new_sock);
 	$child_dbh->disconnect();
 

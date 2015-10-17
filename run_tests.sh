@@ -44,6 +44,9 @@ for t in `ls tests/*/test.*`; do
 
 	# clean up the database between runs
 	sqlite3 db "delete from devices"
+	sqlite3 db "delete from lists"
+	sqlite3 db "delete from list_members"
+
 	count=$((count + 1))
 done
 echo "\n$passed$GREEN ok$RESET $failed$RED fail$RESET"

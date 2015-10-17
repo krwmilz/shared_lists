@@ -1,22 +1,17 @@
 #!/bin/sh
 
-# check if server is running
-if [ `pgrep -f perl\ sl` ]; then
-	echo "server already running, great."
-else
+if ! pgrep -f perl\ sl; then
 	echo "server not running, you need to start it!"
 	exit 1
 fi
 
 # if tput is available, we can do colors!
-if [ `which tput` ]; then
+if which tput; then
 	RED=$(tput setaf 9 0 0)
 	GREEN=$(tput setaf 10 0 0)
+	YELLOW=$(tput setaf 11 0 0)
 	RESET=$(tput sgr0)
 fi
-
-# bring in the automatically generated message type environment variables
-. tests/net_enums.sh
 
 export TESTS=asdf
 
@@ -24,21 +19,35 @@ PORT=5437
 
 passed=0
 failed=0
-for t in `ls tests/*/test.sh`; do
+count=1
+for t in `ls tests/*/test.*`; do
 	CWD=$(pwd)
-	echo -n "$(dirname $t): "
+	printf "%3s " $count
+	echo -n "$(dirname $t): $YELLOW"
 
 	# XXX: put PORT in the environment
-	cd $(dirname $t) && sh $(basename $t) $PORT
+	cd $(dirname $t) && ./$(basename $t) $PORT
 	if [ $? -ne 0 ]; then
-		echo "\t$RED fail$RESET"
-		failed=$(($failed + 1))
+		echo "$RED fail$RESET"
+		failed=$((failed + 1))
 	else
-		echo "\t$GREEN ok$RESET"
-		passed=$(($passed + 1))
+		echo "$GREEN ok$RESET"
+		passed=$((passed + 1))
 	fi
 	cd $CWD
 
+	# `ps -o pid= -p $SERVER_PID`
+	# if [ $? -eq 0 ]; then
+	# 	echo ">>> $RED server died!$RESET"
+	# 	exit 1
+	# fi
+
+	# clean up the database between runs
 	sqlite3 db "delete from devices"
+	count=$((count + 1))
 done
 echo "\n$passed$GREEN ok$RESET $failed$RED fail$RESET"
+
+if [ $failed -ne 0 ]; then
+	exit 1
+fi

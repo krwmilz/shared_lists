@@ -7,9 +7,9 @@ fi
 
 # if tput is available, we can do colors!
 if which tput; then
-	RED=$(tput setaf 9 0 0)
-	GREEN=$(tput setaf 10 0 0)
-	YELLOW=$(tput setaf 11 0 0)
+	RED=$(tput setaf 1 0 0)
+	GREEN=$(tput setaf 2 0 0)
+	YELLOW=$(tput setaf 3 0 0)
 	RESET=$(tput sgr0)
 fi
 

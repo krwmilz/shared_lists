@@ -8,6 +8,7 @@ use DBI;
 use Digest::SHA qw(sha256_base64);
 use Getopt::Std;
 use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
+use MsgTypes;
 use Scalar::Util qw(looks_like_number);
 use Socket;
 
@@ -17,35 +18,32 @@ my $LOG_LEVEL_INFO = 2;
 my $LOG_LEVEL_DEBUG = 3;
 my $LOG_LEVEL = $LOG_LEVEL_INFO;
 
-do 'msg_types.pl';
-
-# print ">>> " . $MSG_NEW_LIST . "\n";
+print $msgs{0};
 
 my %args;
-getopts("p:", \%args);
+# -p is port, -d is database file
+getopts("p:d:", \%args);
+
+my $db_file = "db";
+if ($args{d}) {
+	$db_file = $args{d};
+	# random hack, when -d is given also disable output buffering
+	$| = 1;
+}
+print "info: creating new database '$db_file'\n" unless (-e $db_file);
 
 my $dbh = DBI->connect(
-	"dbi:SQLite:dbname=db",
+	"dbi:SQLite:dbname=$db_file",
 	"",
 	"",
 	{ RaiseError => 1 }
 ) or die $DBI::errstr;
 
-# enable transactions, if possible
+# our transaction scheme needs for this to be on
 $dbh->{AutoCommit} = 1;
 
+# create any new tables, if needed
 create_tables($dbh);
-
-my $sock = new IO::Socket::INET (
-	LocalHost => '0.0.0.0',
-	LocalPort => $args{p} || '5437',
-	Proto => 'tcp',
-	Listen => 1,
-	Reuse => 1,
-);
-
-die "Could not create socket: $!\n" unless $sock;
-my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
 
 # list table queries
 my $sql = qq{insert into lists (list_id, name, first_created, last_updated)
@@ -130,6 +128,17 @@ my @msg_handlers = (
 # make sure children get reaped :)
 $SIG{CHLD} = 'IGNORE';
 
+my $sock = new IO::Socket::INET (
+	LocalHost => '0.0.0.0',
+	LocalPort => $args{p} || '5437',
+	Proto => 'tcp',
+	Listen => 1,
+	Reuse => 1,
+);
+
+die "Could not create socket: $!\n" unless $sock;
+my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
+
 print "info: ready for connections on $local_addr_port\n";
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
@@ -139,14 +148,10 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	}
 
 	my $pid = fork();
-
-	if (! defined $pid ) {
-		die "error: can't fork: $!\n";
-	}
+	die "error: can't fork: $!\n" if (!defined $pid);
 
 	if ($pid) {
 		# parent goes back to listening for more connections
-		info("forked child $pid\n");
 		close $new_sock;
 		next;
 	}
@@ -206,7 +211,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			}
 			# we read more bytes than we were expecting, keep going
 		}
-		print "info: $addr: received msg type $msg_type, $msg_size bytes\n";
+		print "info: $addr: received msg type $msgs{$msg_type}, $msg_size bytes\n";
 
 		$child_dbh->begin_work;
 		# call the appropriate handler

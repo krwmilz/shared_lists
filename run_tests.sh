@@ -15,6 +15,7 @@ trap sigint_handler int
 sigint_handler() {
 	# remove temp db, and kill this process group
 	rm $temp_db
+	rm server.log
 	kill 0
 }
 
@@ -123,6 +124,7 @@ printf "(took %i min %i sec)\n" $((SECONDS/60)) $((SECONDS%60))
 
 kill $server_pid
 rm $temp_db
+rm server.log
 
 if [ $failed -ne 0 ]; then
 	exit 1

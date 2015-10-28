@@ -14,14 +14,19 @@ sub fail {
 
 sub new_socket
 {
+	if (@ARGV != 1) {
+		fail "$0: error, test takes exactly one port argument\n";
+		exit 1;
+	}
+
 	my $sock = new IO::Socket::INET(
 		LocalHost => '127.0.0.1',
 		PeerHost => '127.0.0.1',
-		PeerPort => 5437,
+		PeerPort => $ARGV[0],
 		Proto => 'tcp'
 	);
 
-	die "error: socket creation failed: $!\n" unless $sock;
+	die "error: new socket: $!\n" unless $sock;
 	return $sock;
 }
 
@@ -52,7 +57,6 @@ sub recv_msg
 	}
 
 	# XXX: do msg type upper bounds checking here
-	# fail "server sent $resp_type msg instead of $type" if ($resp_type != $type);
 	fail "bad message size not 0 <= $size < 1024" if ($size < 0 || $size > 1023);
 
 	my $data;
@@ -60,6 +64,7 @@ sub recv_msg
 		fail "read() returned $bread instead of $size!";
 	}
 
+	# caller should validate this is the expected type
 	return ($type, $data, $size);
 }
 

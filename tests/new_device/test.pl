@@ -1,12 +1,13 @@
-#!/usr/bin/perl -I..
+#!/usr/bin/perl -Itests/ -I.. -I../..
 
 use strict;
 use warnings;
 
+use MsgTypes;
 use testlib;
 
 my $sock = new_socket();
-send_msg($sock, 0, "4038675309");
+send_msg($sock, $msgs{new_device}, "4038675309");
 my ($type, $response, $length) = recv_msg($sock);
 close $sock;
 

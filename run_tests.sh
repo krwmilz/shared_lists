@@ -59,7 +59,7 @@ for t in `ls tests/*/Makefile`; do
 		exit 1
 	fi
 
-	# process server log and remove header, base64 strings and phone numbers
+	# remove header, phone numbers, and base64 strings from server.log
 	sed -e "s/.*: //" -e "s/'[0-9]*'/<phone_num>/g" \
 		-e "s/'[a-zA-Z0-9/+]*'/<base64>/g" \
 		< server.log > $test_dir/server.log
@@ -68,7 +68,6 @@ for t in `ls tests/*/Makefile`; do
 
 	if ! make -s -C $test_dir diff; then
 		printf "%3s %s: %s%s%s\n" $count $test_dir $red "diff failed" $reset
-
 		failed=$((failed + 1))
 		cleanup $temp_db
 		continue
@@ -87,7 +86,7 @@ if [ $failed -ne 0 ]; then
 	printf "%i %sfailed%s " $failed $red $reset
 fi
 # magic shell variable $SECONDS contains number of seconds since script start
-printf "(took %i min %i sec)\n" $((SECONDS/60)) $((SECONDS%60))
+printf "(%i min %i sec)\n" $((SECONDS/60)) $((SECONDS%60))
 
 kill $server_pid
 rm $temp_db

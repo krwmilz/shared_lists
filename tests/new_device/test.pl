@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use MsgTypes;
+use msgs;
 use testlib;
 
 my $sock = new_socket();

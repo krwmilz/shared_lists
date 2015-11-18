@@ -12,9 +12,9 @@ MSG_TYPES="new_device
 	ok"
 
 OBJC_PATH="ios/shlist/MsgTypes.h"
-PERL_PATH="MsgTypes.pm"
+PERL_PATH="msgs.pm"
 JAVA_PATH="android/shlist/app/src/main/java/drsocto/shlist/MsgTypes.java"
-SHELL_PATH="tests/net_enums.sh"
+SHELL_PATH="tests/msgs.sh"
 
 GENERATED_AT="generated @ `date`"
 
@@ -54,7 +54,7 @@ gen_perl() {
 	# Perl source file constants for the server and test suite
 	cat << EOF > $PERL_PATH
 # ${GENERATED_AT}
-package MsgTypes;
+package msgs;
 use strict;
 use warnings;
 

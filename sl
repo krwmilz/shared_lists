@@ -9,7 +9,7 @@ use DBI;
 use Digest::SHA qw(sha256_base64);
 use Getopt::Std;
 use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
-use MsgTypes;
+use msgs;
 use POSIX;
 use Scalar::Util qw(looks_like_number);
 use Socket;

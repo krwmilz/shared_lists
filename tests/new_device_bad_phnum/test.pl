@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use MsgTypes;
+use msgs;
 use testlib;
 
 # send a new device message with a bad phone number

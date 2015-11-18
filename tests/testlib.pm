@@ -14,15 +14,15 @@ sub fail {
 
 sub new_socket
 {
-	if (@ARGV != 1) {
-		fail "$0: error, test takes exactly one port argument\n";
+	if (! defined $ENV{PORT}) {
+		fail "$0: error, test needs PORT environment variable set\n";
 		exit 1;
 	}
 
 	my $sock = new IO::Socket::INET(
 		LocalHost => '127.0.0.1',
 		PeerHost => '127.0.0.1',
-		PeerPort => $ARGV[0],
+		PeerPort => $ENV{PORT},
 		Proto => 'tcp'
 	);
 

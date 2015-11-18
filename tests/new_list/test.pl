@@ -1,4 +1,4 @@
-#!/usr/bin/perl -Itests -I.. -I../..
+#!/usr/bin/perl -I../
 
 use strict;
 use warnings;

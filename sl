@@ -147,7 +147,6 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
 	my $pid = fork();
 	die "error: can't fork: $!\n" if (!defined $pid);
-	$| = 1;
 
 	if ($pid) {
 		# parent goes back to listening for more connections

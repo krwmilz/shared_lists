@@ -299,7 +299,7 @@ sub msg_new_list
 	print "$addr: adding first list member devid = '$devid_fp'\n";
 
 	my $time = time;
-	my $list_id = sha256_base64($msg . $time);
+	my $list_id = sha256_base64(arc4random_bytes(32));
 	print "$addr: list fingerprint = '" .fingerprint($list_id). "'\n";
 
 	# add new list with single list member

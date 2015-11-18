@@ -60,10 +60,9 @@ for t in `ls tests/*/Makefile`; do
 	fi
 
 	# process server log and remove header, base64 strings and phone numbers
-	sed 's/.*: //' < server.log \
-		| sed "s/'[0-9]*'/<phone_num>/g" \
-		| sed "s/'[a-zA-Z0-9/+]*'/<base64>/g" \
-		> $test_dir/server.log
+	sed -e "s/.*: //" -e "s/'[0-9]*'/<phone_num>/g" \
+		-e "s/'[a-zA-Z0-9/+]*'/<base64>/g" \
+		< server.log > $test_dir/server.log
 	# truncate server log, don't delete it as it won't be recreated
 	> server.log
 

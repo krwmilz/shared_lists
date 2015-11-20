@@ -1,4 +1,4 @@
 test:
 	sh test.sh
 
-.include "../test.mk"
+include ../test.mk

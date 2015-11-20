@@ -1,4 +1,4 @@
 test:
 	perl test.pl
 
-.include "../test.mk"
+include ../test.mk

@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-$| = 1;
 
 use warnings;
 use strict;
@@ -22,7 +21,7 @@ my $LOG_LEVEL = $LOG_LEVEL_INFO;
 
 my %args;
 # -p is port, -d is database file
-getopts("p:d:", \%args);
+getopts("p:t", \%args);
 
 my $sock = new IO::Socket::INET (
 	LocalHost => '0.0.0.0',
@@ -36,10 +35,12 @@ die "Could not create socket: $!\n" unless $sock;
 my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
 
 my $db_file = "db";
-if ($args{d}) {
-	$db_file = $args{d};
+if ($args{t}) {
+	$db_file = ":memory:";
 }
-print "info: creating new database '$db_file'\n" unless (-e $db_file);
+elsif (! -e $db_file) {
+	print "info: creating new database '$db_file'\n";
+}
 
 my $parent_dbh = DBI->connect(
 	"dbi:SQLite:dbname=$db_file",

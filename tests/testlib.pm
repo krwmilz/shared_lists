@@ -5,7 +5,10 @@ use warnings;
 use Exporter qw(import);
 use IO::Socket;
 
-our @EXPORT = qw(new_socket fail send_msg recv_msg);
+require "msgs.pl";
+our (%msg_num, @msg_str, @msg_func, $protocol_ver);
+
+our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num);
 
 sub fail {
 	print shift;

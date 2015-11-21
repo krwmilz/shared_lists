@@ -18,20 +18,30 @@ SHELL_PATH="tests/msgs.sh"
 
 GENERATED_AT="generated `date`"
 
+# enumerate messages and make a table
+print_table() {
+	# print header
+	echo "${2}" >> ${1}
+
+	i=0
+	for msg in $MSG_TYPES; do
+		eval "echo \"$3\"" >> ${1}
+		i=$((i + 1))
+	done
+
+	# print footer
+	echo "${4}" >> ${1}
+}
+
 # ios
 gen_objc() {
 	cat << EOF > $OBJC_PATH
 /* ${GENERATED_AT} */"
 
 int protocol_version = $PROTOCOL_VERSION;
-enum MSG_TYPES {
 EOF
-	i=0
-	for msg in $MSG_TYPES; do
-		echo -e "\t$msg = $i," >> $OBJC_PATH
-		i=$((i + 1))
-	done
-	echo "};" >> $OBJC_PATH
+
+	print_table $OBJC_PATH "enum MSG_TYPES {" "\t\$msg = \$i," "};"
 }
 
 # android
@@ -40,14 +50,9 @@ gen_java() {
 /* ${GENERATED_AT} */
 
 int protocol_version = $PROTOCOL_VERSION;
-public enum MsgTypes {
 EOF
-	i=0
-	for msg in $MSG_TYPES; do
-		echo -e "\t$msg\t(${i})," >> $JAVA_PATH
-		i=$((i + 1))
-	done
-	echo "};" >> $JAVA_PATH
+
+	print_table $JAVA_PATH "public enum MsgTypes {" "\t\$msg\t(\$i)," "};"
 }
 
 # server and test suite
@@ -59,27 +64,13 @@ use strict;
 use warnings;
 
 use Exporter qw(import);
-our @EXPORT = qw(%msgs \$protocol_version);
+our @EXPORT = qw(%msg_num @msg_str @msg_func \$protocol_version);
 
 our \$protocol_version = $PROTOCOL_VERSION;
-our %msgs = (
 EOF
-	i=0
-	for msg in $MSG_TYPES; do
-		echo "\t$msg => $i," >> $PERL_PATH
-		echo "\t$i => \"$msg\"," >> $PERL_PATH
-		i=$((i + 1))
-	done
-	echo ");" >> $PERL_PATH
-
-	# echo "my @msg_handlers = (" >> $PERL_PATH
-	# i=0
-	# for msg in $MSG_TYPES; do
-	# 	echo "\t\&msg_$msg," >> $PERL_PATH
-
-	# 	i=$((i + 1))
-	# done
-	# echo ");" >> $PERL_PATH
+	print_table $PERL_PATH "our %msg_num = (" "\t\$msg => \$i," ");"
+	print_table $PERL_PATH "our @msg_str = (" "\t'\$msg'," ");"
+	print_table $PERL_PATH "our @msg_func = (" "\t\\&msg_\$msg," ");"
 }
 
 gen_objc

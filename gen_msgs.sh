@@ -16,10 +16,10 @@ PERL_PATH="msgs.pm"
 JAVA_PATH="android/shlist/app/src/main/java/drsocto/shlist/MsgTypes.java"
 SHELL_PATH="tests/msgs.sh"
 
-GENERATED_AT="generated @ `date`"
+GENERATED_AT="generated `date`"
 
+# ios
 gen_objc() {
-	# Objective C message type header for ios
 	cat << EOF > $OBJC_PATH
 /* ${GENERATED_AT} */"
 
@@ -34,8 +34,8 @@ EOF
 	echo "};" >> $OBJC_PATH
 }
 
+# android
 gen_java() {
-	# Java message enumerations for android
 	cat << EOF > $JAVA_PATH
 /* ${GENERATED_AT} */
 
@@ -50,8 +50,8 @@ EOF
 	echo "};" >> $JAVA_PATH
 }
 
+# server and test suite
 gen_perl() {
-	# Perl source file constants for the server and test suite
 	cat << EOF > $PERL_PATH
 # ${GENERATED_AT}
 package msgs;
@@ -82,22 +82,6 @@ EOF
 	# echo ");" >> $PERL_PATH
 }
 
-gen_shell() {
-	# shell constants for test suite use
-	cat << EOF > $SHELL_PATH
-#!/bin/sh
-# $GENERATED_AT
-
-PROTOCOL_VERSION=$PROTOCOL_VERSION
-EOF
-	i=0
-	for msg in $MSG_TYPES; do
-		echo "export $msg=00$(printf "%02x" $i)" >> $SHELL_PATH
-		i=$((i + 1))
-	done
-}
-
 gen_objc
 gen_java
 gen_perl
-gen_shell

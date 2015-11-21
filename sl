@@ -22,7 +22,7 @@ my $LOG_LEVEL_DEBUG = 3;
 my $LOG_LEVEL = $LOG_LEVEL_INFO;
 
 my %args;
-# -p is port, -d is database file
+# -p is port, -t is use temporary in memory db
 getopts("p:t", \%args);
 
 my $sock = new IO::Socket::INET (

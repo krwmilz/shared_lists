@@ -8,10 +8,12 @@ use DBI;
 use Digest::SHA qw(sha256_base64);
 use Getopt::Std;
 use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
-use msgs;
 use POSIX;
 use Scalar::Util qw(looks_like_number);
 use Socket;
+
+require "msgs.pl";
+our (%msg_num, @msg_str, @msg_func, $protocol_ver);
 
 my $LOG_LEVEL_ERROR = 0;
 my $LOG_LEVEL_WARN = 1;
@@ -215,7 +217,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
 		$child_dbh->begin_work;
 		# call the appropriate handler
-		$msg_handlers[$msg_type]->($child_dbh, $new_sock, $addr." $msgs{$msg_type}", $msg);
+		$msg_func[$msg_type]->($child_dbh, $new_sock, $addr." $msg_str[$msg_type]", $msg);
 
 		$child_dbh->commit;   # commit the changes if we get this far
 		if ($@) {
@@ -410,7 +412,7 @@ sub msg_add_friend
 	# print "$addr: added friend $_\n";
 
 	my $out = "$friend";
-	print $new_sock pack("nn", $msgs{add_friend}, length($out));
+	print $new_sock pack("nn", $msg_num{add_friend}, length($out));
 	print $new_sock $out;
 }
 

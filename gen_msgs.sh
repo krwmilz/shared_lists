@@ -12,7 +12,7 @@ MSG_TYPES="new_device
 	ok"
 
 OBJC_PATH="ios/shlist/MsgTypes.h"
-PERL_PATH="msgs.pm"
+PERL_PATH="msgs.pl"
 JAVA_PATH="android/shlist/app/src/main/java/drsocto/shlist/MsgTypes.java"
 SHELL_PATH="tests/msgs.sh"
 
@@ -58,15 +58,12 @@ EOF
 # server and test suite
 gen_perl() {
 	cat << EOF > $PERL_PATH
+#!/usr/bin/perl
 # ${GENERATED_AT}
-package msgs;
 use strict;
 use warnings;
 
-use Exporter qw(import);
-our @EXPORT = qw(%msg_num @msg_str @msg_func \$protocol_version);
-
-our \$protocol_version = $PROTOCOL_VERSION;
+our \$protocol_ver = $PROTOCOL_VERSION;
 EOF
 	print_table $PERL_PATH "our %msg_num = (" "\t\$msg => \$i," ");"
 	print_table $PERL_PATH "our @msg_str = (" "\t'\$msg'," ");"

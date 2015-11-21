@@ -1,13 +1,11 @@
 #!/usr/bin/perl -I../
-
 use strict;
 use warnings;
-
-use testlib;
+use test;
 
 # this test:
 # - gets a new device id
-# - then adds a new friend
+# - adds a new friend
 
 my $sock = new_socket();
 send_msg($sock, 0, "4038675309");

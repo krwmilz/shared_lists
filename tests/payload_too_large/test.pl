@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use testlib;
+use test;
 
 my $sock = new_socket();
 

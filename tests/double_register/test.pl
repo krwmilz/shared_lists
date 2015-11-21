@@ -1,7 +1,7 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
-use testlib;
+use test;
 
 my $sock = new_socket();
 send_msg($sock, $msg_num{new_device}, "4038675309");

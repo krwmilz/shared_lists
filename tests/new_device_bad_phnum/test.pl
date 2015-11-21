@@ -1,7 +1,7 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
-use testlib;
+use test;
 
 # send a new device message with a bad phone number
 my $sock = new_socket();

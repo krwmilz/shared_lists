@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use testlib;
+use test;
 
 # this test:
 # - gets a new device id

@@ -432,21 +432,22 @@ sub msg_list_request
 
 	return if (device_id_invalid($dbh, $msg, $addr));
 
-	print "info: $addr: gathering lists for $msg\n";
+	my $devid_fp = fingerprint($msg);
+	print "info: $addr: gathering lists for '$devid_fp'\n";
 
 	my @direct_lists;
     my @direct_list_ids;
 	# first get all lists this device id is a direct member of
 	$get_lists_sth->execute($msg);
 	while (my ($list_id, $list_name) = $get_lists_sth->fetchrow_array()) {
-		print "info: $addr: found list '$list_name' : $list_id\n";
+		print "info: $addr: found list '$list_name' '$list_id'\n";
 
 		# get all members of this list
 		my @list_members;
 		$get_list_members_sth->execute($list_id);
 		while (my ($member_device_id) = $get_list_members_sth->fetchrow_array()) {
 			push @list_members, get_phone_number($dbh, $member_device_id);
-			print "info: $addr: direct list: found member $member_device_id\n";
+			print "info: $addr: direct list: found member '$member_device_id'\n";
 		}
         push @direct_list_ids, $list_id;
 		push @direct_lists, "$list_name:$list_id:" . join(":", @list_members);

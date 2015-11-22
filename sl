@@ -126,18 +126,6 @@ my $get_list_items_sth = $parent_dbh->prepare($sql);
 $sql = qq{insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)};
 my $new_list_item_sth = $parent_dbh->prepare($sql);
 
-my @msg_handlers = (
-	\&msg_new_device,
-	\&msg_new_list,
-	\&msg_add_friend,
-	\&msg_list_request,
-	\&msg_join_list,
-	\&msg_leave_list,
-	\&msg_list_items_request,
-	\&msg_new_list_item,
-	\&msg_ok
-);
-
 # make sure children get reaped :)
 $SIG{CHLD} = 'IGNORE';
 
@@ -187,7 +175,7 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		if (!defined $msg_type) {
 			print "$addr: error unpacking msg type\n";
 			last;
-		} elsif ($msg_type > @msg_handlers) {
+		} elsif ($msg_type > @msg_str) {
 			print "$addr: unknown message type " . sprintf "0x%x\n", $msg_type;
 			last;
 		}
@@ -487,7 +475,7 @@ sub msg_list_request
 	# XXX: add time of last request to list (rate throttling)?
 }
 
-sub msg_list_items_request
+sub msg_list_items
 {
 	my ($dbh, $new_sock, $addr, $msg) = @_;
 

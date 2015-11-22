@@ -8,7 +8,7 @@ use IO::Socket;
 require "msgs.pl";
 our (%msg_num, @msg_str, @msg_func, $protocol_ver);
 
-our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num);
+our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str);
 
 sub fail {
 	print shift;

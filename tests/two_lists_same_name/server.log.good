@@ -1,9 +1,9 @@
 new connection
 added new device <phone_num> <base64>
-'this is a new list'
+<string>
 adding first list member devid = <base64>
 list fingerprint = <base64>
-'this is a new list'
+<string>
 adding first list member devid = <base64>
 list fingerprint = <base64>
 disconnected!

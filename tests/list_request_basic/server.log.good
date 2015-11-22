@@ -1,0 +1,19 @@
+new connection
+added new device <phone_num> <base64>
+<string>
+adding first list member devid = <base64>
+list fingerprint = <base64>
+<string>
+adding first list member devid = <base64>
+list fingerprint = <base64>
+<string>
+adding first list member devid = <base64>
+list fingerprint = <base64>
+gathering lists for <base64>
+found list <string> <base64>
+found member <base64>
+found list <string> <base64>
+found member <base64>
+found list <string> <base64>
+found member <base64>
+disconnected!

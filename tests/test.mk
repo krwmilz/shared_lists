@@ -1,8 +1,12 @@
+test:
+	perl test.pl
+
 diff:
-	# remove header, phone numbers and base64 strings from server.log
-	sed -i -e "s/.*: //" -e "s/'[0-9]*'/<phone_num>/g" \
+	# remove header, phone numbers, base64 and strings from server.log
+	sed -i  -e "s/.*: //" \
+		-e "s/'[0-9]*'/<phone_num>/g" \
 		-e "s/'[a-zA-Z0-9/+]*'/<base64>/g" \
-		server.log
+		-e "s/'[a-zA-Z0-9 ]*'/<string>/g" server.log
 	diff -u server.log.good server.log
 
 clean:

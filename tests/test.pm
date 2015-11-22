@@ -11,14 +11,14 @@ our (%msg_num, @msg_str, @msg_func, $protocol_ver);
 our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str);
 
 sub fail {
-	print shift;
+	print shift . "\n";
 	exit 1;
 }
 
 sub new_socket
 {
 	if (! defined $ENV{PORT}) {
-		fail "$0: error, test needs PORT environment variable set\n";
+		fail "$0: error, test needs PORT environment variable set";
 		exit 1;
 	}
 

@@ -501,7 +501,7 @@ sub msg_list_items
 		$get_list_items_sth->fetchrow_array()) {
 		print "info: $addr: list item #$pos $name\n";
 
-		push "$pos:$name:$owner:$status", @items;
+		push @items, "$pos:$name:$owner:$status";
 	}
 
 	my $out = join("\0", @items);

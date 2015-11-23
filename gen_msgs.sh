@@ -24,7 +24,7 @@ print_table() {
 
 	i=0
 	for msg in $msg_types; do
-		eval "echo \"$3\"" >> ${1}
+		eval "echo -e \"\t$3\"" >> ${1}
 		i=$((i + 1))
 	done
 
@@ -40,7 +40,7 @@ gen_objc() {
 int protocol_version = $protocol_version;
 EOF
 
-	print_table $objc_path "enum msg_types {" "\t\$msg = \$i," "};"
+	print_table $objc_path "enum msg_types {" "\$msg = \$i," "};"
 }
 
 # android
@@ -51,7 +51,7 @@ gen_java() {
 int protocol_version = $protocol_version;
 EOF
 
-	print_table $java_path "public enum MsgTypes {" "\t\$msg\t(\$i)," "};"
+	print_table $java_path "public enum MsgTypes {" "\$msg\t(\$i)," "};"
 }
 
 # server and test suite
@@ -64,9 +64,9 @@ use warnings;
 
 our \$protocol_ver = $protocol_version;
 EOF
-	print_table $perl_path "our %msg_num = (" "\t\$msg => \$i," ");"
-	print_table $perl_path "our @msg_str = (" "\t'\$msg'," ");"
-	print_table $perl_path "our @msg_func = (" "\t\\&msg_\$msg," ");"
+	print_table $perl_path "our %msg_num = (" "\$msg => \$i," ");"
+	print_table $perl_path "our @msg_str = (" "'\$msg'," ");"
+	print_table $perl_path "our @msg_func = (" "\\&msg_\$msg," ");"
 }
 
 gen_objc

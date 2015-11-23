@@ -456,7 +456,7 @@ sub msg_list_request
 
 		while (my ($list_id, $list_name) =
 			$get_lists_sth->fetchrow_array()) {
-            if ($list_id ~~ @direct_list_ids) {
+            if (grep {$_ eq $list_id} @direct_list_ids) {
                 next;
             }
 		    print "info: $addr: found mutual friends list '$list_name'\n";

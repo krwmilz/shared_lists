@@ -325,15 +325,15 @@ sub msg_join_list
 
     return if (device_id_invalid($dbh, $device_id, $addr));
 
-    print "info: $addr: device $device_id\n";
-    print "info: $addr: list $list_id\n";
+    print "info: $addr: device '$device_id'\n";
+    print "info: $addr: list '$list_id'\n";
     
     my $time = time;
     $check_list_member_sth->execute($list_id, $device_id);
 
     if (!$check_list_member_sth->fetchrow_array()) {
         $new_list_member_sth->execute($list_id, $device_id, $time);
-        print "info: $addr: device $device_id has been added to list $list_id\n";
+        print "info: $addr: device '$device_id' has been added to list $list_id\n";
     } else {
         print "warn: $addr: tried to create a duplicate list member entry for device $device_id and list $list_id\n";
     }
@@ -350,16 +350,16 @@ sub msg_leave_list
 
     return if (device_id_invalid($dbh, $device_id, $addr));
     
-    print "info: $addr: device $device_id\n";
-    print "info: $addr: list $list_id\n";
+    print "info: $addr: device '$device_id'\n";
+    print "info: $addr: list '$list_id'\n";
 
     $check_list_member_sth->execute($list_id, $device_id);
 
     if ($check_list_member_sth->fetchrow_array()) {
         $remove_list_member_sth->execute($list_id, $device_id);
-        print "info: $addr: device $device_id has been removed from list $list_id\n";
+        print "info: $addr: device '$device_id' has been removed from list '$list_id'\n";
     } else {
-        print "warn: $addr: tried to leave a list the user was not in for device $device_id and list $list_id\n";
+        print "warn: $addr: tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n";
     }
 
     $get_list_members_sth->execute($list_id);
@@ -367,7 +367,7 @@ sub msg_leave_list
     my $alive = 1;
 
     if (!$get_list_members_sth->fetchrow_array()) {
-        print "info: $addr: list $list_id is empty... deleting\n";
+        print "info: $addr: list '$list_id' is empty... deleting\n";
         $delete_list_sth->execute($list_id);
         $delete_list_data_sth->execute($list_id);
         $alive = 0;

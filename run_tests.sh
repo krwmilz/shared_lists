@@ -41,7 +41,7 @@ for t in `ls tests/*/Makefile`; do
 
 	# kill the server and wait for it to shut down
 	kill $server_pid
-	wait
+	wait 2>/dev/null
 
 	if ! make -s -C $test_dir diff; then
 		fail $test_dir "diff failed"

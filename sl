@@ -115,8 +115,6 @@ my $get_list_items_sth = $parent_dbh->prepare($sql);
 $sql = qq{insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)};
 my $new_list_item_sth = $parent_dbh->prepare($sql);
 
-my $done = 0;
-
 my $sock = new IO::Socket::INET (
 	LocalHost => '0.0.0.0',
 	LocalPort => $args{p} || '5437',
@@ -129,19 +127,9 @@ die "Could not create socket: $!\n" unless $sock;
 my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
 
 $SIG{CHLD} = 'IGNORE';
-$SIG{INT} = \&sig_handler;
-$SIG{TERM} = \&sig_handler;
-sub sig_handler {
-	wait;
-	$parent_dbh->disconnect();
-	$parent_dbh = undef;
-	$sock->shutdown(SHUT_RDWR);
-	close($sock);
-	$done = 1;
-}
 
-while (!$done) {
-	my ($new_sock, $bin_addr) = $sock->accept();
+while (my ($new_sock, $bin_addr) = $sock->accept()) {
+
 	if (!$new_sock) {
 		# print "warn: accepted empty socket";
 		next;
@@ -156,9 +144,6 @@ while (!$done) {
 		# print "parent: forked child $pid\n";
 		next;
 	}
-
-	$SIG{INT} = 'IGNORE';
-	$SIG{TERM} = 'IGNORE';
 
 	# after here we know we're in the child
 	# supposed to do this for db connections across forks

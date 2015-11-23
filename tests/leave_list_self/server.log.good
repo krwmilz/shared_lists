@@ -1,0 +1,11 @@
+new connection
+added new device <phone_num> <base64>
+<string>
+adding first list member devid = <base64>
+list fingerprint = <base64>
+device <base64>
+list <base64>
+device <base64> has been removed from list <base64>
+list <base64> is empty... deleting
+gathering lists for <base64>
+disconnected!

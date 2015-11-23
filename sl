@@ -296,7 +296,7 @@ sub msg_new_list
 	# XXX: also send back the date and all that stuff
 	my $phone_number = get_phone_number($dbh, $device_id);
 	my $out = $list_id . "\0" . $list_name . "\0" . $phone_number;
-	print $new_sock pack("nn", 1, length($out));
+	print $new_sock pack("nn", $msg_num{new_list}, length($out));
 	print $new_sock $out;
 }
 
@@ -373,7 +373,7 @@ sub msg_leave_list
         $alive = 0;
     }
     my $out = "$list_id\0$alive";
-    print $new_sock pack("nn", 5, length($out));
+    print $new_sock pack("nn", $msg_num{leave_list}, length($out));
     print $new_sock $out;
 }
 
@@ -466,7 +466,7 @@ sub msg_list_request
 	}
 	$out .= join("\0", @indirect_lists);
 
-	print $new_sock pack("nn", 3, length($out));
+	print $new_sock pack("nn", $msg_num{list_request}, length($out));
 	print $new_sock $out;
 
 	# XXX: add time of last request to list (rate throttling)?

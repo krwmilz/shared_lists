@@ -24,7 +24,7 @@ print_table() {
 
 	i=0
 	for msg in $msg_types; do
-		eval "echo -e \"\t$3\"" >> ${1}
+		eval "echo \"\t$3\"" >> ${1}
 		i=$((i + 1))
 	done
 

@@ -4,5 +4,6 @@ use warnings;
 use test;
 
 my $sock = new_socket();
-send_msg($sock, 'new_device', "");
+# send_msg is too sophisticated for this test
+print $sock pack("nn", 47837, 0);
 close $sock;

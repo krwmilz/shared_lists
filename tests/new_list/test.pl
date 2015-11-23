@@ -10,19 +10,19 @@ use test;
 # - verifies received information is congruent with what was sent
 
 my $sock = new_socket();
-my $send_t = $msg_num{new_device};
+my $send_t = 'new_device';
 send_msg($sock, $send_t, "4038675309");
 my ($recv_t, $device_id, $length) = recv_msg($sock);
 
-fail "got response type $recv_t, expected $send_t" if ($recv_t != $send_t);
+fail "got response type '$recv_t', expected '$send_t'" if ($recv_t ne $send_t);
 fail "expected response length of 43, got $length" if ($length != 43);
 
 my $list_name = "this is a new list";
-$send_t = $msg_num{new_list};
+$send_t = 'new_list';
 send_msg($sock, $send_t, "$device_id\0$list_name");
 my ($recv_t2, $list_data, $length2) = recv_msg($sock);
 
-fail "got response type $recv_t2, expected $send_t" if ($recv_t2 != $send_t);
+fail "got response type '$recv_t2', expected '$send_t'" if ($recv_t2 ne $send_t);
 
 my ($id, $name, @members) = split("\0", $list_data);
 my $id_length = length($id);

@@ -24,10 +24,9 @@ for t in `ls tests/*/Makefile`; do
 
 	perl sl -p $PORT -t > $test_dir/server.log &
 	server_pid=$!
-	sleep 0.1
 
 	# run test, complain if failed
-	if ! make -s -C $test_dir "test"; then
+	if ! make -s -C $test_dir test; then
 		fail $test_dir "test failed"
 		kill $server_pid
 		wait

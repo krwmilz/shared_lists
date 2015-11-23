@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-
 use warnings;
 use strict;
 
@@ -24,17 +23,6 @@ my $LOG_LEVEL = $LOG_LEVEL_INFO;
 my %args;
 # -p is port, -t is use temporary in memory db
 getopts("p:t", \%args);
-
-my $sock = new IO::Socket::INET (
-	LocalHost => '0.0.0.0',
-	LocalPort => $args{p} || '5437',
-	Proto => 'tcp',
-	Listen => 1,
-	Reuse => 1,
-);
-
-die "Could not create socket: $!\n" unless $sock;
-my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
 
 my $db_file = "db";
 if ($args{t}) {
@@ -76,6 +64,7 @@ my $ph_num_exists_sth = $parent_dbh->prepare($sql);
 
 $sql = qq{select * from devices where device_id = ?};
 my $device_id_exists_sth = $parent_dbh->prepare($sql);
+
 
 # friends_map table queries
 $sql = qq{insert into friends_map (device_id, friend) values (?, ?)};
@@ -126,13 +115,35 @@ my $get_list_items_sth = $parent_dbh->prepare($sql);
 $sql = qq{insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)};
 my $new_list_item_sth = $parent_dbh->prepare($sql);
 
-# make sure children get reaped :)
+my $done = 0;
+
+my $sock = new IO::Socket::INET (
+	LocalHost => '0.0.0.0',
+	LocalPort => $args{p} || '5437',
+	Proto => 'tcp',
+	Listen => 100,
+	Reuse => 1,
+);
+
+die "Could not create socket: $!\n" unless $sock;
+my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
+
 $SIG{CHLD} = 'IGNORE';
+$SIG{INT} = \&sig_handler;
+$SIG{TERM} = \&sig_handler;
+sub sig_handler {
+	wait;
+	$parent_dbh->disconnect();
+	$parent_dbh = undef;
+	$sock->shutdown(SHUT_RDWR);
+	close($sock);
+	$done = 1;
+}
 
-while (my ($new_sock, $bin_addr) = $sock->accept()) {
-
+while (!$done) {
+	my ($new_sock, $bin_addr) = $sock->accept();
 	if (!$new_sock) {
-		print "warn: accepted empty socket";
+		# print "warn: accepted empty socket";
 		next;
 	}
 
@@ -142,9 +153,12 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	if ($pid) {
 		# parent goes back to listening for more connections
 		close $new_sock;
+		# print "parent: forked child $pid\n";
 		next;
 	}
 
+	$SIG{INT} = 'IGNORE';
+	$SIG{TERM} = 'IGNORE';
 
 	# after here we know we're in the child
 	# supposed to do this for db connections across forks
@@ -218,15 +232,13 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	}
 
 	print "$addr: disconnected!\n";
+	$new_sock->shutdown(SHUT_RDWR);
 	close($new_sock);
 	$child_dbh->disconnect();
 	$child_dbh = undef;
 
 	exit 0;
 }
-
-$parent_dbh->disconnect();
-close($sock);
 
 sub get_phone_number
 {

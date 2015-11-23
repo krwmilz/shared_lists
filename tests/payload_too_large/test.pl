@@ -1,8 +1,6 @@
 #!/usr/bin/perl -I../
-
 use strict;
 use warnings;
-
 use test;
 
 my $sock = new_socket();
@@ -11,5 +9,5 @@ my $sock = new_socket();
 my $out;
 $out .= "asdf" for (1..1000);
 
-send_msg($sock, 0, $out);
+send_msg($sock, 'new_device', $out);
 close $sock;

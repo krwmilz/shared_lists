@@ -11,7 +11,8 @@ use test;
 
 my $sock = new_socket();
 my $send_t = 'new_device';
-send_msg($sock, $send_t, "4038675309");
+my $phnum = "4038675309";
+send_msg($sock, $send_t, $phnum);
 my ($recv_t, $device_id, $length) = recv_msg($sock);
 
 fail "got response type '$recv_t', expected '$send_t'" if ($recv_t ne $send_t);
@@ -30,3 +31,4 @@ my $id_length = length($id);
 fail "bad id length $id_length != 43" if ($id_length != 43);
 fail "recv'd name '$name' not equal to '$list_name'" if ($name ne $list_name);
 fail "list does not have exactly 1 member" if (@members != 1);
+fail "got list member '$members[0]', expected '$phnum'" if ($members[0] ne $phnum);

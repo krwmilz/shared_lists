@@ -157,8 +157,8 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	# NI_NUMERIC* mean don't try and resolve ip address or port
 	my ($err, $addr, $port) = getnameinfo($bin_addr, NI_NUMERICHOST | NI_NUMERICSERV);
 	print "warn: getnameinfo() failed: $err\n" if ($err);
-	$addr = sprintf "%s [%5s] %15s/%5i", strftime("%F %T", localtime), $$, $addr, $port;
-	print "$addr: new connection\n";
+	$addr = sprintf "%s %-15s %-5s", strftime("%F %T", localtime), $addr, $port;
+	print "$addr: new connection (pid = '$$')\n";
 
 	# read will be 0 when there's nothing else to read
 	while (my $bread = read $new_sock, my $metadata, 4) {

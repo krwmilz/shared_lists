@@ -1,4 +1,4 @@
-new connection
-added new device <phone_num> <base64>
+new connection (pid = <digits>)
+added new device <digits> <base64>
 phone number 4038675309 already exists
 disconnected!

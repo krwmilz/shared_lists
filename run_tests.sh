@@ -20,6 +20,7 @@ count=0
 for t in `ls tests/*/Makefile`; do
 	count=`expr $count + 1`
 	test_dir=`dirname ${t}`
+	export TEST_DIR="$test_dir"
 	make -s -C $test_dir clean
 
 	perl sl -p $PORT -t > $test_dir/server.log &

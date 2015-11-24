@@ -13,7 +13,7 @@ our (%msg_num, @msg_str);
 our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str SHUT_RDWR);
 
 sub fail {
-	print "$0: " . shift . "\n";
+	print "$ENV{TEST_DIR}/$0: " . shift . "\n";
 	exit 1;
 }
 

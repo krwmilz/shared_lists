@@ -13,5 +13,9 @@ for my $msg (sort @msg_str) {
 	next if ($msg eq "new_device");
 	send_msg($sock, $msg, "notvaliddeviceid");
 }
-$sock->shutdown(SHUT_RDWR);
-close $sock;
+
+for my $msg (sort @msg_str) {
+	# new device doesn't take device id as a first parameter
+	next if ($msg eq "new_device");
+	send_msg($sock, $msg, "&^%_invalid_base64");
+}

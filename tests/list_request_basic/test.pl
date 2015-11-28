@@ -33,6 +33,7 @@ if ($type ne 'list_request') {
 my ($direct, $indirect) = split("\0\0", $list_data);
 fail "got indirect lists, expected none" if (length($indirect) != 0);
 
+my $num_lists = 0;
 for my $l (split("\0", $direct)) {
 	my ($name, $id, @members) = split(":", $l);
 	unless ($name && $id && @members) {
@@ -47,4 +48,6 @@ for my $l (split("\0", $direct)) {
 	if ($members[0] ne $phone_num) {
 		fail "unexpected list member $members[0]";
 	}
+	$num_lists++;
 }
+fail "expected 3 direct lists, got $num_lists\n" if ($num_lists != 3);

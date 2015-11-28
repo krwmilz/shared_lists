@@ -21,99 +21,18 @@ my $LOG_LEVEL_DEBUG = 3;
 my $LOG_LEVEL = $LOG_LEVEL_INFO;
 
 my %args;
-# -p is port, -t is use temporary in memory db
-getopts("p:t", \%args);
+getopts("p:d:", \%args);
 
 my $db_file = "db";
-if ($args{t}) {
-	$db_file = ":memory:";
+if ($args{d}) {
+	$db_file = $args{d};
+	unlink $db_file;
 }
 elsif (! -e $db_file) {
 	print "info: creating new database '$db_file'\n";
 }
 
-my $parent_dbh = DBI->connect(
-	"dbi:SQLite:dbname=$db_file",
-	"",
-	"",
-	{ RaiseError => 1 }
-) or die $DBI::errstr;
-
-# our transaction scheme needs for this to be on
-$parent_dbh->{AutoCommit} = 1;
-$parent_dbh->do("PRAGMA foreign_keys = ON");
-
-# create any new tables, if needed
-create_tables($parent_dbh);
-
-# list table queries
-my $sql = qq{insert into lists (list_id, name, first_created, last_updated)
-	values (?, ?, ?, ?)};
-my $new_list_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{delete from lists where list_id = ?};
-my $delete_list_sth = $parent_dbh->prepare($sql);
-
-
-# devices table queries
-$sql = qq{insert into devices (device_id, phone_num, first_seen) values (?, ?, ?)};
-my $new_device_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{select * from devices where phone_num = ?};
-my $ph_num_exists_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{select * from devices where device_id = ?};
-my $device_id_exists_sth = $parent_dbh->prepare($sql);
-
-
-# friends_map table queries
-$sql = qq{insert into friends_map (device_id, friend) values (?, ?)};
-my $friends_map_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{select friend from friends_map where device_id = ?};
-my $friends_map_select_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{delete from friends_map where device_id = ?};
-my $friends_map_delete_sth = $parent_dbh->prepare($sql);
-
-
-# mutual_friends table
-$sql = qq{select mutual_friend from mutual_friends where device_id = ?};
-my $mutual_friend_select_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{delete from mutual_friends where device_id = ? or mutual_friend = ?};
-my $mutual_friends_delete_sth = $parent_dbh->prepare($sql);
-
-
-# lists/list_members compound queries
-$sql = qq{select lists.list_id, lists.name from lists, list_members where
-	lists.list_id = list_members.list_id and device_id = ?};
-my $get_lists_sth = $parent_dbh->prepare($sql);
-
-
-# list_members table
-$sql = qq{select device_id from list_members where list_id = ?};
-my $get_list_members_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{insert into list_members (list_id, device_id, joined_date) values (?, ?, ?)};
-my $new_list_member_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{delete from list_members where list_id = ? and device_id = ?};
-my $remove_list_member_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{select device_id from list_members where list_id = ? and device_id = ?};
-my $check_list_member_sth = $parent_dbh->prepare($sql);
-
-
-# list_data table
-$sql = qq{delete from list_data where list_id = ?};
-my $delete_list_data_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{select * from list_data where list_id = ?};
-my $get_list_items_sth = $parent_dbh->prepare($sql);
-
-$sql = qq{insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)};
-my $new_list_item_sth = $parent_dbh->prepare($sql);
+create_tables();
 
 my $sock = new IO::Socket::INET (
 	LocalHost => '0.0.0.0',
@@ -122,7 +41,6 @@ my $sock = new IO::Socket::INET (
 	Listen => 100,
 	Reuse => 1,
 );
-
 die "Could not create socket: $!\n" unless $sock;
 my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
 
@@ -130,33 +48,31 @@ $SIG{CHLD} = 'IGNORE';
 
 while (my ($new_sock, $bin_addr) = $sock->accept()) {
 
-	if (!$new_sock) {
-		# print "warn: accepted empty socket";
-		next;
-	}
+	next if (!$new_sock);
 
 	my $pid = fork();
-	die "error: can't fork: $!\n" if (!defined $pid);
-
-	if ($pid) {
-		# parent goes back to listening for more connections
+	if (!defined $pid) {
+		die "error: can't fork: $!\n";
+	} elsif ($pid) {
 		close $new_sock;
-		# print "parent: forked child $pid\n";
 		next;
 	}
+	# after here we're in the child
 
-	# after here we know we're in the child
-	# supposed to do this for db connections across forks
-	my $child_dbh = $parent_dbh->clone();
-	$child_dbh->{AutoCommit} = 1;
+	my $dbh = DBI->connect(
+		"dbi:SQLite:dbname=$db_file",
+		"", "",
+		{ RaiseError => 1 }
+	) or die $DBI::errstr;
+	$dbh->do("PRAGMA foreign_keys = ON");
+	$dbh->{AutoCommit} = 1;
 
-	# afaict unreferences the parents db handle
-	$parent_dbh->{InactiveDestroy} = 1;
-	undef $parent_dbh;
+	my $stmt_handles = prepare_stmt_handles($dbh);
 
-	# NI_NUMERIC* mean don't try and resolve ip address or port
+	# don't try and resolve ip address or port
 	my ($err, $addr, $port) = getnameinfo($bin_addr, NI_NUMERICHOST | NI_NUMERICSERV);
 	print "warn: getnameinfo() failed: $err\n" if ($err);
+
 	$addr = sprintf "%s %-15s %-5s", strftime("%F %T", localtime), $addr, $port;
 	print "$addr: new connection (pid = '$$')\n";
 
@@ -202,36 +118,39 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			# we read more bytes than we were expecting, keep going
 		}
 
-		$child_dbh->begin_work;
+		$dbh->begin_work;
 		# call the appropriate handler
-		$msg_func[$msg_type]->($child_dbh, $new_sock, $addr." $msg_str[$msg_type]", $msg);
+		my $hdr = "$addr $msg_str[$msg_type]";
+		$msg_func[$msg_type]->($dbh, $stmt_handles, $new_sock, $hdr, $msg);
 
-		$child_dbh->commit;   # commit the changes if we get this far
+		$dbh->commit;   # commit the changes if we get this far
 		if ($@) {
 			warn "Transaction aborted because $@";
 			# now rollback to undo the incomplete changes
 			# but do it in an eval{} as it may also fail
-			eval { $child_dbh->rollback };
+			eval { $dbh->rollback };
 			# add other application on-error-clean-up code here
 		}
 	}
 
-	print "$addr: disconnected!\n";
-	$new_sock->shutdown(SHUT_RDWR);
-	close($new_sock);
-	$child_dbh->disconnect();
-	$child_dbh = undef;
+	for my $sth (keys %$stmt_handles) {
+		# $stmt_handles->{$sth}->finish;
+		$stmt_handles->{$sth} = undef;
+	}
 
+	print "$addr: disconnected!\n";
+	close($new_sock);
+	$dbh->disconnect();
 	exit 0;
 }
 
 sub get_phone_number
 {
-	my ($dbh, $device_id) = @_;
+	my ($dbh, $sth, $device_id) = @_;
 
 	#print "info: get_phone_number() unimplemented, returning device id!\n";
 	#return $device_id;
-	my (undef, $ph_num) = $dbh->selectrow_array($device_id_exists_sth, undef, $device_id);
+	my (undef, $ph_num) = $dbh->selectrow_array($sth->{device_id_exists}, undef, $device_id);
 	unless (defined $ph_num && looks_like_number($ph_num)) {
 		print "warn: phone number lookup for $device_id failed!\n";
 		return "000";
@@ -242,7 +161,8 @@ sub get_phone_number
 
 sub msg_new_device
 {
-	my ($dbh, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my %sth = %$sth_ref;
 
 	# single field
 	my $ph_num = $msg;
@@ -251,7 +171,7 @@ sub msg_new_device
 		print "$addr: device phone number $ph_num invalid\n";
 		return;
 	}
-	if ($dbh->selectrow_array($ph_num_exists_sth, undef, $ph_num)) {
+	if ($dbh->selectrow_array($sth{ph_num_exists}, undef, $ph_num)) {
 		print "$addr: phone number $ph_num already exists\n";
 		return;
 	}
@@ -263,19 +183,20 @@ sub msg_new_device
 
 	print $new_sock pack("nn", 0, length($token));
 	print $new_sock $token;
-	$new_device_sth->execute($token, $ph_num, time);
+	$sth{new_device}->execute($token, $ph_num, time);
 	print "$addr: added new device '$ph_num' '" .fingerprint($token). "'\n";
 }
 
 sub msg_new_list
 {
-	my ($dbh, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my %sth = %$sth_ref;
 
 	# expecting two fields delimited by null
 	my ($device_id, $list_name) = split("\0", $msg);
 
 	# validate input
-	return if (device_id_invalid($dbh, $device_id, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
 	unless ($list_name) {
 		print "$addr: list name missing\n";
 		return;
@@ -290,11 +211,11 @@ sub msg_new_list
 	print "$addr: list fingerprint = '" .fingerprint($list_id). "'\n";
 
 	# add new list with single list member
-	$new_list_sth->execute($list_id, $list_name, $time, $time);
-	$new_list_member_sth->execute($list_id, $device_id, $time);
+	$sth{new_list}->execute($list_id, $list_name, $time, $time);
+	$sth{new_list_member}->execute($list_id, $device_id, $time);
 
 	# XXX: also send back the date and all that stuff
-	my $phone_number = get_phone_number($dbh, $device_id);
+	my $phone_number = get_phone_number($dbh, $sth_ref, $device_id);
 	my $out = $list_id . "\0" . $list_name . "\0" . $phone_number;
 	print $new_sock pack("nn", $msg_num{new_list}, length($out));
 	print $new_sock $out;
@@ -302,7 +223,7 @@ sub msg_new_list
 
 sub msg_new_list_item
 {
-    my ($dbh, $new_sock, $addr, $msg) = @_;
+    my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
 
     # my ($list_id, $position, $text) = split ("\0", $msg);
     
@@ -320,19 +241,20 @@ sub msg_new_list_item
 
 sub msg_join_list
 {
-    my ($dbh, $new_sock, $addr, $msg) = @_;
+    my ($dbh, $sth_ref, $new_sock, $addr, $msg, $sth) = @_;
+    my %sth = %$sth_ref;
     my ($device_id, $list_id) = split("\0", $msg);
 
-    return if (device_id_invalid($dbh, $device_id, $addr));
+    return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
 
     print "info: $addr: device '$device_id'\n";
     print "info: $addr: list '$list_id'\n";
     
     my $time = time;
-    $check_list_member_sth->execute($list_id, $device_id);
+    $sth{check_list_member}->execute($list_id, $device_id);
 
-    if (!$check_list_member_sth->fetchrow_array()) {
-        $new_list_member_sth->execute($list_id, $device_id, $time);
+    if (!$sth{check_list_member}->fetchrow_array()) {
+        $sth{new_list_member}->execute($list_id, $device_id, $time);
         print "info: $addr: device '$device_id' has been added to list $list_id\n";
     } else {
         print "warn: $addr: tried to create a duplicate list member entry for device $device_id and list $list_id\n";
@@ -344,32 +266,34 @@ sub msg_join_list
 
 sub msg_leave_list
 {
-    my ($dbh, $new_sock, $addr, $msg) = @_;
+    my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+    my %sth = %$sth_ref;
 
     my ($device_id, $list_id) = split("\0", $msg);
 
-    return if (device_id_invalid($dbh, $device_id, $addr));
+    return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
     
     print "info: $addr: device '$device_id'\n";
     print "info: $addr: list '$list_id'\n";
 
-    $check_list_member_sth->execute($list_id, $device_id);
+    $sth{check_list_member}->execute($list_id, $device_id);
 
-    if ($check_list_member_sth->fetchrow_array()) {
-        $remove_list_member_sth->execute($list_id, $device_id);
+    if ($sth{check_list_member}->fetchrow_array()) {
+        $sth{remove_list_member}->execute($list_id, $device_id);
         print "info: $addr: device '$device_id' has been removed from list '$list_id'\n";
     } else {
         print "warn: $addr: tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n";
     }
+    $sth{check_list_member}->finish();
 
-    $get_list_members_sth->execute($list_id);
+    $sth{get_list_members}->execute($list_id);
     
     my $alive = 1;
 
-    if (!$get_list_members_sth->fetchrow_array()) {
+    if (!$sth{get_list_members}->fetchrow_array()) {
         print "info: $addr: list '$list_id' is empty... deleting\n";
-        $delete_list_sth->execute($list_id);
-        $delete_list_data_sth->execute($list_id);
+        $sth{delete_list}->execute($list_id);
+        $sth{delete_list_data}->execute($list_id);
         $alive = 0;
     }
     my $out = "$list_id\0$alive";
@@ -403,7 +327,7 @@ sub msg_add_friend
 
 sub msg_delete_friend
 {
-	my ($dbh, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
 
 	# delete all friends, remove mutual friend references
 	# $friends_map_delete_sth->execute($device_id);
@@ -413,9 +337,10 @@ sub msg_delete_friend
 # get both lists the device is in, and lists it can see
 sub msg_list_request
 {
-	my ($dbh, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my %sth = %$sth_ref;
 
-	return if (device_id_invalid($dbh, $msg, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $msg, $addr));
 
 	my $devid_fp = fingerprint($msg);
 	print "info: $addr: gathering lists for '$devid_fp'\n";
@@ -423,15 +348,15 @@ sub msg_list_request
 	my @direct_lists;
     my @direct_list_ids;
 	# first get all lists this device id is a direct member of
-	$get_lists_sth->execute($msg);
-	while (my ($list_id, $list_name) = $get_lists_sth->fetchrow_array()) {
+	$sth{get_lists}->execute($msg);
+	while (my ($list_id, $list_name) = $sth{get_lists}->fetchrow_array()) {
 		print "info: $addr: found list '$list_name' '$list_id'\n";
 
 		# get all members of this list
 		my @list_members;
-		$get_list_members_sth->execute($list_id);
-		while (my ($member_device_id) = $get_list_members_sth->fetchrow_array()) {
-			push @list_members, get_phone_number($dbh, $member_device_id);
+		$sth{get_list_members}->execute($list_id);
+		while (my ($member_device_id) = $sth{get_list_members}->fetchrow_array()) {
+			push @list_members, get_phone_number($dbh, $sth_ref, $member_device_id);
 			print "info: $addr: direct list: found member '$member_device_id'\n";
 		}
         push @direct_list_ids, $list_id;
@@ -444,18 +369,18 @@ sub msg_list_request
 
 	my @indirect_lists;
 	# now calculate which lists this device id should see
-	$mutual_friend_select_sth->execute($msg);
-	while (my ($friend) = $mutual_friend_select_sth->fetchrow_array()) {
-		print "info: $addr: found mutual friend $friend\n";
+	$sth{mutual_friend_select}->execute($msg);
+	while (my ($friend) = $sth{mutual_friend_select}->fetchrow_array()) {
+		print "info: $addr: found mutual friend '$friend'\n";
 
 		# get all of my friends lists
-		$get_lists_sth->execute($friend);
+		$sth{get_lists}->execute($friend);
 
 		# we can't send device id's back to the client
-		my $friend_ph_num = get_phone_number($dbh, $friend);
+		my $friend_ph_num = get_phone_number($dbh, $sth_ref, $friend);
 
 		while (my ($list_id, $list_name) =
-			$get_lists_sth->fetchrow_array()) {
+			$sth{get_lists}->fetchrow_array()) {
             if (grep {$_ eq $list_id} @direct_list_ids) {
                 next;
             }
@@ -474,28 +399,29 @@ sub msg_list_request
 
 sub msg_list_items
 {
-	my ($dbh, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my %sth = %$sth_ref;
 
 	my ($device_id, $list_id) = split("\0", $msg);
 
-	return if (device_id_invalid($dbh, $device_id, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
 
 	if (!$list_id) {
 		print "warn: $addr: received null list id";
 		return;
 	}
-	unless ($dbh->selectrow_array($check_list_member_sth, undef, $list_id, $device_id)) {
+	unless ($dbh->selectrow_array($sth{check_list_member}, undef, $list_id, $device_id)) {
 		# XXX: table list_members list_id's should always exist in table lists
 		print "warn: $addr: $device_id not a member of $list_id\n";
 		return;
 	}
 	print "info: $addr: $device_id request items for $list_id\n";
 
-	$get_list_items_sth->execute($list_id);
+	$sth{get_list_items}->execute($list_id);
 
 	my @items;
 	while (my ($list_id, $pos, $name, $status, $owner, undef) =
-		$get_list_items_sth->fetchrow_array()) {
+		$sth{get_list_items}->fetchrow_array()) {
 		print "info: $addr: list item #$pos $name\n";
 
 		push @items, "$pos:$name:$owner:$status";
@@ -508,9 +434,9 @@ sub msg_list_items
 
 sub msg_ok
 {
-	my ($dbh, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
 
-	return if (device_id_invalid($dbh, $msg, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $msg, $addr));
 
 	# send message type 8, 0 bytes payload
 	print $new_sock pack("nn", 8, 1);
@@ -519,13 +445,12 @@ sub msg_ok
 
 sub fingerprint
 {
-	my $device_id = shift;
-	return substr $device_id, 0, 8;
+	return substr shift, 0, 8;
 }
 
 sub device_id_invalid
 {
-	my ($dbh, $device_id, $addr) = @_;
+	my ($dbh, $sth_ref, $device_id, $addr) = @_;
 
 	# validate this at least looks like base64
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
@@ -534,7 +459,7 @@ sub device_id_invalid
 	}
 
 	# make sure we know about this device id
-	unless ($dbh->selectrow_array($device_id_exists_sth, undef, $device_id)) {
+	unless ($dbh->selectrow_array($sth_ref->{device_id_exists}, undef, $device_id)) {
 		print "$addr: unknown device '$device_id'\n";
 		return 1;
 	}
@@ -544,7 +469,12 @@ sub device_id_invalid
 
 sub create_tables {
 
-	my $db_handle = shift;
+	my $db_handle = DBI->connect(
+		"dbi:SQLite:dbname=$db_file",
+		"", "",
+		{ RaiseError => 1 }
+	) or die $DBI::errstr;
+	$db_handle->do("PRAGMA foreign_keys = ON");
 
 	$db_handle->do(qq{create table if not exists lists(
 		list_id int not null primary key,
@@ -571,7 +501,8 @@ sub create_tables {
 		device_id text not null,
 		mutual_friend text not null,
 		primary key(device_id, mutual_friend),
-		foreign key(device_id) references devices(device_id))
+		foreign key(device_id) references devices(device_id),
+		foreign key(mutual_friend) references devices(device_id))
 	}) or die $DBI::errstr;
 
 	$db_handle->do(qq{create table if not exists list_members(
@@ -594,8 +525,85 @@ sub create_tables {
 		foreign key(list_id) references lists(list_id),
 		foreign key(owner) references devices(device_id))
 	}) or die $DBI::errstr;
+
+	$db_handle->disconnect();
+	$db_handle = undef;
 }
 
+sub prepare_stmt_handles {
+	my $dbh = shift;
+
+	my %stmt_handles;
+	my $sql;
+
+	# list table queries
+	$sql = qq{insert into lists (list_id, name, first_created, last_updated)
+	values (?, ?, ?, ?)};
+	$stmt_handles{new_list} = $dbh->prepare($sql);
+
+	$sql = qq{delete from lists where list_id = ?};
+	$stmt_handles{delete_list} = $dbh->prepare($sql);
+
+	# devices table queries
+	$sql = qq{insert into devices (device_id, phone_num, first_seen) values (?, ?, ?)};
+	$stmt_handles{new_device} = $dbh->prepare($sql);
+
+	$sql = qq{select * from devices where phone_num = ?};
+	$stmt_handles{ph_num_exists} = $dbh->prepare($sql);
+
+	$sql = qq{select * from devices where device_id = ?};
+	$stmt_handles{device_id_exists} = $dbh->prepare($sql);
+
+	# friends_map table queries
+	$sql = qq{insert into friends_map (device_id, friend) values (?, ?)};
+	$stmt_handles{friends_map} = $dbh->prepare($sql);
+
+	$sql = qq{select * from friends_map where device_id = ? and friend = ?};
+	$stmt_handles{friends_map_select} = $dbh->prepare($sql);
+
+	$sql = qq{delete from friends_map where device_id = ?};
+	$stmt_handles{friends_map_delete} = $dbh->prepare($sql);
+
+	# mutual_friends table
+	$sql = qq{insert into mutual_friends (device_id, mutual_friend) values (?, ?)};
+	$stmt_handles{mutual_friend_insert} = $dbh->prepare($sql);
+
+	$sql = qq{select mutual_friend from mutual_friends where device_id = ?};
+	$stmt_handles{mutual_friend_select} = $dbh->prepare($sql);
+
+	$sql = qq{delete from mutual_friends where device_id = ? or mutual_friend = ?};
+	$stmt_handles{mutual_friends_delete} = $dbh->prepare($sql);
+
+	# lists/list_members compound queries
+	$sql = qq{select lists.list_id, lists.name from lists, list_members where
+	lists.list_id = list_members.list_id and device_id = ?};
+	$stmt_handles{get_lists} = $dbh->prepare($sql);
+
+	# list_members table
+	$sql = qq{select device_id from list_members where list_id = ?};
+	$stmt_handles{get_list_members} = $dbh->prepare($sql);
+
+	$sql = qq{insert into list_members (list_id, device_id, joined_date) values (?, ?, ?)};
+	$stmt_handles{new_list_member} = $dbh->prepare($sql);
+
+	$sql = qq{delete from list_members where list_id = ? and device_id = ?};
+	$stmt_handles{remove_list_member} = $dbh->prepare($sql);
+
+	$sql = qq{select device_id from list_members where list_id = ? and device_id = ?};
+	$stmt_handles{check_list_member} = $dbh->prepare($sql);
+
+	# list_data table
+	$sql = qq{delete from list_data where list_id = ?};
+	$stmt_handles{delete_list_data} = $dbh->prepare($sql);
+
+	$sql = qq{select * from list_data where list_id = ?};
+	$stmt_handles{get_list_items} = $dbh->prepare($sql);
+
+	$sql = qq{insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)};
+	$stmt_handles{new_list_item} = $dbh->prepare($sql);
+
+	return \%stmt_handles;
+}
 
 sub error {
 	return if ($LOG_LEVEL < $LOG_LEVEL_ERROR);

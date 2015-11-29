@@ -15,12 +15,6 @@ use Socket;
 require "msgs.pl";
 our (%msg_num, @msg_str, @msg_func, $protocol_ver);
 
-my $LOG_LEVEL_ERROR = 0;
-my $LOG_LEVEL_WARN = 1;
-my $LOG_LEVEL_INFO = 2;
-my $LOG_LEVEL_DEBUG = 3;
-my $LOG_LEVEL = $LOG_LEVEL_INFO;
-
 my %args;
 getopts("p:d:", \%args);
 
@@ -630,24 +624,4 @@ sub prepare_stmt_handles {
 	$stmt_handles{new_list_item} = $dbh->prepare($sql);
 
 	return \%stmt_handles;
-}
-
-sub error {
-	return if ($LOG_LEVEL < $LOG_LEVEL_ERROR);
-	print "error: " . sprintf @_;
-}
-
-sub warn {
-	return if ($LOG_LEVEL < $LOG_LEVEL_WARN);
-	print "warn: " . sprintf @_;
-}
-
-sub info {
-	return if ($LOG_LEVEL < $LOG_LEVEL_INFO);
-	print "info: " . sprintf @_;
-}
-
-sub debug {
-	return if ($LOG_LEVEL < $LOG_LEVEL_DEBUG);
-	print "debug: " . sprintf @_;
 }

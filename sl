@@ -190,7 +190,7 @@ sub msg_new_device
 	# XXX: need to check the db to make sure this isn't duplicate
 	my $token = sha256_base64(arc4random_bytes(32));
 
-	print $new_sock pack("nn", 0, length($token));
+	print $new_sock pack("nn", $msg_num{new_device}, length($token));
 	print $new_sock $token;
 	$sth{new_device}->execute($token, $ph_num, time);
 	print "$addr: added new device '$ph_num' '" .fingerprint($token). "'\n";
@@ -269,7 +269,7 @@ sub msg_join_list
         print "warn: $addr: tried to create a duplicate list member entry for device $device_id and list $list_id\n";
     }
 
-    print $new_sock pack("nn", 4, length($list_id));
+    print $new_sock pack("nn", $msg_num{join_list}, length($list_id));
     print $new_sock $list_id;
 }
 
@@ -455,7 +455,7 @@ sub msg_list_items
 	}
 
 	my $out = join("\0", @items);
-	print $new_sock pack("nn", 6, length($out));
+	print $new_sock pack("nn", $msg_num{list_items}, length($out));
 	print $new_sock $out;
 }
 
@@ -466,7 +466,7 @@ sub msg_ok
 	return if (device_id_invalid($dbh, $sth_ref, $msg, $addr));
 
 	# send message type 8, 0 bytes payload
-	print $new_sock pack("nn", 8, 1);
+	print $new_sock pack("nn", $msg_num{ok}, 1);
 	print $new_sock '!';
 }
 

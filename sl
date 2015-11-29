@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+$| = 1;
 use warnings;
 use strict;
 
@@ -304,21 +305,39 @@ sub msg_leave_list
 # update friend map
 sub msg_add_friend
 {
-	my ($dbh, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my %sth = %$sth_ref;
 
 	# device id followed by 1 or more friends numbers
 	my ($device_id, $friend) = split("\0", $msg);
 
-	return if (device_id_invalid($dbh, $device_id, $addr));
-	print "$addr: '$device_id' adding '$friend'\n";
+	return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
+	my $devid_fp = fingerprint($device_id);
+	print "$addr: '$devid_fp' adding '$friend'\n";
 
 	unless (looks_like_number($friend)) {
 		print "$addr: bad friends number $friend\n";
 		return;
 	}
 
-	# $friends_map_sth->execute($device_id, $_);
-	# print "$addr: added friend $_\n";
+	# XXX: check they're not already a friend before doing this
+	$sth{friends_map}->execute($device_id, $friend);
+
+	# check if this added friend is a member already
+	my ($fr_devid) = $dbh->selectrow_array($sth{ph_num_exists}, undef, $friend);
+	if ($fr_devid) {
+		print "$addr: added friend is a member\n";
+		print "$addr: friends device id is '$fr_devid'\n";
+
+		my $phnum = get_phone_number($dbh, $sth_ref, $device_id);
+
+		# check if my phone number is in their friends list
+		if ($dbh->selectrow_array($sth{friends_map_select}, undef, $fr_devid, $phnum)) {
+			print "$addr: found mutual friendship\n";
+			$sth{mutual_friend_insert}->execute($device_id, $fr_devid);
+			$sth{mutual_friend_insert}->execute($fr_devid, $device_id);
+		}
+	}
 
 	my $out = "$friend";
 	print $new_sock pack("nn", $msg_num{add_friend}, length($out));

@@ -77,54 +77,16 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 	$addr = sprintf "%s %-15s %-5s", strftime("%F %T", localtime), $addr, $port;
 	print "$addr: new connection (pid = '$$')\n";
 
-	# read will be 0 when there's nothing else to read
-	while (my $bread = read $new_sock, my $metadata, 4) {
-		# i'm not sure if read is guaranteed to read all 4 bytes
-		if ($bread != 4) {
-			print "warn: $addr: read $bread instead of 4 bytes\n";
-			last;
-		}
-		# try to extract msg type and size to two unsigned shorts
-		my ($msg_type, $msg_size) = unpack("nn", $metadata);
+	while (1) {
+		my ($msg_type, $msg) = parse_msg_header($new_sock, $addr);
+		last unless (defined $msg_type && defined $msg);
 
-		# validate message type
-		if (!defined $msg_type) {
-			print "$addr: error unpacking msg type\n";
-			last;
-		} elsif ($msg_type > @msg_str) {
-			print "$addr: unknown message type " . sprintf "0x%x\n", $msg_type;
-			last;
-		}
-
-		# validate message size
-		if (!defined $msg_size) {
-			print "$addr: error unpacking msg size\n";
-			last;
-		}
-		if ($msg_size == 0 || $msg_size > 1024) {
-			print "$addr: message size not 0 < $msg_size <= 1024\n";
-			last;
-		}
-
-		# read exact amount of bytes the message should be
-		# XXX: not sure if this is optimal
-		$bread = read($new_sock, my $msg, $msg_size);
-		if ($bread != $msg_size) {
-			print "warn: $addr: read $bread instead of $msg_size\n";
-
-			if ($bread < $msg_size) {
-				print "warn: $addr: $bread too small, scrapping msg\n";
-				last;
-			}
-			# we read more bytes than we were expecting, keep going
-		}
+		my $hdr = "$addr $msg_str[$msg_type]";
 
 		$dbh->begin_work;
-		# call the appropriate handler
-		my $hdr = "$addr $msg_str[$msg_type]";
 		$msg_func[$msg_type]->($dbh, $stmt_handles, $new_sock, $hdr, $msg);
+		$dbh->commit;
 
-		$dbh->commit;   # commit the changes if we get this far
 		if ($@) {
 			warn "Transaction aborted because $@";
 			# now rollback to undo the incomplete changes
@@ -134,15 +96,61 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 		}
 	}
 
-	for my $sth (keys %$stmt_handles) {
-		# $stmt_handles->{$sth}->finish;
-		$stmt_handles->{$sth} = undef;
-	}
+	$stmt_handles->{$_} = undef for (keys %$stmt_handles);
 
 	print "$addr: disconnected!\n";
 	close($new_sock);
 	$dbh->disconnect();
 	exit 0;
+}
+
+sub parse_msg_header {
+	my ($new_sock, $addr) = (@_);
+
+	my $bread = read $new_sock, my $metadata, 4;
+	if ($bread == 0) {
+		return undef;
+	} elsif ($bread != 4) {
+		# i'm not sure if read is guaranteed to read all 4 bytes
+		print "warn: $addr: read $bread instead of 4 bytes\n";
+		return undef;
+	}
+	# try to extract msg type and size to two unsigned shorts
+	my ($msg_type, $msg_size) = unpack("nn", $metadata);
+
+	# validate message type
+	if (!defined $msg_type) {
+		print "$addr: error unpacking msg type\n";
+		return undef;
+	} elsif ($msg_type > @msg_str) {
+		print "$addr: unknown message type " . sprintf "0x%x\n", $msg_type;
+		return undef;
+	}
+
+	# validate message size
+	if (!defined $msg_size) {
+		print "$addr: error unpacking msg size\n";
+		return undef;
+	}
+	if ($msg_size == 0 || $msg_size > 1024) {
+		print "$addr: message size not 0 < $msg_size <= 1024\n";
+		return undef;
+	}
+
+	# read exact amount of bytes the message should be
+	# XXX: not sure if this is optimal
+	$bread = read($new_sock, my $msg, $msg_size);
+	if ($bread != $msg_size) {
+		print "warn: $addr: read $bread instead of $msg_size\n";
+
+		if ($bread < $msg_size) {
+			print "warn: $addr: $bread too small, scrapping msg\n";
+			return undef;
+		}
+		# we read more bytes than we were expecting, keep going
+	}
+
+	return ($msg_type, $msg);
 }
 
 sub get_phone_number

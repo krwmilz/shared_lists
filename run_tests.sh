@@ -10,8 +10,13 @@ if which tput > /dev/null; then
 fi
 
 fail() {
-	printf "%3s %s: %s%s%s\n" $count $1 $red "$2" $reset
+	printf "%3s %s: $red%s$reset\n" $count "$1" "$2"
 	failed=`expr $failed + 1`
+}
+
+ok() {
+	printf "%3s %s: $green%s$reset\n" $count "$1" "ok"
+	passed=`expr $passed + 1`
 }
 
 passed=0
@@ -50,9 +55,8 @@ for t in `ls tests/*/Makefile`; do
 		continue
 	fi
 
-	printf "%3s %s: %s%s%s\n" $count $test_dir $green "ok" $reset
-	passed=`expr $passed + 1`
 	make -s -C $test_dir clean
+	ok $test_dir
 done
 rm -f $tmp_file
 

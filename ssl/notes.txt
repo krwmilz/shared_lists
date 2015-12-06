@@ -1,0 +1,9 @@
+Our certificates in ssl/ are provided by let's encrypt.
+I think they will expire in 2016-03.
+
+To get a certificate that IO::Socket::SSL will like, you have to concatenate
+cert.pem and chain.pem to produce cert_chain.pem.
+
+Also, concatenating cert.pem and fullchain.pem works, but fullchain.pem has a
+larger file size. I'm unsure at this point which one is (more) correct, as they
+both work.

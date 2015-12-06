@@ -4,7 +4,7 @@ use warnings;
 
 use Errno;
 use Exporter qw(import);
-use IO::Socket qw(SHUT_RDWR);
+use IO::Socket::SSL;
 use Time::HiRes qw(usleep);
 
 require "msgs.pl";
@@ -29,11 +29,12 @@ sub new_socket
 	my $sock = undef;
 	my $i = 0;
 	while (! $sock) {
-		$sock = new IO::Socket::INET(
-			LocalHost => '127.0.0.1',
-			PeerHost => '127.0.0.1',
+		$sock = new IO::Socket::SSL->new(
+			PeerHost => 'localhost',
 			PeerPort => $ENV{PORT},
-			Proto => 'tcp',
+			# this is needed because PeerHost is localhost and our
+			# SSL certificates are signed with amp.ca
+			SSL_verifycn_name => "absentmindedproductions.ca",
 		);
 
 		if ($!{ECONNREFUSED}) {
@@ -42,7 +43,7 @@ sub new_socket
 			usleep(50 * 1000);
 		}
 		else {
-			die "error: new socket: $!\n" unless $sock;
+			die "error=$!, ssl_error=$SSL_ERROR\n" unless $sock;
 		}
 	}
 

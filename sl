@@ -8,6 +8,7 @@ use DBI;
 use Digest::SHA qw(sha256_base64);
 use Getopt::Std;
 use IO::Socket;
+use IO::Socket::SSL;
 use POSIX;
 use Scalar::Util qw(looks_like_number);
 use Socket;
@@ -56,6 +57,14 @@ while (my $new_sock = $listen_sock->accept()) {
 	close $listen_sock;
 	log_set_peer_host_port($new_sock);
 	log_print("new connection (pid = '$$')\n");
+
+	# upgrade connection to SSL
+	IO::Socket::SSL->start_SSL($new_sock,
+		SSL_server => 1,
+		SSL_cert_file => 'ssl/cert_chain.pem',
+		SSL_key_file => 'ssl/privkey.pem'
+	) or die "failed to ssl handshake: $SSL_ERROR";
+	#log_print(IO::Socket::SSL->get_fingerprint($new_sock) . "\n");
 
 	# each child opens their own database connection
 	my $dbh = DBI->connect(

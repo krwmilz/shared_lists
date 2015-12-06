@@ -7,7 +7,7 @@ use BSD::arc4random qw(:all);
 use DBI;
 use Digest::SHA qw(sha256_base64);
 use Getopt::Std;
-use IO::Socket qw(getnameinfo NI_NUMERICHOST NI_NUMERICSERV);
+use IO::Socket;
 use POSIX;
 use Scalar::Util qw(looks_like_number);
 use Socket;
@@ -24,61 +24,57 @@ if ($args{d}) {
 	unlink $db_file;
 }
 elsif (! -e $db_file) {
-	print "info: creating new database '$db_file'\n";
+	log_print_bare("creating new database '$db_file'\n");
 }
 
 create_tables();
 
-my $sock = new IO::Socket::INET (
+my $listen_sock = new IO::Socket::INET (
 	LocalHost => '0.0.0.0',
 	LocalPort => $args{p} || '5437',
 	Proto => 'tcp',
 	Listen => 100,
 	Reuse => 1,
 );
-die "Could not create socket: $!\n" unless $sock;
-my $local_addr_port = inet_ntoa($sock->sockaddr) . ":" .$sock->sockport();
+die "Could not create socket: $!\n" unless $listen_sock;
 
-$SIG{CHLD} = 'IGNORE';
+my ($laddr, $lport) = ($listen_sock->sockhost(), $listen_sock->sockport());
+log_print_bare("accepting connections on $laddr:$lport (pid = '$$')\n");
 
-while (my ($new_sock, $bin_addr) = $sock->accept()) {
+while (my $new_sock = $listen_sock->accept()) {
 
-	next if (!$new_sock);
-
-	my $pid = fork();
+	# create a child process to handle this client
+	my $pid = fork;
 	if (!defined $pid) {
 		die "error: can't fork: $!\n";
 	} elsif ($pid) {
+		# in parent: go back to listening for more connections
 		close $new_sock;
 		next;
 	}
-	# after here we're in the child
 
+	close $listen_sock;
+	log_set_peer_host_port($new_sock);
+	log_print("new connection (pid = '$$')\n");
+
+	# each child opens their own database connection
 	my $dbh = DBI->connect(
 		"dbi:SQLite:dbname=$db_file",
 		"", "",
 		{ RaiseError => 1 }
 	) or die $DBI::errstr;
+
 	$dbh->do("PRAGMA foreign_keys = ON");
 	$dbh->{AutoCommit} = 1;
-
 	my $stmt_handles = prepare_stmt_handles($dbh);
 
-	# don't try and resolve ip address or port
-	my ($err, $addr, $port) = getnameinfo($bin_addr, NI_NUMERICHOST | NI_NUMERICSERV);
-	print "warn: getnameinfo() failed: $err\n" if ($err);
-
-	$addr = sprintf "%s %-15s %-5s", strftime("%F %T", localtime), $addr, $port;
-	print "$addr: new connection (pid = '$$')\n";
-
+	# main message receiving loop
 	while (1) {
-		my ($msg_type, $msg) = parse_msg_header($new_sock, $addr);
+		my ($msg_type, $msg) = recv_msg($new_sock);
 		last unless (defined $msg_type && defined $msg);
 
-		my $hdr = "$addr $msg_str[$msg_type]";
-
 		$dbh->begin_work;
-		$msg_func[$msg_type]->($dbh, $stmt_handles, $new_sock, $hdr, $msg);
+		$msg_func[$msg_type]->($dbh, $stmt_handles, $new_sock, $msg);
 		$dbh->commit;
 
 		if ($@) {
@@ -86,62 +82,56 @@ while (my ($new_sock, $bin_addr) = $sock->accept()) {
 			# now rollback to undo the incomplete changes
 			# but do it in an eval{} as it may also fail
 			eval { $dbh->rollback };
-			# add other application on-error-clean-up code here
+			# XXX: are database errors fatal to this connection?
 		}
 	}
 
 	$stmt_handles->{$_} = undef for (keys %$stmt_handles);
-
-	print "$addr: disconnected!\n";
-	close($new_sock);
 	$dbh->disconnect();
+
+	log_print("disconnected!\n");
 	exit 0;
 }
+print "got here\n";
 
-sub parse_msg_header {
-	my ($new_sock, $addr) = (@_);
+# any header parsing errors or message read errors are fatal in this function
+sub recv_msg {
+	my ($new_sock) = (@_);
 
-	my $bread = read $new_sock, my $metadata, 4;
+	# message header is 4 bytes
+	my $bread = read $new_sock, my $header, 4;
 	if ($bread == 0) {
 		return undef;
 	} elsif ($bread != 4) {
-		# i'm not sure if read is guaranteed to read all 4 bytes
-		print "warn: $addr: read $bread instead of 4 bytes\n";
-		return undef;
-	}
-	# try to extract msg type and size to two unsigned shorts
-	my ($msg_type, $msg_size) = unpack("nn", $metadata);
-
-	# validate message type
-	if (!defined $msg_type) {
-		print "$addr: error unpacking msg type\n";
-		return undef;
-	} elsif ($msg_type > @msg_str) {
-		print "$addr: unknown message type " . sprintf "0x%x\n", $msg_type;
+		log_print("error: read $bread instead of 4 bytes\n");
 		return undef;
 	}
 
-	# validate message size
-	if (!defined $msg_size) {
-		print "$addr: error unpacking msg size\n";
-		return undef;
-	}
-	if ($msg_size == 0 || $msg_size > 1024) {
-		print "$addr: message size not 0 < $msg_size <= 1024\n";
+	my ($msg_type, $msg_size) = unpack("nn", $header);
+	unless (defined $msg_type && defined $msg_size) {
+		log_print("error: unpacking message type or size\n");
 		return undef;
 	}
 
-	# read exact amount of bytes the message should be
-	# XXX: not sure if this is optimal
+	if ($msg_type >= @msg_str) {
+		my $bad_msg = sprintf "0x%x", $msg_type;
+		log_print("error: unknown message type $bad_msg\n");
+		return undef;
+	}
+
+	if ($msg_size > 4096) {
+		log_print("error: $msg_size byte message too large\n");
+		return undef;
+	}
+
+	# read the actual message
 	$bread = read($new_sock, my $msg, $msg_size);
 	if ($bread != $msg_size) {
-		print "warn: $addr: read $bread instead of $msg_size\n";
-
 		if ($bread < $msg_size) {
-			print "warn: $addr: $bread too small, scrapping msg\n";
+			log_print("msg read: read $bread instead of $msg_size bytes\n");
 			return undef;
 		}
-		# we read more bytes than we were expecting, keep going
+		log_print("msg read: read $bread instead of $msg_size bytes\n");
 	}
 
 	return ($msg_type, $msg);
@@ -155,7 +145,7 @@ sub get_phone_number
 	#return $device_id;
 	my (undef, $ph_num) = $dbh->selectrow_array($sth->{device_id_exists}, undef, $device_id);
 	unless (defined $ph_num && looks_like_number($ph_num)) {
-		print "warn: phone number lookup for $device_id failed!\n";
+		log_print("phone number lookup for $device_id failed!\n");
 		return "000";
 	}
 
@@ -164,18 +154,18 @@ sub get_phone_number
 
 sub msg_new_device
 {
-	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
 	my %sth = %$sth_ref;
 
 	# single field
 	my $ph_num = $msg;
 
 	if (!looks_like_number($ph_num)) {
-		print "$addr: device phone number $ph_num invalid\n";
+		log_print("new_device: received phone number '$ph_num' invalid\n");
 		return;
 	}
 	if ($dbh->selectrow_array($sth{ph_num_exists}, undef, $ph_num)) {
-		print "$addr: phone number $ph_num already exists\n";
+		log_print("new_device: phone number '$ph_num' already exists\n");
 		return;
 	}
 
@@ -187,31 +177,31 @@ sub msg_new_device
 	print $new_sock pack("nn", $msg_num{new_device}, length($token));
 	print $new_sock $token;
 	$sth{new_device}->execute($token, $ph_num, time);
-	print "$addr: added new device '$ph_num' '" .fingerprint($token). "'\n";
+	log_print("new_device: success '$ph_num' '" .fingerprint($token). "'\n");
 }
 
 sub msg_new_list
 {
-	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
 	my %sth = %$sth_ref;
 
 	# expecting two fields delimited by null
 	my ($device_id, $list_name) = split("\0", $msg);
 
 	# validate input
-	return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $device_id));
 	unless ($list_name) {
-		print "$addr: list name missing\n";
+		log_print("new_list: name field missing\n");
 		return;
 	}
 	my $devid_fp = fingerprint($device_id);
 
-	print "$addr: '$list_name'\n";
-	print "$addr: adding first list member devid = '$devid_fp'\n";
+	log_print("new_list: '$list_name'\n");
+	log_print("new_list: adding first member devid = '$devid_fp'\n");
 
 	my $time = time;
 	my $list_id = sha256_base64(arc4random_bytes(32));
-	print "$addr: list fingerprint = '" .fingerprint($list_id). "'\n";
+	log_print("new_list: fingerprint = '" .fingerprint($list_id). "'\n");
 
 	# add new list with single list member
 	$sth{new_list}->execute($list_id, $list_name, $time, $time);
@@ -226,7 +216,7 @@ sub msg_new_list
 
 sub msg_new_list_item
 {
-    my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+    my ($dbh, $sth_ref, $new_sock, $msg) = @_;
 
     # my ($list_id, $position, $text) = split ("\0", $msg);
     
@@ -244,23 +234,23 @@ sub msg_new_list_item
 
 sub msg_join_list
 {
-    my ($dbh, $sth_ref, $new_sock, $addr, $msg, $sth) = @_;
+    my ($dbh, $sth_ref, $new_sock, $msg, $sth) = @_;
     my %sth = %$sth_ref;
     my ($device_id, $list_id) = split("\0", $msg);
 
-    return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
+    return if (device_id_invalid($dbh, $sth_ref, $device_id));
 
-    print "info: $addr: device '$device_id'\n";
-    print "info: $addr: list '$list_id'\n";
+    log_print("join_list: device '$device_id'\n");
+    log_print("join_list: list '$list_id'\n");
     
     my $time = time;
     $sth{check_list_member}->execute($list_id, $device_id);
 
     if (!$sth{check_list_member}->fetchrow_array()) {
         $sth{new_list_member}->execute($list_id, $device_id, $time);
-        print "info: $addr: device '$device_id' has been added to list $list_id\n";
+        log_print("join_list: device '$device_id' has been added to list '$list_id'\n");
     } else {
-        print "warn: $addr: tried to create a duplicate list member entry for device $device_id and list $list_id\n";
+        log_print("join_list: tried to create a duplicate list member entry for device $device_id and list $list_id\n");
     }
 
     print $new_sock pack("nn", $msg_num{join_list}, length($list_id));
@@ -269,23 +259,23 @@ sub msg_join_list
 
 sub msg_leave_list
 {
-    my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+    my ($dbh, $sth_ref, $new_sock, $msg) = @_;
     my %sth = %$sth_ref;
 
     my ($device_id, $list_id) = split("\0", $msg);
 
-    return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
+    return if (device_id_invalid($dbh, $sth_ref, $device_id));
     
-    print "info: $addr: device '$device_id'\n";
-    print "info: $addr: list '$list_id'\n";
+    log_print("leave_list: device '$device_id'\n");
+    log_print("leave_list: list '$list_id'\n");
 
     $sth{check_list_member}->execute($list_id, $device_id);
 
     if ($sth{check_list_member}->fetchrow_array()) {
         $sth{remove_list_member}->execute($list_id, $device_id);
-        print "info: $addr: device '$device_id' has been removed from list '$list_id'\n";
+        log_print("leave_list: device '$device_id' has been removed from list '$list_id'\n");
     } else {
-        print "warn: $addr: tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n";
+        log_print("leave_list: warn: tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n");
     }
     $sth{check_list_member}->finish();
 
@@ -294,7 +284,7 @@ sub msg_leave_list
     my $alive = 1;
 
     if (!$sth{get_list_members}->fetchrow_array()) {
-        print "info: $addr: list '$list_id' is empty... deleting\n";
+        log_print("leave_list: list '$list_id' is empty... deleting\n");
         $sth{delete_list}->execute($list_id);
         $sth{delete_list_data}->execute($list_id);
         $alive = 0;
@@ -307,18 +297,18 @@ sub msg_leave_list
 # update friend map
 sub msg_add_friend
 {
-	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
 	my %sth = %$sth_ref;
 
-	# device id followed by 1 or more friends numbers
+	# device id followed by 1 friends number
 	my ($device_id, $friend) = split("\0", $msg);
 
-	return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $device_id));
 	my $devid_fp = fingerprint($device_id);
-	print "$addr: '$devid_fp' adding '$friend'\n";
+	log_print("add_friend: '$devid_fp' adding '$friend'\n");
 
 	unless (looks_like_number($friend)) {
-		print "$addr: bad friends number $friend\n";
+		log_print("add_friend: bad friends number '$friend'\n");
 		return;
 	}
 
@@ -328,14 +318,15 @@ sub msg_add_friend
 	# check if this added friend is a member already
 	my ($fr_devid) = $dbh->selectrow_array($sth{ph_num_exists}, undef, $friend);
 	if ($fr_devid) {
-		print "$addr: added friend is a member\n";
-		print "$addr: friends device id is '$fr_devid'\n";
+		my $friends_fp = fingerprint($fr_devid);
+		log_print("add_friend: added friend is a member\n");
+		log_print("add_friend: friends device id is '$friends_fp'\n");
 
 		my $phnum = get_phone_number($dbh, $sth_ref, $device_id);
 
 		# check if my phone number is in their friends list
 		if ($dbh->selectrow_array($sth{friends_map_select}, undef, $fr_devid, $phnum)) {
-			print "$addr: found mutual friendship\n";
+			log_print("add_friend: found mutual friendship\n");
 			$sth{mutual_friend_insert}->execute($device_id, $fr_devid);
 			$sth{mutual_friend_insert}->execute($fr_devid, $device_id);
 		}
@@ -348,7 +339,7 @@ sub msg_add_friend
 
 sub msg_delete_friend
 {
-	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
 
 	# delete all friends, remove mutual friend references
 	# $friends_map_delete_sth->execute($device_id);
@@ -358,27 +349,27 @@ sub msg_delete_friend
 # get both lists the device is in, and lists it can see
 sub msg_list_request
 {
-	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
 	my %sth = %$sth_ref;
 
-	return if (device_id_invalid($dbh, $sth_ref, $msg, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $msg));
 
 	my $devid_fp = fingerprint($msg);
-	print "info: $addr: gathering lists for '$devid_fp'\n";
+	log_print("list_request: gathering lists for '$devid_fp'\n");
 
 	my @direct_lists;
     my @direct_list_ids;
 	# first get all lists this device id is a direct member of
 	$sth{get_lists}->execute($msg);
 	while (my ($list_id, $list_name) = $sth{get_lists}->fetchrow_array()) {
-		print "info: $addr: found list '$list_name' '$list_id'\n";
+		log_print("list_request: found list '$list_name' '$list_id'\n");
 
 		# get all members of this list
 		my @list_members;
 		$sth{get_list_members}->execute($list_id);
 		while (my ($member_device_id) = $sth{get_list_members}->fetchrow_array()) {
 			push @list_members, get_phone_number($dbh, $sth_ref, $member_device_id);
-			print "info: $addr: direct list: found member '$member_device_id'\n";
+			log_print("list_request: direct list: found member '$member_device_id'\n");
 		}
         push @direct_list_ids, $list_id;
 		push @direct_lists, "$list_name:$list_id:" . join(":", @list_members);
@@ -392,7 +383,7 @@ sub msg_list_request
 	# now calculate which lists this device id should see
 	$sth{mutual_friend_select}->execute($msg);
 	while (my ($friend) = $sth{mutual_friend_select}->fetchrow_array()) {
-		print "info: $addr: found mutual friend '$friend'\n";
+		log_print("list_request: found mutual friend '$friend'\n");
 
 		# get all of my friends lists
 		$sth{get_lists}->execute($friend);
@@ -405,7 +396,7 @@ sub msg_list_request
             if (grep {$_ eq $list_id} @direct_list_ids) {
                 next;
             }
-		    print "info: $addr: found mutual friends list '$list_name'\n";
+		    log_print("list_request: found mutual friends list '$list_name'\n");
 
 		    push @indirect_lists, "$list_name:$list_id:$friend_ph_num"
 		}
@@ -420,30 +411,30 @@ sub msg_list_request
 
 sub msg_list_items
 {
-	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
 	my %sth = %$sth_ref;
 
 	my ($device_id, $list_id) = split("\0", $msg);
 
-	return if (device_id_invalid($dbh, $sth_ref, $device_id, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $device_id));
 
 	if (!$list_id) {
-		print "warn: $addr: received null list id";
+		log_print("list_items: received null list id");
 		return;
 	}
 	unless ($dbh->selectrow_array($sth{check_list_member}, undef, $list_id, $device_id)) {
 		# XXX: table list_members list_id's should always exist in table lists
-		print "warn: $addr: $device_id not a member of $list_id\n";
+		log_print("list_items: $device_id not a member of $list_id\n");
 		return;
 	}
-	print "info: $addr: $device_id request items for $list_id\n";
+	log_print("list_items: $device_id request items for $list_id\n");
 
 	$sth{get_list_items}->execute($list_id);
 
 	my @items;
 	while (my ($list_id, $pos, $name, $status, $owner, undef) =
 		$sth{get_list_items}->fetchrow_array()) {
-		print "info: $addr: list item #$pos $name\n";
+		log_print("list_items: list item #$pos $name\n");
 
 		push @items, "$pos:$name:$owner:$status";
 	}
@@ -455,9 +446,9 @@ sub msg_list_items
 
 sub msg_ok
 {
-	my ($dbh, $sth_ref, $new_sock, $addr, $msg) = @_;
+	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
 
-	return if (device_id_invalid($dbh, $sth_ref, $msg, $addr));
+	return if (device_id_invalid($dbh, $sth_ref, $msg));
 
 	# send message type 8, 0 bytes payload
 	print $new_sock pack("nn", $msg_num{ok}, 1);
@@ -471,17 +462,22 @@ sub fingerprint
 
 sub device_id_invalid
 {
-	my ($dbh, $sth_ref, $device_id, $addr) = @_;
+	my ($dbh, $sth_ref, $device_id) = @_;
+
+	unless ($device_id) {
+		log_print("device id '' invalid\n");
+		return 1;
+	}
 
 	# validate this at least looks like base64
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
-		print "$addr: device id '$device_id' not valid base64\n";
+		log_print("device id '$device_id' not valid base64\n");
 		return 1;
 	}
 
 	# make sure we know about this device id
 	unless ($dbh->selectrow_array($sth_ref->{device_id_exists}, undef, $device_id)) {
-		print "$addr: unknown device '$device_id'\n";
+		log_print("unknown device '$device_id'\n");
 		return 1;
 	}
 
@@ -624,4 +620,23 @@ sub prepare_stmt_handles {
 	$stmt_handles{new_list_item} = $dbh->prepare($sql);
 
 	return \%stmt_handles;
+}
+
+my ($addr, $port) = ('', '');
+sub log_set_peer_host_port {
+	my ($sock) = (@_);
+	($addr, $port) = ($sock->peerhost(), $sock->peerport());
+}
+
+sub log_print {
+	my $ftime = strftime("%F %T", localtime);
+	printf "%s %-15s %-5s> ", $ftime, $addr, $port;
+	# we print potentially unsafe strings here, don't use printf
+	print @_;
+}
+
+sub log_print_bare {
+	my $ftime = strftime("%F %T", localtime);
+	printf "%s> ", $ftime;
+	printf @_;
 }

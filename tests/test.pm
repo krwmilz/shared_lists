@@ -79,7 +79,7 @@ sub recv_msg
 		fail "error unpacking metadata";
 	}
 
-	if ($type < 0 || $type >= @msg_str) {
+	if ($type >= @msg_str) {
 		fail "$0: recv_msg: invalid msg num '$type'";
 	}
 	fail "bad message size not 0 <= $size < 1024" if ($size < 0 || $size > 1023);

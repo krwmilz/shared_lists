@@ -1,6 +1,7 @@
+accepting connections on <ip>:<port> (pid = <digits>)
 new connection (pid = <digits>)
-added new device <digits> <base64>
-<string>
-adding first list member devid = <base64>
-list fingerprint = <base64>
+new_device: success <digits> <base64>
+new_list: <string>
+new_list: adding first member devid = <base64>
+new_list: fingerprint = <base64>
 disconnected!

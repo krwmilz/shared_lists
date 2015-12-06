@@ -1,5 +1,6 @@
+accepting connections on <ip>:<port> (pid = <digits>)
 new connection (pid = <digits>)
-added new device <digits> <base64>
-<base64> adding <base64>
-bad friends number 4033217654bad
+new_device: success <digits> <base64>
+add_friend: <base64> adding <base64>
+add_friend: bad friends number <base64>
 disconnected!

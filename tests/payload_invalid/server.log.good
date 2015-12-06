@@ -1,0 +1,14 @@
+accepting connections on <ip>:<port> (pid = <digits>)
+new connection (pid = <digits>)
+error: 7000 byte message too large
+disconnected!
+new connection (pid = <digits>)
+new_device: received phone number <digits> invalid
+device id <digits> invalid
+device id <digits> invalid
+device id <digits> invalid
+device id <digits> invalid
+device id <digits> invalid
+device id <digits> invalid
+device id <digits> invalid
+disconnected!

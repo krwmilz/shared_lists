@@ -1,4 +1,5 @@
+accepting connections on <ip>:<port> (pid = <digits>)
 new connection (pid = <digits>)
-added new device <digits> <base64>
-list name missing
+new_device: success <digits> <base64>
+new_list: name field missing
 disconnected!

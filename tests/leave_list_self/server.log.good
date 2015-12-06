@@ -1,11 +1,12 @@
+accepting connections on <ip>:<port> (pid = <digits>)
 new connection (pid = <digits>)
-added new device <digits> <base64>
-<string>
-adding first list member devid = <base64>
-list fingerprint = <base64>
-device <base64>
-list <base64>
-device <base64> has been removed from list <base64>
-list <base64> is empty... deleting
-gathering lists for <base64>
+new_device: success <digits> <base64>
+new_list: <string>
+new_list: adding first member devid = <base64>
+new_list: fingerprint = <base64>
+leave_list: device <base64>
+leave_list: list <base64>
+leave_list: device <base64> has been removed from list <base64>
+leave_list: list <base64> is empty... deleting
+list_request: gathering lists for <base64>
 disconnected!

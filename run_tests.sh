@@ -35,13 +35,13 @@ for t in `ls tests/*/Makefile`; do
 	# run test, complain if it failed
 	if ! make -s -C $test_dir test; then
 		fail $test_dir "test failed"
-		kill -INT $server_pid
+		kill $server_pid
 		wait 2>/dev/null
 		continue
 	fi
 
 	# kill the server and wait for it to shut down
-	kill -INT $server_pid
+	kill $server_pid
 	wait 2>/dev/null
 
 	# diff the server's output log

@@ -64,7 +64,9 @@ while (my $new_sock = $listen_sock->accept()) {
 		SSL_cert_file => 'ssl/cert_chain.pem',
 		SSL_key_file => 'ssl/privkey.pem'
 	) or die "failed to ssl handshake: $SSL_ERROR";
-	#log_print(IO::Socket::SSL->get_fingerprint($new_sock) . "\n");
+	my $ssl_ver = $new_sock->get_sslversion();
+	my $ssl_cipher = $new_sock->get_cipher();
+	log_print("ssl started, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
 
 	# each child opens their own database connection
 	my $dbh = DBI->connect(

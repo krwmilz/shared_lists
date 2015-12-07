@@ -32,24 +32,19 @@ for t in `ls tests/*/Makefile`; do
 	perl sl -p $PORT -d $tmp_file > $test_dir/server.log &
 	server_pid=$!
 
-	# run test, complain if failed
+	# run test, complain if it failed
 	if ! make -s -C $test_dir test; then
 		fail $test_dir "test failed"
-		kill $server_pid
-		wait
-		continue
-	fi
-
-	# make sure the server is still running
-	if ! kill -0 $server_pid; then
-		fail $test_dir "test killed server"
+		kill -INT $server_pid
+		wait 2>/dev/null
 		continue
 	fi
 
 	# kill the server and wait for it to shut down
-	kill $server_pid
+	kill -INT $server_pid
 	wait 2>/dev/null
 
+	# diff the server's output log
 	if ! make -s -C $test_dir diff; then
 		fail $test_dir "diff failed"
 		continue
@@ -60,7 +55,7 @@ for t in `ls tests/*/Makefile`; do
 done
 rm -f $tmp_file
 
-printf "\n"
+echo
 if [ $passed -ne 0 ]; then
 	printf "%i %sok%s " $passed $green $reset
 fi

@@ -52,15 +52,20 @@ sub new_socket
 
 sub send_msg
 {
-	my ($sock, $type_str, $contents) = @_;
+	my ($sock, $type_str, $msg) = @_;
 
 	if (! exists $msg_num{$type_str}) {
 		fail "$0: send_msg: invalid msg type '$type_str'";
 	}
 
 	# send away
-	print $sock pack("nn", $msg_num{$type_str}, length($contents));
-	print $sock $contents;
+	my ($n, $msg_len) = (0, length($msg));
+	$n += $sock->syswrite(pack("nn", $msg_num{$type_str}, $msg_len));
+	$n += $sock->syswrite($msg);
+
+	if ($n != ($msg_len + 4)) {
+		fail "$0: send_msg: tried to send $msg_len bytes, but sent $n\n";
+	}
 }
 
 sub recv_msg
@@ -69,7 +74,7 @@ sub recv_msg
 
 	# wait for response
 	my ($metadata, $type, $size);
-	my $bread = read($sock, $metadata, 4);
+	my $bread = $sock->sysread($metadata, 4);
 	unless (defined $bread) {
 		fail "read(): $!\n";
 	}
@@ -83,10 +88,12 @@ sub recv_msg
 	if ($type >= @msg_str) {
 		fail "$0: recv_msg: invalid msg num '$type'";
 	}
-	fail "bad message size not 0 <= $size < 1024" if ($size < 0 || $size > 1023);
+
+	fail "bad message size not $size < 1024" if ($size > 1023);
+	return ($msg_str[$type], undef, 0) if ($size == 0);
 
 	my $data;
-	if ((my $bread = read($sock, $data, $size)) != $size) {
+	if ((my $bread = $sock->sysread($data, $size)) != $size) {
 		fail "read() returned $bread instead of $size!";
 	}
 

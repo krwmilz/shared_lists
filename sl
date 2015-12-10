@@ -85,7 +85,7 @@ while (my $new_sock = $listen_sock->accept()) {
 		last unless (defined $msg_type && defined $msg);
 
 		$dbh->begin_work;
-		$msg_func[$msg_type]->($dbh, $stmt_handles, $new_sock, $msg);
+		my $reply = $msg_func[$msg_type]->($dbh, $stmt_handles, $msg);
 		$dbh->commit;
 
 		if ($@) {
@@ -94,7 +94,12 @@ while (my $new_sock = $listen_sock->accept()) {
 			# but do it in an eval{} as it may also fail
 			eval { $dbh->rollback };
 			# XXX: are database errors fatal to this connection?
+			next;
 		}
+
+		# when message handlers have errors, don't send a reply
+		next unless defined $reply;
+		send_msg($new_sock, $msg_type, $reply);
 	}
 
 	$stmt_handles->{$_} = undef for (keys %$stmt_handles);
@@ -107,16 +112,10 @@ print "got here\n";
 
 # any header parsing errors or message read errors are fatal in this function
 sub recv_msg {
-	my ($new_sock) = (@_);
+	my ($sock) = (@_);
 
-	# message header is 4 bytes
-	my $bread = read $new_sock, my $header, 4;
-	if ($bread == 0) {
-		return undef;
-	} elsif ($bread != 4) {
-		log_print("error: read $bread instead of 4 bytes\n");
-		return undef;
-	}
+	my $header = read_all($sock, 4);
+	return undef unless defined $header;
 
 	my ($msg_type, $msg_size) = unpack("nn", $header);
 	unless (defined $msg_type && defined $msg_size) {
@@ -134,18 +133,41 @@ sub recv_msg {
 		log_print("error: $msg_size byte message too large\n");
 		return undef;
 	}
-
-	# read the actual message
-	$bread = read($new_sock, my $msg, $msg_size);
-	if ($bread != $msg_size) {
-		if ($bread < $msg_size) {
-			log_print("msg read: read $bread instead of $msg_size bytes\n");
-			return undef;
-		}
-		log_print("msg read: read $bread instead of $msg_size bytes\n");
+	elsif ($msg_size == 0) {
+		# don't try and do another read, as a read of size 0 is EOF
+		return ($msg_type, "");
 	}
 
+	my $msg = read_all($sock, $msg_size);
+	return undef unless defined $msg;
+
 	return ($msg_type, $msg);
+}
+
+sub read_all {
+	my ($sock, $bytes_total) = @_;
+
+	my $bytes_read = $sock->sysread(my $data, $bytes_total);
+	if (!defined $bytes_read) {
+		log_print("error: read failed: $!\n");
+		return undef;
+	} elsif ($bytes_read == 0) {
+		# log_print("error: read EOF\n");
+		return undef;
+	} elsif ($bytes_read != $bytes_total) {
+		log_print("error: read $bytes_read instead of $bytes_total bytes\n");
+		return undef;
+	}
+
+	return $data;
+}
+
+sub send_msg {
+	my ($socket, $msg_type, $msg) = (@_);
+
+	my $n = $socket->syswrite(pack("nn", $msg_type, length($msg)));
+	$n += $socket->syswrite($msg);
+	return $n;
 }
 
 sub get_phone_number
@@ -165,7 +187,7 @@ sub get_phone_number
 
 sub msg_new_device
 {
-	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+	my ($dbh, $sth_ref, $msg) = @_;
 	my %sth = %$sth_ref;
 
 	# single field
@@ -185,15 +207,15 @@ sub msg_new_device
 	# XXX: need to check the db to make sure this isn't duplicate
 	my $token = sha256_base64(arc4random_bytes(32));
 
-	print $new_sock pack("nn", $msg_num{new_device}, length($token));
-	print $new_sock $token;
 	$sth{new_device}->execute($token, $ph_num, time);
 	log_print("new_device: success '$ph_num' '" .fingerprint($token). "'\n");
+
+	return $token;
 }
 
 sub msg_new_list
 {
-	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+	my ($dbh, $sth_ref, $msg) = @_;
 	my %sth = %$sth_ref;
 
 	# expecting two fields delimited by null
@@ -221,13 +243,14 @@ sub msg_new_list
 	# XXX: also send back the date and all that stuff
 	my $phone_number = get_phone_number($dbh, $sth_ref, $device_id);
 	my $out = $list_id . "\0" . $list_name . "\0" . $phone_number;
-	print $new_sock pack("nn", $msg_num{new_list}, length($out));
-	print $new_sock $out;
+
+	return $out;
 }
 
 sub msg_new_list_item
 {
     my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+    return undef;
 
     # my ($list_id, $position, $text) = split ("\0", $msg);
     
@@ -245,7 +268,7 @@ sub msg_new_list_item
 
 sub msg_join_list
 {
-    my ($dbh, $sth_ref, $new_sock, $msg, $sth) = @_;
+    my ($dbh, $sth_ref, $msg) = @_;
     my %sth = %$sth_ref;
     my ($device_id, $list_id) = split("\0", $msg);
 
@@ -264,13 +287,12 @@ sub msg_join_list
         log_print("join_list: tried to create a duplicate list member entry for device $device_id and list $list_id\n");
     }
 
-    print $new_sock pack("nn", $msg_num{join_list}, length($list_id));
-    print $new_sock $list_id;
+    return $list_id;
 }
 
 sub msg_leave_list
 {
-    my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+    my ($dbh, $sth_ref, $msg) = @_;
     my %sth = %$sth_ref;
 
     my ($device_id, $list_id) = split("\0", $msg);
@@ -301,14 +323,14 @@ sub msg_leave_list
         $alive = 0;
     }
     my $out = "$list_id\0$alive";
-    print $new_sock pack("nn", $msg_num{leave_list}, length($out));
-    print $new_sock $out;
+
+    return $out;
 }
 
 # update friend map
 sub msg_add_friend
 {
-	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+	my ($dbh, $sth_ref, $msg) = @_;
 	my %sth = %$sth_ref;
 
 	# device id followed by 1 friends number
@@ -343,9 +365,7 @@ sub msg_add_friend
 		}
 	}
 
-	my $out = "$friend";
-	print $new_sock pack("nn", $msg_num{add_friend}, length($out));
-	print $new_sock $out;
+	return $friend;
 }
 
 sub msg_delete_friend
@@ -360,7 +380,7 @@ sub msg_delete_friend
 # get both lists the device is in, and lists it can see
 sub msg_list_request
 {
-	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+	my ($dbh, $sth_ref, $msg) = @_;
 	my %sth = %$sth_ref;
 
 	return if (device_id_invalid($dbh, $sth_ref, $msg));
@@ -414,15 +434,14 @@ sub msg_list_request
 	}
 	$out .= join("\0", @indirect_lists);
 
-	print $new_sock pack("nn", $msg_num{list_request}, length($out));
-	print $new_sock $out;
+	return $out;
 
 	# XXX: add time of last request to list (rate throttling)?
 }
 
 sub msg_list_items
 {
-	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+	my ($dbh, $sth_ref, $msg) = @_;
 	my %sth = %$sth_ref;
 
 	my ($device_id, $list_id) = split("\0", $msg);
@@ -451,19 +470,19 @@ sub msg_list_items
 	}
 
 	my $out = join("\0", @items);
-	print $new_sock pack("nn", $msg_num{list_items}, length($out));
-	print $new_sock $out;
+	return $out;
 }
 
 sub msg_ok
 {
-	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+	my ($dbh, $sth_ref, $msg) = @_;
 
 	return if (device_id_invalid($dbh, $sth_ref, $msg));
 
-	# send message type 8, 0 bytes payload
-	print $new_sock pack("nn", $msg_num{ok}, 1);
-	print $new_sock '!';
+	log_print("ok: device '" . fingerprint($msg) . "' checking in\n");
+
+	# send empty payload back
+	return "";
 }
 
 sub fingerprint

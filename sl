@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-$| = 1;
 use warnings;
 use strict;
 

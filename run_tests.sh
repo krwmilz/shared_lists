@@ -28,7 +28,7 @@ for t in `ls tests/*/Makefile`; do
 	export TEST_DIR="$test_dir"
 	make -s -C $test_dir clean
 
-	perl sl -p $PORT -t > $test_dir/server.log &
+	perl -T sl -p $PORT -t > $test_dir/server.log &
 	server_pid=$!
 
 	# run test, complain if it failed

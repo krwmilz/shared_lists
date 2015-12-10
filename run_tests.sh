@@ -22,14 +22,13 @@ ok() {
 passed=0
 failed=0
 count=0
-tmp_file=`mktemp`
 for t in `ls tests/*/Makefile`; do
 	count=`expr $count + 1`
 	test_dir=`dirname ${t}`
 	export TEST_DIR="$test_dir"
 	make -s -C $test_dir clean
 
-	perl sl -p $PORT -d $tmp_file > $test_dir/server.log &
+	perl sl -p $PORT -t > $test_dir/server.log &
 	server_pid=$!
 
 	# run test, complain if it failed
@@ -53,7 +52,6 @@ for t in `ls tests/*/Makefile`; do
 	make -s -C $test_dir clean
 	ok $test_dir
 done
-rm -f $tmp_file
 
 echo
 if [ $passed -ne 0 ]; then

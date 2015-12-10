@@ -4,6 +4,7 @@ use strict;
 
 use BSD::arc4random qw(:all);
 use DBI;
+use File::Temp;
 use Digest::SHA qw(sha256_base64);
 use Getopt::Std;
 use IO::Socket;
@@ -16,17 +17,15 @@ require "msgs.pl";
 our (%msg_num, @msg_str, @msg_func, $protocol_ver);
 
 my %args;
-getopts("p:d:", \%args);
+getopts("p:t", \%args);
+
+$SIG{TERM} = sub { exit };
 
 my $db_file = "db";
-if ($args{d}) {
-	$db_file = $args{d};
-	unlink $db_file;
-}
-elsif (! -e $db_file) {
-	log_print_bare("creating new database '$db_file'\n");
-}
+# EXLOCK needs to be 0 because SQLite expects it to be
+$db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
+log_print_bare("creating new database '$db_file'\n") unless (-e $db_file);
 create_tables();
 
 my $listen_sock = new IO::Socket::INET (

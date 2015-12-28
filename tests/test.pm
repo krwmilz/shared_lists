@@ -13,9 +13,8 @@ our (%msg_num, @msg_str);
 our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str SHUT_RDWR);
 
 sub fail {
-	my $test_dir = '.';
-	$test_dir = $ENV{TEST_DIR} if ($ENV{TEST_DIR});
-	print "$test_dir/$0: " . shift . "\n";
+	my (undef, $file, $line) = caller;
+	print "$file:$line: " . shift . "\n";
 	exit 1;
 }
 

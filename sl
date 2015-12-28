@@ -2,7 +2,7 @@
 use warnings;
 use strict;
 
-use BSD::arc4random qw(:all);
+use BSD::arc4random qw(arc4random_bytes arc4random_stir);
 use DBI;
 use File::Temp;
 use Digest::SHA qw(sha256_base64);
@@ -52,8 +52,9 @@ while (my $client_sock = $listen_sock->accept()) {
 		next;
 	}
 
-	# in child: close the listening socket and add ip/port logging prefix
+	# in child: on linux we must stir the random pool after fork()'s
 	close $listen_sock;
+	arc4random_stir();
 	log_set_peer_host_port($client_sock);
 	log_print("new connection (pid = '$$')\n");
 

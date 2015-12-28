@@ -10,7 +10,7 @@ use Time::HiRes qw(usleep);
 require "msgs.pl";
 our (%msg_num, @msg_str);
 
-our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str SHUT_RDWR);
+our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str check_status);
 
 sub fail {
 	my (undef, $file, $line) = caller;
@@ -54,55 +54,94 @@ sub new_socket
 	return $sock;
 }
 
-sub send_msg
-{
-	my ($sock, $type_str, $msg) = @_;
+sub send_msg {
+	my ($sock, $msg_type, $msg) = @_;
 
-	if (! exists $msg_num{$type_str}) {
-		fail "$0: send_msg: invalid msg type '$type_str'";
+	if (! exists $msg_num{$msg_type}) {
+		fail "send_msg: invalid message type '$msg_type'";
 	}
 
-	# send away
-	my ($n, $msg_len) = (0, length($msg));
-	$n += $sock->syswrite(pack("nn", $msg_num{$type_str}, $msg_len));
-	$n += $sock->syswrite($msg);
+	my $hdr_length = 4;
+	my $msg_length = length($msg);
 
-	if ($n != ($msg_len + 4)) {
-		fail "$0: send_msg: tried to send $msg_len bytes, but sent $n\n";
-	}
+	send_all($sock, pack("nn", $msg_num{$msg_type}, $msg_length), $hdr_length);
+	send_all($sock, $msg, $msg_length);
+
+	return $hdr_length + $msg_length;
 }
 
-sub recv_msg
-{
-	my ($sock) = @_;
+sub send_all {
+	my ($socket, $bytes, $bytes_total) = @_;
 
-	# wait for response
-	my ($metadata, $type, $size);
-	my $bread = $sock->sysread($metadata, 4);
-	unless (defined $bread) {
-		fail "read(): $!\n";
-	}
-	if ($bread != 4) {
-		fail "read() returned $bread instead of 4!";
-	}
-	unless (($type, $size) = unpack("nn", $metadata)) {
-		fail "error unpacking metadata";
+	my $bytes_written = $socket->syswrite($bytes);
+
+	if (!defined $bytes_written) {
+		fail "send_all: write failed: $!";
+	} elsif ($bytes_written != $bytes_total) {
+		fail "send_all: wrote $bytes_written instead of $bytes_total bytes";
 	}
 
-	if ($type >= @msg_str) {
-		fail "$0: recv_msg: invalid msg num '$type'";
+	return;
+}
+
+sub recv_msg {
+	my ($sock, $expected_type) = @_;
+
+	my $header = read_all($sock, 4);
+	my ($msg_type, $msg_size) = unpack("nn", $header);
+
+	if ($msg_type >= @msg_str) {
+		fail "recv_msg: unknown message type $msg_type";
+	}
+	if ($msg_str[$msg_type] ne $expected_type) {
+		fail "recv_msg: response type mismatch '$msg_str[$msg_type]'" .
+			" != '$expected_type'";
 	}
 
-	fail "bad message size not $size < 1024" if ($size > 1023);
-	return ($msg_str[$type], undef, 0) if ($size == 0);
-
-	my $data;
-	if ((my $bread = $sock->sysread($data, $size)) != $size) {
-		fail "read() returned $bread instead of $size!";
+	if ($msg_size > 4096) {
+		fail "recv_msg: $msg_size byte message too large";
+	}
+	elsif ($msg_size == 0) {
+		# don't try and do another read, as a read of size 0 is EOF
+		return ("", 0);
 	}
 
-	# caller should validate this is the expected type
-	return ($msg_str[$type], $data, $size);
+	my $msg = read_all($sock, $msg_size);
+	return ($msg, $msg_size);
+}
+
+sub read_all {
+	my ($sock, $bytes_total) = @_;
+
+	my $bytes_read = $sock->sysread(my $data, $bytes_total);
+
+	if (!defined $bytes_read) {
+		fail "recv_msg: read failed: $!";
+	} elsif ($bytes_read == 0) {
+		fail "recv_msg: read EOF on socket";
+	} elsif ($bytes_read != $bytes_total) {
+		fail "recv_msg: read $bytes_read instead of $bytes_total bytes";
+	}
+
+	return $data;
+}
+
+sub check_status {
+	my ($msg, $expected_status) = @_;
+
+	my $first_null = index($msg, "\0");
+	if ($first_null == -1) {
+		fail "check_status: no null byte found in response";
+	}
+
+	my $msg_status = substr($msg, 0, $first_null);
+	my $msg_rest = substr($msg, $first_null + 1);
+
+	if ($msg_status ne $expected_status) {
+		fail "unexpected receive status '$msg_status': '$msg_rest'";
+	}
+
+	return $msg_rest;
 }
 
 1;

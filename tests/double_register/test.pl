@@ -4,12 +4,16 @@ use warnings;
 use test;
 
 my $sock = new_socket();
-send_msg($sock, 'new_device', "4038675309");
-my ($type, $response, $length) = recv_msg($sock);
 
-# verify response length is 32 random bytes encoded with base64
-if ($length != 43) {
-	fail "expected response length of 43, got $length";
-}
+my $phnum = '4038675309';
+send_msg($sock, 'new_device', $phnum);
+my ($msg_data) = recv_msg($sock, 'new_device');
 
-send_msg($sock, 'new_device', "4038675309");
+check_status($msg_data, 'ok');
+
+send_msg($sock, 'new_device', $phnum);
+($msg_data) = recv_msg($sock, 'new_device');
+
+my $msg = check_status($msg_data, 'err');
+my $msg_good = 'the sent phone number already exists';
+fail "unexpected error message '$msg', was expecting '$msg_good'" if ($msg ne $msg_good);

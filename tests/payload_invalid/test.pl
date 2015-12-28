@@ -3,10 +3,16 @@ use strict;
 use warnings;
 use test;
 
-# send way too long message
+# send message that's too long
 send_msg(new_socket(), 'new_device', "longstr" x 1000);
 
 # send message size 0 to all message types
 # reuse a socket because we shouldn't get disconnected for this
 my $sock = new_socket();
-send_msg($sock, $_, "") for (@msg_str);
+for (@msg_str) {
+	send_msg($sock, $_, "");
+	my ($msg_data) = recv_msg($sock, $_);
+
+	my $msg = check_status($msg_data, 'err');
+	# print "$msg\n";
+}

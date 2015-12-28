@@ -38,96 +38,83 @@ die "Could not create socket: $!\n" unless $listen_sock;
 my ($laddr, $lport) = ($listen_sock->sockhost(), $listen_sock->sockport());
 log_print_bare("accepting connections on $laddr:$lport (pid = '$$')\n");
 
-while (my $new_sock = $listen_sock->accept()) {
+# every time accept() returns we have a new client trying to connect
+while (my $client_sock = $listen_sock->accept()) {
 
 	# create a child process to handle this client
 	my $pid = fork;
 	if (!defined $pid) {
 		die "error: can't fork: $!\n";
 	} elsif ($pid) {
-		# in parent: go back to listening for more connections
-		close $new_sock;
+		# in parent: close our copy of $client_sock and listen again
+		close $client_sock;
 		next;
 	}
 
+	# in child: close the listening socket and add ip/port logging prefix
 	close $listen_sock;
-	log_set_peer_host_port($new_sock);
+	log_set_peer_host_port($client_sock);
 	log_print("new connection (pid = '$$')\n");
 
-	# upgrade connection to SSL
-	IO::Socket::SSL->start_SSL($new_sock,
+	# unconditionally upgrade connection to SSL
+	IO::Socket::SSL->start_SSL($client_sock,
 		SSL_server => 1,
 		SSL_cert_file => 'ssl/cert_chain.pem',
 		SSL_key_file => 'ssl/privkey.pem'
-	) or die "failed to ssl handshake: $SSL_ERROR";
-	my $ssl_ver = $new_sock->get_sslversion();
-	my $ssl_cipher = $new_sock->get_cipher();
+	) or die "failed ssl handshake: $SSL_ERROR";
+	my $ssl_ver = $client_sock->get_sslversion();
+	my $ssl_cipher = $client_sock->get_cipher();
 	log_print("ssl started, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
 
-	# each child opens their own database connection
+	# open a new database connection
 	my $dbh = DBI->connect(
 		"dbi:SQLite:dbname=$db_file",
 		"", "",
 		{ RaiseError => 1 }
 	) or die $DBI::errstr;
 
+	# foreign keys are off by default, autocommit is needed for transactions
 	$dbh->do("PRAGMA foreign_keys = ON");
 	$dbh->{AutoCommit} = 1;
-	my $stmt_handles = prepare_stmt_handles($dbh);
+	my $sths = prepare_stmt_handles($dbh);
 
-	# main message receiving loop
 	while (1) {
-		my ($msg_type, $msg) = recv_msg($new_sock);
-		last unless (defined $msg_type && defined $msg);
+		my ($msg_type, $msg) = recv_msg($client_sock);
 
 		$dbh->begin_work;
-		my $reply = $msg_func[$msg_type]->($dbh, $stmt_handles, $msg);
+		my $reply = $msg_func[$msg_type]->($dbh, $sths, $msg);
 		$dbh->commit;
 
 		if ($@) {
-			warn "Transaction aborted because $@";
 			# now rollback to undo the incomplete changes
 			# but do it in an eval{} as it may also fail
 			eval { $dbh->rollback };
-			# XXX: are database errors fatal to this connection?
-			next;
+
+			log_print("$msg_str[$msg_type]: discarding reply '$reply'\n");
+			log_print("$msg_str[$msg_type]: db transaction aborted: $@\n");
+			$reply = "err\0database transaction aborted";
 		}
 
-		# when message handlers have errors, don't send a reply
-		next unless defined $reply;
-		send_msg($new_sock, $msg_type, $reply);
+		send_msg($client_sock, $msg_type, $reply);
 	}
-
-	$stmt_handles->{$_} = undef for (keys %$stmt_handles);
-	$dbh->disconnect();
-
-	log_print("disconnected!\n");
-	exit 0;
 }
-print "got here\n";
+print ">>>>>> got here\n";
 
-# any header parsing errors or message read errors are fatal in this function
+# any header parsing errors or message read errors are fatal
 sub recv_msg {
-	my ($sock) = (@_);
+	my ($sock) = @_;
 
 	my $header = read_all($sock, 4);
-	return undef unless defined $header;
-
 	my ($msg_type, $msg_size) = unpack("nn", $header);
-	unless (defined $msg_type && defined $msg_size) {
-		log_print("error: unpacking message type or size\n");
-		return undef;
-	}
 
 	if ($msg_type >= @msg_str) {
-		my $bad_msg = sprintf "0x%x", $msg_type;
-		log_print("error: unknown message type $bad_msg\n");
-		return undef;
+		log_print("error: unknown message type $msg_type\n");
+		exit 0;
 	}
 
 	if ($msg_size > 4096) {
 		log_print("error: $msg_size byte message too large\n");
-		return undef;
+		exit 0;
 	}
 	elsif ($msg_size == 0) {
 		# don't try and do another read, as a read of size 0 is EOF
@@ -135,8 +122,6 @@ sub recv_msg {
 	}
 
 	my $msg = read_all($sock, $msg_size);
-	return undef unless defined $msg;
-
 	return ($msg_type, $msg);
 }
 
@@ -144,41 +129,47 @@ sub read_all {
 	my ($sock, $bytes_total) = @_;
 
 	my $bytes_read = $sock->sysread(my $data, $bytes_total);
+
 	if (!defined $bytes_read) {
 		log_print("error: read failed: $!\n");
-		return undef;
+		exit 0;
 	} elsif ($bytes_read == 0) {
-		# log_print("error: read EOF\n");
-		return undef;
+		log_print("disconnected!\n");
+		exit 0;
 	} elsif ($bytes_read != $bytes_total) {
 		log_print("error: read $bytes_read instead of $bytes_total bytes\n");
-		return undef;
+		exit 0;
 	}
 
 	return $data;
 }
 
 sub send_msg {
-	my ($socket, $msg_type, $msg) = (@_);
+	my ($sock, $msg_type, $msg) = @_;
 
-	my $n = $socket->syswrite(pack("nn", $msg_type, length($msg)));
-	$n += $socket->syswrite($msg);
-	return $n;
+	my $hdr_length = 4;
+	my $msg_length = length($msg);
+
+	send_all($sock, pack("nn", $msg_type, $msg_length), $hdr_length);
+	send_all($sock, $msg, $msg_length);
+
+	return $hdr_length + $msg_length;
 }
 
-sub get_phone_number
-{
-	my ($dbh, $sth, $device_id) = @_;
+sub send_all {
+	my ($socket, $bytes, $bytes_total) = @_;
 
-	#print "info: get_phone_number() unimplemented, returning device id!\n";
-	#return $device_id;
-	my (undef, $ph_num) = $dbh->selectrow_array($sth->{device_id_exists}, undef, $device_id);
-	unless (defined $ph_num && looks_like_number($ph_num)) {
-		log_print("phone number lookup for $device_id failed!\n");
-		return "000";
+	my $bytes_written = $socket->syswrite($bytes);
+
+	if (!defined $bytes_written) {
+		log_print("error: write failed: $!\n");
+		exit 0;
+	} elsif ($bytes_written != $bytes_total) {
+		log_print("error: wrote $bytes_written instead of $bytes_total bytes\n");
+		exit 0;
 	}
 
-	return $ph_num;
+	return;
 }
 
 sub msg_new_device
@@ -189,13 +180,13 @@ sub msg_new_device
 	# single field
 	my $ph_num = $msg;
 
-	if (!looks_like_number($ph_num)) {
-		log_print("new_device: received phone number '$ph_num' invalid\n");
-		return;
+	unless (looks_like_number($ph_num)) {
+		log_print("new_device: phone number '$ph_num' invalid\n");
+		return "err\0the sent phone number is not a number";
 	}
 	if ($dbh->selectrow_array($sth{ph_num_exists}, undef, $ph_num)) {
 		log_print("new_device: phone number '$ph_num' already exists\n");
-		return;
+		return "err\0the sent phone number already exists";
 	}
 
 	# make a new device id, the client will supply this on all
@@ -206,7 +197,7 @@ sub msg_new_device
 	$sth{new_device}->execute($token, $ph_num, time);
 	log_print("new_device: success '$ph_num' '" .fingerprint($token). "'\n");
 
-	return $token;
+	return "ok\0$token";
 }
 
 sub msg_new_list
@@ -217,14 +208,16 @@ sub msg_new_list
 	# expecting two fields delimited by null
 	my ($device_id, $list_name) = split("\0", $msg);
 
-	# validate input
-	return if (device_id_invalid($dbh, $sth_ref, $device_id));
-	unless ($list_name) {
-		log_print("new_list: name field missing\n");
-		return;
+	if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
+		return "err\0$err";
 	}
-	my $devid_fp = fingerprint($device_id);
 
+	unless ($list_name) {
+		log_print("new_list: error, no name\n");
+		return "err\0no list name was given";
+	}
+
+	my $devid_fp = fingerprint($device_id);
 	log_print("new_list: '$list_name'\n");
 	log_print("new_list: adding first member devid = '$devid_fp'\n");
 
@@ -238,15 +231,19 @@ sub msg_new_list
 
 	# XXX: also send back the date and all that stuff
 	my $phone_number = get_phone_number($dbh, $sth_ref, $device_id);
-	my $out = $list_id . "\0" . $list_name . "\0" . $phone_number;
+	my $response = "$list_id\0$list_name\0$phone_number";
 
-	return $out;
+	return "ok\0$response";
 }
 
 sub msg_new_list_item
 {
-    my ($dbh, $sth_ref, $new_sock, $msg) = @_;
-    return undef;
+    my ($dbh, $sth_ref, $msg) = @_;
+
+    if (my $err = device_id_invalid($dbh, $sth_ref, $msg)) {
+	    return "err\0$err";
+    }
+    return "err\0unimplemented";
 
     # my ($list_id, $position, $text) = split ("\0", $msg);
     
@@ -268,7 +265,9 @@ sub msg_join_list
     my %sth = %$sth_ref;
     my ($device_id, $list_id) = split("\0", $msg);
 
-    return if (device_id_invalid($dbh, $sth_ref, $device_id));
+    if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
+	    return "err\0$err";
+    }
 
     log_print("join_list: device '$device_id'\n");
     log_print("join_list: list '$list_id'\n");
@@ -283,7 +282,7 @@ sub msg_join_list
         log_print("join_list: tried to create a duplicate list member entry for device $device_id and list $list_id\n");
     }
 
-    return $list_id;
+    return "ok\0$list_id";
 }
 
 sub msg_leave_list
@@ -293,8 +292,10 @@ sub msg_leave_list
 
     my ($device_id, $list_id) = split("\0", $msg);
 
-    return if (device_id_invalid($dbh, $sth_ref, $device_id));
-    
+    if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
+	    return "err\0$err";
+    }
+
     log_print("leave_list: device '$device_id'\n");
     log_print("leave_list: list '$list_id'\n");
 
@@ -320,7 +321,7 @@ sub msg_leave_list
     }
     my $out = "$list_id\0$alive";
 
-    return $out;
+    return "ok\0$out";
 }
 
 # update friend map
@@ -331,14 +332,16 @@ sub msg_add_friend
 
 	# device id followed by 1 friends number
 	my ($device_id, $friend) = split("\0", $msg);
+	if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
+		return "err\0$err";
+	}
 
-	return if (device_id_invalid($dbh, $sth_ref, $device_id));
 	my $devid_fp = fingerprint($device_id);
 	log_print("add_friend: '$devid_fp' adding '$friend'\n");
 
 	unless (looks_like_number($friend)) {
 		log_print("add_friend: bad friends number '$friend'\n");
-		return;
+		return "err\0friends phone number is not a valid phone number";
 	}
 
 	# XXX: check they're not already a friend before doing this
@@ -361,12 +364,13 @@ sub msg_add_friend
 		}
 	}
 
-	return $friend;
+	return "ok\0$friend";
 }
 
 sub msg_delete_friend
 {
-	my ($dbh, $sth_ref, $new_sock, $msg) = @_;
+	my ($dbh, $sth_ref, $msg) = @_;
+	return "err\0unimplemented";
 
 	# delete all friends, remove mutual friend references
 	# $friends_map_delete_sth->execute($device_id);
@@ -379,7 +383,9 @@ sub msg_list_request
 	my ($dbh, $sth_ref, $msg) = @_;
 	my %sth = %$sth_ref;
 
-	return if (device_id_invalid($dbh, $sth_ref, $msg));
+	if (my $err = device_id_invalid($dbh, $sth_ref, $msg)) {
+		return "err\0$err";
+	}
 
 	my $devid_fp = fingerprint($msg);
 	log_print("list_request: gathering lists for '$devid_fp'\n");
@@ -430,7 +436,7 @@ sub msg_list_request
 	}
 	$out .= join("\0", @indirect_lists);
 
-	return $out;
+	return "ok\0$out";
 
 	# XXX: add time of last request to list (rate throttling)?
 }
@@ -441,17 +447,18 @@ sub msg_list_items
 	my %sth = %$sth_ref;
 
 	my ($device_id, $list_id) = split("\0", $msg);
-
-	return if (device_id_invalid($dbh, $sth_ref, $device_id));
+	if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
+		return "err\0$err";
+	}
 
 	if (!$list_id) {
 		log_print("list_items: received null list id");
-		return;
+		return "err\0the sent list id was empty";
 	}
 	unless ($dbh->selectrow_array($sth{check_list_member}, undef, $list_id, $device_id)) {
 		# XXX: table list_members list_id's should always exist in table lists
 		log_print("list_items: $device_id not a member of $list_id\n");
-		return;
+		return "err\0the sent device id is not a member of the list";
 	}
 	log_print("list_items: $device_id request items for $list_id\n");
 
@@ -466,19 +473,18 @@ sub msg_list_items
 	}
 
 	my $out = join("\0", @items);
-	return $out;
+	return "ok\0$out";
 }
 
 sub msg_ok
 {
 	my ($dbh, $sth_ref, $msg) = @_;
-
-	return if (device_id_invalid($dbh, $sth_ref, $msg));
+	if (my $err = device_id_invalid($dbh, $sth_ref, $msg)) {
+		return "err\0$err";
+	}
 
 	log_print("ok: device '" . fingerprint($msg) . "' checking in\n");
-
-	# send empty payload back
-	return "";
+	return "ok\0";
 }
 
 sub fingerprint
@@ -486,28 +492,43 @@ sub fingerprint
 	return substr shift, 0, 8;
 }
 
+sub get_phone_number
+{
+	my ($dbh, $sth, $device_id) = @_;
+
+	#print "info: get_phone_number() unimplemented, returning device id!\n";
+	#return $device_id;
+	my (undef, $ph_num) = $dbh->selectrow_array($sth->{device_id_exists}, undef, $device_id);
+	unless (defined $ph_num && looks_like_number($ph_num)) {
+		log_print("phone number lookup for $device_id failed!\n");
+		return "000";
+	}
+
+	return $ph_num;
+}
+
 sub device_id_invalid
 {
 	my ($dbh, $sth_ref, $device_id) = @_;
 
 	unless ($device_id) {
-		log_print("device id '' invalid\n");
-		return 1;
+		log_print("device_id: got empty device id\n");
+		return "the client sent an empty device id";
 	}
 
 	# validate this at least looks like base64
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
-		log_print("device id '$device_id' not valid base64\n");
-		return 1;
+		log_print("device_id: '$device_id' not base64\n");
+		return "the client sent a device id that wasn't base64";
 	}
 
 	# make sure we know about this device id
 	unless ($dbh->selectrow_array($sth_ref->{device_id_exists}, undef, $device_id)) {
-		log_print("unknown device '$device_id'\n");
-		return 1;
+		log_print("device_id: unknown device '$device_id'\n");
+		return "the client sent an unknown device id";
 	}
 
-	return 0;
+	return;
 }
 
 sub create_tables {

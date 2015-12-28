@@ -9,30 +9,37 @@ use test;
 # - device 1 creates a new list
 # - then verify that device 2 can see it
 
-my $sock_1 = new_socket();
-my $phnum_1 ="4038675309";
-send_msg($sock_1, 'new_device', $phnum_1);
-my (undef, $device_id1, undef) = recv_msg($sock_1);
+my ($sock_1, $sock_2) = (new_socket(), new_socket());
+my ($phnum_1, $phnum_2) = ("4038675309", "4037082094");
 
-my $sock_2 = new_socket();
-my $phnum_2 = "4037082094";
+send_msg($sock_1, 'new_device', $phnum_1);
+my ($msg_1) = recv_msg($sock_1, 'new_device');
+
 send_msg($sock_2, 'new_device', $phnum_2);
-my (undef, $device_id2, undef) = recv_msg($sock_2);
+my ($msg_2) = recv_msg($sock_2, 'new_device');
+
+my $device_id1 = check_status($msg_1, 'ok');
+my $device_id2 = check_status($msg_2, 'ok');
 
 # the mutual friend relationship, computer style
 send_msg($sock_1, 'add_friend', "$device_id1\0$phnum_2");
-recv_msg($sock_1);
+recv_msg($sock_1, 'add_friend');
 send_msg($sock_2, 'add_friend', "$device_id2\0$phnum_1");
-recv_msg($sock_2);
+recv_msg($sock_2, 'add_friend');
 
 my $list_name = "this is a new list";
+
 send_msg($sock_1, 'new_list', "$device_id1\0$list_name");
-my (undef, $list_data, undef) = recv_msg($sock_1);
+my ($msg_data) = recv_msg($sock_1, 'new_list');
+
+my $list_data = check_status($msg_data, 'ok');
 my ($list_id) = split("\0", $list_data);
 
 # make sure socket 2 can see socket 1's list
 send_msg($sock_2, 'list_request', $device_id2);
-my (undef, $request_data, $request_len) = recv_msg($sock_2);
+($msg_data) = recv_msg($sock_2, 'list_request');
+
+my $request_data = check_status($msg_data, 'ok');
 my (undef, $other) = split("\0\0", $request_data);
 
 my $num_lists = 0;

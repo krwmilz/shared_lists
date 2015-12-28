@@ -7,11 +7,9 @@ use DBI;
 use File::Temp;
 use Digest::SHA qw(sha256_base64);
 use Getopt::Std;
-use IO::Socket;
 use IO::Socket::SSL;
 use POSIX;
 use Scalar::Util qw(looks_like_number);
-use Socket;
 
 require "msgs.pl";
 our (%msg_num, @msg_str, @msg_func, $protocol_ver);

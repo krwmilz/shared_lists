@@ -26,8 +26,8 @@ sub new_socket
 	}
 
 	my $sock = undef;
-	my $i = 0;
-	while (! $sock) {
+	my $timeout = time + 5;
+	while (1) {
 		$sock = new IO::Socket::SSL->new(
 			PeerHost => 'localhost',
 			PeerPort => $ENV{PORT},
@@ -37,13 +37,18 @@ sub new_socket
 		);
 
 		if ($!{ECONNREFUSED}) {
-			# print "$i: connection refused, retrying\n";
-			$i++;
-			usleep(50 * 1000);
+			if (time > $timeout) {
+				fail "server not ready after 5 seconds";
+			}
+			usleep(100 * 1000);
+			next;
 		}
-		else {
-			die "error=$!, ssl_error=$SSL_ERROR\n" unless $sock;
-		}
+
+		last;
+	}
+
+	unless ($sock) {
+		die "failed connect or ssl handshake: $!,$SSL_ERROR";
 	}
 
 	return $sock;

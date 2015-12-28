@@ -650,7 +650,7 @@ sub prepare_stmt_handles {
 
 my ($addr, $port) = ('', '');
 sub log_set_peer_host_port {
-	my ($sock) = (@_);
+	my ($sock) = @_;
 	($addr, $port) = ($sock->peerhost(), $sock->peerport());
 }
 

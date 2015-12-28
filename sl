@@ -18,6 +18,7 @@ my %args;
 getopts("p:t", \%args);
 
 $SIG{TERM} = sub { exit };
+$SIG{INT} = sub { exit };
 
 my $db_file = "db";
 # EXLOCK needs to be 0 because SQLite expects it to be

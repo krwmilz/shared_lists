@@ -32,7 +32,6 @@ print_table() {
 	echo "${4}" >> ${1}
 }
 
-# ios
 gen_objc() {
 	cat << EOF > $objc_path
 /* ${generated_at} */"
@@ -43,7 +42,6 @@ EOF
 	print_table $objc_path "enum msg_types {" "\$msg = \$i," "};"
 }
 
-# android
 gen_java() {
 	cat << EOF > $java_path
 /* ${generated_at} */
@@ -54,7 +52,6 @@ EOF
 	print_table $java_path "public enum MsgTypes {" "\$msg\t(\$i)," "};"
 }
 
-# server and test suite
 gen_perl() {
 	cat << EOF > $perl_path
 #!/usr/bin/perl

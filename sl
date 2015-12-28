@@ -179,8 +179,7 @@ sub msg_new_device
 	my ($dbh, $sth_ref, $msg) = @_;
 	my %sth = %$sth_ref;
 
-	# single field
-	my $ph_num = $msg;
+	my ($ph_num, $os) = unpack("Z*Z*", $msg);
 
 	unless (looks_like_number($ph_num)) {
 		log_print("new_device: phone number '$ph_num' invalid\n");
@@ -190,14 +189,23 @@ sub msg_new_device
 		log_print("new_device: phone number '$ph_num' already exists\n");
 		return "err\0the sent phone number already exists";
 	}
+	unless (defined $os) {
+		log_print("new_device: no operating system field sent\n");
+		return "err\0no operating system field sent";
+	}
+	if ($os ne 'unix' && $os ne 'android' && $os ne 'ios') {
+		log_print("new_device: unknown operating system '$os'\n");
+		return "err\0operating system not supported";
+	}
 
 	# make a new device id, the client will supply this on all
 	# further communication
 	# XXX: need to check the db to make sure this isn't duplicate
 	my $token = sha256_base64(arc4random_bytes(32));
 
-	$sth{new_device}->execute($token, $ph_num, time);
-	log_print("new_device: success '$ph_num' '" .fingerprint($token). "'\n");
+	$sth{new_device}->execute($token, $ph_num, $os, time);
+	my $fp = fingerprint($token);
+	log_print("new_device: success, '$ph_num':'$fp' os '$os'\n");
 
 	return "ok\0$token";
 }
@@ -576,7 +584,8 @@ sub create_tables {
 	$db_handle->do(qq{create table if not exists devices(
 		device_id text not null primary key,
 		phone_num int not null,
-		type text,
+		os text,
+		push_token text,
 		first_seen int not null)
 	}) or die $DBI::errstr;
 
@@ -635,7 +644,7 @@ sub prepare_stmt_handles {
 	$stmt_handles{delete_list} = $dbh->prepare($sql);
 
 	# devices table queries
-	$sql = qq{insert into devices (device_id, phone_num, first_seen) values (?, ?, ?)};
+	$sql = qq{insert into devices (device_id, phone_num, os, first_seen) values (?, ?, ?, ?)};
 	$stmt_handles{new_device} = $dbh->prepare($sql);
 
 	$sql = qq{select * from devices where phone_num = ?};

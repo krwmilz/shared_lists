@@ -11,7 +11,7 @@ use test;
 
 my $sock = new_socket();
 my $phnum = "4038675309";
-send_msg($sock, 'new_device', $phnum);
+send_msg($sock, 'new_device', "$phnum\0unix");
 my ($payload, $length) = recv_msg($sock, 'new_device');
 
 my $device_id = check_status($payload, 'ok');

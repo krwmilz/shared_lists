@@ -12,7 +12,7 @@ use test;
 my $phone_num = "4038675309";
 my $sock = new_socket();
 
-send_msg($sock, 'new_device', $phone_num);
+send_msg($sock, 'new_device', "$phone_num\0unix");
 my ($msg_data) = recv_msg($sock, 'new_device');
 
 my $device_id = check_status($msg_data, 'ok');

@@ -7,10 +7,10 @@ my ($sock_1, $sock_2) = (new_socket(), new_socket());
 my ($phnum_1, $phnum_2) = ("4038675309", "4037082094");
 
 # create device 1 and 2
-send_msg($sock_1, 'new_device', $phnum_1);
+send_msg($sock_1, 'new_device', "$phnum_1\0unix");
 my ($msg_data1) = recv_msg($sock_1, 'new_device');
 
-send_msg($sock_2, 'new_device', $phnum_2);
+send_msg($sock_2, 'new_device', "$phnum_2\0unix");
 my ($msg_data2) = recv_msg($sock_2, 'new_device');
 
 my $device_id1 = check_status($msg_data1, 'ok');

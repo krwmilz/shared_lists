@@ -64,7 +64,7 @@ while (my $client_sock = $listen_sock->accept()) {
 	) or die "failed ssl handshake: $SSL_ERROR";
 	my $ssl_ver = $client_sock->get_sslversion();
 	my $ssl_cipher = $client_sock->get_cipher();
-	log_print("ssl started, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
+	log_print("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
 
 	# open a new database connection
 	my $dbh = DBI->connect(

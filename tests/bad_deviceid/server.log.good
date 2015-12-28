@@ -1,6 +1,6 @@
 accepting connections on <ip>:<port> (pid = <digits>)
 new connection (pid = <digits>)
-ssl started, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
+ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
 device_id: unknown device <base64>
 device_id: '&^%_invalid_base64' not base64
 device_id: unknown device <base64>

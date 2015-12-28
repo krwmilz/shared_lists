@@ -1,15 +1,18 @@
 #!/bin/sh
 
 protocol_version=0
-msg_types="new_device
-	new_list
+msg_types="
+	new_device
 	add_friend
-	list_request
+	new_list
 	join_list
 	leave_list
+	list_get
+	list_get_other
 	list_items
 	new_list_item
-	ok"
+	ok
+"
 
 objc_path="ios/shlist/MsgTypes.h"
 perl_path="msgs.pl"

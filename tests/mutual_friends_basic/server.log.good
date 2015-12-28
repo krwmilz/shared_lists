@@ -6,9 +6,9 @@ add_friend: <base64> adding <digits>
 add_friend: added friend is a member
 add_friend: friends device id is <base64>
 add_friend: found mutual friendship
-list_request: gathering lists for <base64>
-list_request: found mutual friend <base64>
-list_request: found mutual friends list <string>
+list_get_other: gathering lists for <base64>
+list_get_other: found mutual friend <base64>
+list_get_other: found list <string>
 disconnected!
 new connection (pid = <digits>)
 ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'

@@ -28,16 +28,13 @@ for my $name ("new list 1", "new list 2", "new list 3") {
 	$list_id_map{$name} = $id;
 }
 
-send_msg($sock, 'list_request', $device_id);
-($msg_data) = recv_msg($sock, 'list_request');
+send_msg($sock, 'list_get', $device_id);
+($msg_data) = recv_msg($sock, 'list_get');
 
-my $list_data = check_status($msg_data, 'ok');
-my ($direct, $indirect) = split("\0\0", $list_data);
-fail "got indirect lists, expected none" if (length($indirect) != 0);
-
+my $lists = check_status($msg_data, 'ok');
 my $num_lists = 0;
-for my $l (split("\0", $direct)) {
-	my ($name, $id, @members) = split(":", $l);
+for my $l (split("\n", $lists)) {
+	my ($id, $name, $num_items, @members) = split("\0", $l);
 	unless ($name && $id && @members) {
 		fail "response didn't send at least 3 fields";
 	}

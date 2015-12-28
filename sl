@@ -379,8 +379,8 @@ sub msg_delete_friend
 	# $mutual_friends_delete_sth->execute($device_id, $device_id);
 }
 
-# get both lists the device is in, and lists it can see
-sub msg_list_request
+# get lists that the device id is participating in
+sub msg_list_get
 {
 	my ($dbh, $sth_ref, $msg) = @_;
 	my %sth = %$sth_ref;
@@ -390,57 +390,81 @@ sub msg_list_request
 	}
 
 	my $devid_fp = fingerprint($msg);
-	log_print("list_request: gathering lists for '$devid_fp'\n");
+	log_print("list_get: gathering lists for '$devid_fp'\n");
 
-	my @direct_lists;
-    my @direct_list_ids;
-	# first get all lists this device id is a direct member of
+	my @lists;
 	$sth{get_lists}->execute($msg);
 	while (my ($list_id, $list_name) = $sth{get_lists}->fetchrow_array()) {
-		log_print("list_request: found list '$list_name' '$list_id'\n");
 
-		# get all members of this list
-		my @list_members;
+		my $list_fp = fingerprint($list_id);
+		log_print("list_get: found list '$list_name' '$list_fp'\n");
+
+		# find all members of this list
+		my @members;
 		$sth{get_list_members}->execute($list_id);
-		while (my ($member_device_id) = $sth{get_list_members}->fetchrow_array()) {
-			push @list_members, get_phone_number($dbh, $sth_ref, $member_device_id);
-			log_print("list_request: direct list: found member '$member_device_id'\n");
+		while (my ($device_id) = $sth{get_list_members}->fetchrow_array()) {
+			push @members, get_phone_number($dbh, $sth_ref, $device_id);
 		}
-        push @direct_list_ids, $list_id;
-		push @direct_lists, "$list_name:$list_id:" . join(":", @list_members);
+		my $members = join("\0", @members);
+		log_print("list_get: list has ". @members ." members\n");
+
+		# find how many items are complete in this list
+		my $num_items = 0;
+		$sth{get_list_items}->execute($list_id);
+		while (my @results = $sth{get_list_items}->fetchrow_array()) {
+			my (undef, $item_name, $item_status) = @results;
+			# XXX: actually check the item status
+			$num_items++;
+		}
+		log_print("list_get: list has $num_items items\n");
+
+		push @lists, "$list_id\0$list_name\0$num_items\0$members";
 	}
-	my $out .= join("\0", @direct_lists);
 
-    # separator between direct/indirect lists
-	$out .= "\0\0";
+	return "ok\0" . join("\n", @lists);
+}
 
-	my @indirect_lists;
+# get friends lists that the device id isn't participating in
+sub msg_list_get_other {
+	my ($dbh, $sth_ref, $msg) = @_;
+	my %sth = %$sth_ref;
+
+	if (my $err = device_id_invalid($dbh, $sth_ref, $msg)) {
+		return "err\0$err";
+	}
+	my $devid_fp = fingerprint($msg);
+	log_print("list_get_other: gathering lists for '$devid_fp'\n");
+
+	my @list_ids;
+	$sth{get_lists}->execute($msg);
+	while (my ($list_id) = $sth{get_lists}->fetchrow_array()) {
+		push @list_ids, $list_id;
+	}
+
+	my @other_lists;
 	# now calculate which lists this device id should see
 	$sth{mutual_friend_select}->execute($msg);
-	while (my ($friend) = $sth{mutual_friend_select}->fetchrow_array()) {
-		log_print("list_request: found mutual friend '$friend'\n");
+	while (my ($friend_id) = $sth{mutual_friend_select}->fetchrow_array()) {
 
-		# get all of my friends lists
-		$sth{get_lists}->execute($friend);
+		my $friend_fp = fingerprint($friend_id);
+		log_print("list_get_other: found mutual friend '$friend_fp'\n");
 
 		# we can't send device id's back to the client
-		my $friend_ph_num = get_phone_number($dbh, $sth_ref, $friend);
+		my $friend_phnum = get_phone_number($dbh, $sth_ref, $friend_id);
 
-		while (my ($list_id, $list_name) =
-			$sth{get_lists}->fetchrow_array()) {
-            if (grep {$_ eq $list_id} @direct_list_ids) {
-                next;
-            }
-		    log_print("list_request: found mutual friends list '$list_name'\n");
+		# find all of my friends lists
+		$sth{get_lists}->execute($friend_id);
+		while (my ($id, $name) = $sth{get_lists}->fetchrow_array()) {
 
-		    push @indirect_lists, "$list_name:$list_id:$friend_ph_num"
+			# filter out lists this device id is already in
+			next if (grep {$_ eq $id} @list_ids);
+
+			log_print("list_get_other: found list '$name'\n");
+			push @other_lists, "$id\0$name\0$friend_phnum";
 		}
 	}
-	$out .= join("\0", @indirect_lists);
 
-	return "ok\0$out";
-
-	# XXX: add time of last request to list (rate throttling)?
+	return "ok\0" . join("\n", @other_lists);
 }
 
 sub msg_list_items
@@ -583,11 +607,11 @@ sub create_tables {
 	$db_handle->do(qq{create table if not exists list_data(
 		list_id int not null,
 		name text not null,
-		quantity non null,
 		status int not null default 0,
-		owner text not null,
+		quantity,
+		owner text,
 		last_updated int not null,
-		primary key(list_id, name, owner),
+		primary key(list_id, name),
 		foreign key(list_id) references lists(list_id),
 		foreign key(owner) references devices(device_id))
 	}) or die $DBI::errstr;

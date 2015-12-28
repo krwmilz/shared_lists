@@ -17,4 +17,6 @@ device_id: unknown device <base64>
 device_id: '&^%_invalid_base64' not base64
 device_id: unknown device <base64>
 device_id: '&^%_invalid_base64' not base64
+device_id: unknown device <base64>
+device_id: '&^%_invalid_base64' not base64
 disconnected!

@@ -36,16 +36,14 @@ my $list_data = check_status($msg_data, 'ok');
 my ($list_id) = split("\0", $list_data);
 
 # make sure socket 2 can see socket 1's list
-send_msg($sock_2, 'list_request', $device_id2);
-($msg_data) = recv_msg($sock_2, 'list_request');
+send_msg($sock_2, 'list_get_other', $device_id2);
+($msg_data) = recv_msg($sock_2, 'list_get_other');
 
-my $request_data = check_status($msg_data, 'ok');
-my (undef, $other) = split("\0\0", $request_data);
-
+my $other_lists = check_status($msg_data, 'ok');
 my $num_lists = 0;
-for my $l (split("\0", $other)) {
-	my ($name, $id, @members) = split(":", $l);
-	unless ($name && $id && @members) {
+for my $l (split("\n", $other_lists)) {
+	my ($id, $name, @members) = split("\0", $l);
+	unless ($id && $name && @members) {
 		fail "response didn't send at least 3 fields";
 	}
 	if ($list_id ne $id) {

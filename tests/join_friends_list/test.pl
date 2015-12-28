@@ -38,15 +38,12 @@ send_msg($sock_2, 'join_list', "$device_id2\0$list_id");
 check_status($msg_data, 'ok');
 
 # device 2 requests its lists to make sure its committed to the list
-send_msg($sock_2, 'list_request', $device_id2);
-($msg_data) = recv_msg($sock_2, 'list_request');
+send_msg($sock_2, 'list_get', $device_id2);
+($msg_data) = recv_msg($sock_2, 'list_get');
 
-my $request_data = check_status($msg_data, 'ok');
-my ($mine, $other) = split("\0\0", $request_data);
+my $list = check_status($msg_data, 'ok');
+my ($id, $name, $num_items, @members) = split("\0", $list);
 
-fail "unexpected other list '$other'" if ($other ne '');
-my ($name, $request_id, @members) = split(":", $mine);
-
-fail "request list id mismatch: '$request_id' ne '$list_id'" if ($request_id ne $list_id);
+fail "request list id mismatch: '$id' ne '$list_id'" if ($id ne $list_id);
 fail "unexpected name '$name', expected '$list_name'" if ($name ne $list_name);
 fail "expected 2 list members, got ". @members if (@members != 2);

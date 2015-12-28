@@ -31,9 +31,8 @@ my ($leave_id) = split("\0", $msg);
 fail "got leave data '$leave_id', expected $list_id" if ($leave_id ne $list_id);
 
 # verify we don't get this list back when requesting all lists
-send_msg($sock, 'list_request', $device_id);
-($msg_data) = recv_msg($sock, 'list_request');
+send_msg($sock, 'list_get', $device_id);
+($msg_data) = recv_msg($sock, 'list_get');
 
-my $request_data = check_status($msg_data, 'ok');
-my ($direct, $other) = split("\0\0", $request_data);
-fail "expected empty, got other" if ($direct ne "" || $other ne "");
+my $lists = check_status($msg_data, 'ok');
+fail "expected no lists" if ($lists ne "");

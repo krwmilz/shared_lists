@@ -11,11 +11,14 @@ new_list: fingerprint = <base64>
 new_list: <string>
 new_list: adding first member devid = <base64>
 new_list: fingerprint = <base64>
-list_request: gathering lists for <base64>
-list_request: found list <string> <base64>
-list_request: direct list: found member <base64>
-list_request: found list <string> <base64>
-list_request: direct list: found member <base64>
-list_request: found list <string> <base64>
-list_request: direct list: found member <base64>
+list_get: gathering lists for <base64>
+list_get: found list <string> <base64>
+list_get: list has 1 members
+list_get: list has 0 items
+list_get: found list <string> <base64>
+list_get: list has 1 members
+list_get: list has 0 items
+list_get: found list <string> <base64>
+list_get: list has 1 members
+list_get: list has 0 items
 disconnected!

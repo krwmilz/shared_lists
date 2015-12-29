@@ -1,9 +1,19 @@
-Our certificates in ssl/ are provided by let's encrypt.
+ Server
+========
+
+Our certificates in this directory are provided by let's encrypt.
 I think they will expire in 2016-03.
 
 To get a certificate that IO::Socket::SSL will like, you have to concatenate
 cert.pem and chain.pem to produce cert_chain.pem.
 
-Also, concatenating cert.pem and fullchain.pem works, but fullchain.pem has a
-larger file size. I'm unsure at this point which one is (more) correct, as they
-both work.
+
+ APN
+=====
+
+apn/ directory has all apple push notification certificates and keys.
+
+- apn/aps.key: 2048 bit rsa private key
+- apn/aps.csr: certificate signing request, created from aps.key
+- apn/aps.cer: DER encoded certificate from Apple, created from aps.csr
+- apn/aps.pem: conversion of aps.cer to PEM format for use in program

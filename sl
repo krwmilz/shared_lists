@@ -449,8 +449,8 @@ sub msg_list_get_other {
 		push @list_ids, $list_id;
 	}
 
-	my @other_lists;
 	# now calculate which lists this device id should see
+	my (%members, %names);
 	$sth{mutual_friend_select}->execute($msg);
 	while (my ($friend_id) = $sth{mutual_friend_select}->fetchrow_array()) {
 
@@ -467,12 +467,18 @@ sub msg_list_get_other {
 			# filter out lists this device id is already in
 			next if (grep {$_ eq $id} @list_ids);
 
+			push(@{ $members{$id} }, $friend_phnum);
+			$names{$id} = $name;
 			log_print("list_get_other: found list '$name'\n");
-			push @other_lists, "$id\0$name\0$friend_phnum";
 		}
 	}
 
-	return "ok\0" . join("\n", @other_lists);
+	my @lists;
+	for (keys %names) {
+		push @lists, "$_\0$names{$_}\0" . join("\0", @{$members{$_}});
+	}
+
+	return "ok\0" . join("\n", @lists);
 }
 
 sub msg_list_items

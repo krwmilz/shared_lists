@@ -64,6 +64,7 @@ while (my $client_sock = $listen_sock->accept()) {
 		SSL_cert_file => 'ssl/cert_chain.pem',
 		SSL_key_file => 'ssl/privkey.pem'
 	) or die "failed ssl handshake: $SSL_ERROR";
+
 	my $ssl_ver = $client_sock->get_sslversion();
 	my $ssl_cipher = $client_sock->get_cipher();
 	log_print("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
@@ -536,8 +537,6 @@ sub get_phone_number
 {
 	my ($dbh, $sth, $device_id) = @_;
 
-	#print "info: get_phone_number() unimplemented, returning device id!\n";
-	#return $device_id;
 	my (undef, $ph_num) = $dbh->selectrow_array($sth->{device_id_exists}, undef, $device_id);
 	unless (defined $ph_num && looks_like_number($ph_num)) {
 		log_print("phone number lookup for $device_id failed!\n");

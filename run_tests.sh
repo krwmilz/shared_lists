@@ -9,6 +9,10 @@ if which tput > /dev/null; then
 	reset=`tput sgr0`
 fi
 
+if [ `uname` = "OpenBSD" ]; then
+	alias make=gmake
+fi
+
 fail() {
 	printf "%3s %s: $red%s$reset\n" $count "$1" "$2"
 	failed=`expr $failed + 1`

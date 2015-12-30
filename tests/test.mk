@@ -15,7 +15,7 @@ diff: process-server-log
 	diff -u server.log.good server.log
 else
 diff: process-server-log
-	sort -o server.log < server.log
+	LC_ALL=C sort -o server.log < server.log
 	diff -u server.log.good server.log
 endif
 

@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+use LWP::UserAgent;
+use Getopt::Std;
+use JSON::PP;
+
+my $api_key = "API key goes here";
+my $agent = "Shlist Pushd/0 ";
+
+my %args;
+getopt("j:d:", \%args);
+
+unless ($args{j} && $args{d}) {
+	print "usage: ./$0 -j <json> -d <device>\n";
+	exit 1;
+}
+
+my %data = (
+	to => "$args{d}",
+	data => {
+		message => "test test 1 2 3"
+	},
+	notification => {
+		title => "the shlist is alive",
+		text => "move along"
+	}
+);
+my $json_text = encode_json(\%data);
+
+my $ua = LWP::UserAgent->new;
+$ua->agent($agent);
+
+my $req = HTTP::Request->new(POST => 'https://android.googleapis.com/gcm/send');
+$req->authorization("key=$api_key");
+$req->content_type('application/json');
+$req->content($json_text);
+
+my $res = $ua->request($req);
+
+if ($res->is_success) {
+	print $res->content;
+}
+else {
+	print $res->status_line, "\n";
+}

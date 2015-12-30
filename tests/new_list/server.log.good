@@ -5,4 +5,5 @@ new_device: success, <digits>:<base64> os <base64>
 new_list: <string>
 new_list: adding first member devid = <base64>
 new_list: fingerprint = <base64>
+new_list: error, no name
 disconnected!

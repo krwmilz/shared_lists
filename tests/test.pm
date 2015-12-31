@@ -5,17 +5,23 @@ use warnings;
 use Errno;
 use Exporter qw(import);
 use IO::Socket::SSL;
+use String::Random;
 use Time::HiRes qw(usleep);
 
 require "msgs.pl";
 our (%msg_num, @msg_str);
 
-our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str check_status);
+our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str check_status rand_phnum);
 
 sub fail {
 	my (undef, $file, $line) = caller;
 	print "$file:$line: " . shift . "\n";
 	exit 1;
+}
+
+my $string_gen = String::Random->new;
+sub rand_phnum {
+	return $string_gen->randpattern('nnnnnnnnnn');
 }
 
 sub new_socket

@@ -95,8 +95,8 @@ while (my $client_sock = $listen_sock->accept()) {
 			# but do it in an eval{} as it may also fail
 			eval { $dbh->rollback };
 
-			log_print("$msg_str[$msg_type]: discarding reply '$reply'\n");
-			log_print("$msg_str[$msg_type]: db transaction aborted: $@\n");
+			log_print("discarding reply '$reply'\n");
+			log_print("db transaction aborted: $@\n");
 			$reply = "err\0database transaction aborted";
 		}
 

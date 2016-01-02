@@ -3,6 +3,6 @@ use strict;
 use warnings;
 use test;
 
-# send_msg is too sophisticated for this test
+# send an invalid message type
 my $sock = new_socket();
 print $sock pack("nn", 47837, 0);

@@ -1,11 +1,11 @@
 accepting connections on <ip>:<port> (pid = <digits>)
 new connection (pid = <digits>)
 ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
-new_device: success, <digits>:<base64> os <base64>
-new_list: <string>
-new_list: adding first member devid = <base64>
-new_list: fingerprint = <base64>
-new_list: <digits>
-new_list: adding first member devid = <base64>
-new_list: fingerprint = <base64>
+device_add: success, <digits>:<base64> os <base64>
+list_add: <string>
+list_add: adding first member devid = <base64>
+list_add: fingerprint = <base64>
+list_add: <digits>
+list_add: adding first member devid = <base64>
+list_add: fingerprint = <base64>
 disconnected!

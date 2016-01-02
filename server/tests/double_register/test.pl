@@ -6,13 +6,13 @@ use test;
 my $sock = new_socket();
 
 my $phnum = '4038675309';
-send_msg($sock, 'new_device', "$phnum\0unix");
-my ($msg_data) = recv_msg($sock, 'new_device');
+send_msg($sock, 'device_add', "$phnum\0unix");
+my ($msg_data) = recv_msg($sock, 'device_add');
 
 check_status($msg_data, 'ok');
 
-send_msg($sock, 'new_device', "$phnum\0unix");
-($msg_data) = recv_msg($sock, 'new_device');
+send_msg($sock, 'device_add', "$phnum\0unix");
+($msg_data) = recv_msg($sock, 'device_add');
 
 my $msg = check_status($msg_data, 'err');
 my $msg_good = 'the sent phone number already exists';

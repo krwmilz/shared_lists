@@ -32,8 +32,8 @@ sub create_devices {
 		my $sock = new_socket();
 		my $phnum = rand_phnum();
 
-		send_msg($sock, 'new_device', "$phnum\0unix");
-		my ($msg) = recv_msg($sock, 'new_device');
+		send_msg($sock, 'device_add', "$phnum\0unix");
+		my ($msg) = recv_msg($sock, 'device_add');
 
 		my $device_id = check_status($msg, 'ok');
 

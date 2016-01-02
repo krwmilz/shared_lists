@@ -1,42 +1,42 @@
 #!/usr/bin/perl
-# generated Mon Dec 28 00:59:49 MST 2015
+# generated 'Sat Jan  2 16:41:19 MST 2016'
 use strict;
 use warnings;
 
 our $protocol_ver = 0;
 our %msg_num = (
-	new_device => 0,
-	add_friend => 1,
-	new_list => 2,
-	join_list => 3,
-	leave_list => 4,
-	list_get => 5,
-	list_get_other => 6,
-	list_items => 7,
-	new_list_item => 8,
-	ok => 9,
+	device_add => 0,
+	device_ok => 1,
+	friend_add => 2,
+	list_add => 3,
+	list_join => 4,
+	list_leave => 5,
+	lists_get => 6,
+	lists_get_other => 7,
+	list_items_get => 8,
+	list_item_add => 9,
 );
 our @msg_str = (
-	'new_device',
-	'add_friend',
-	'new_list',
-	'join_list',
-	'leave_list',
-	'list_get',
-	'list_get_other',
-	'list_items',
-	'new_list_item',
-	'ok',
+	'device_add',
+	'device_ok',
+	'friend_add',
+	'list_add',
+	'list_join',
+	'list_leave',
+	'lists_get',
+	'lists_get_other',
+	'list_items_get',
+	'list_item_add',
 );
 our @msg_func = (
-	\&msg_new_device,
-	\&msg_add_friend,
-	\&msg_new_list,
-	\&msg_join_list,
-	\&msg_leave_list,
-	\&msg_list_get,
-	\&msg_list_get_other,
-	\&msg_list_items,
-	\&msg_new_list_item,
-	\&msg_ok,
+	\&msg_device_add,
+	\&msg_device_ok,
+	\&msg_friend_add,
+	\&msg_list_add,
+	\&msg_list_join,
+	\&msg_list_leave,
+	\&msg_lists_get,
+	\&msg_lists_get_other,
+	\&msg_list_items_get,
+	\&msg_list_item_add,
 );

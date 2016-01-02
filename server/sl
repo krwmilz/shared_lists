@@ -178,7 +178,7 @@ sub send_all {
 	return;
 }
 
-sub msg_new_device {
+sub msg_device_add {
 	my ($sth, $msg) = @_;
 
 	my ($err, $ph_num, $os) = split_fields($msg, 2);
@@ -211,7 +211,7 @@ sub msg_new_device {
 	return "ok\0$token";
 }
 
-sub msg_new_list {
+sub msg_list_add {
 	my ($sth, $msg) = @_;
 
 	my ($err, $device_id, $list_name) = split_fields($msg, 2);
@@ -239,7 +239,7 @@ sub msg_new_list {
 	return "ok\0$response";
 }
 
-sub msg_new_list_item {
+sub msg_list_item_add {
     my ($sth, $msg) = @_;
 
     my ($err, $device_id) = split_fields($msg, 1);
@@ -264,7 +264,7 @@ sub msg_new_list_item {
     # last_update 
 }
 
-sub msg_join_list {
+sub msg_list_join {
     my ($sth, $msg) = @_;
 
     my ($err, $device_id, $list_id) = split_fields($msg, 2);
@@ -293,7 +293,7 @@ sub msg_join_list {
     return "ok\0$list_id";
 }
 
-sub msg_leave_list {
+sub msg_list_leave {
     my ($sth, $msg) = @_;
 
     my ($err, $device_id, $list_id) = split_fields($msg, 2);
@@ -333,7 +333,7 @@ sub msg_leave_list {
     return "ok\0$out";
 }
 
-sub msg_add_friend {
+sub msg_friend_add {
 	my ($sth, $msg) = @_;
 
 	my ($err, $device_id, $friend) = split_fields($msg, 2);
@@ -374,7 +374,7 @@ sub msg_add_friend {
 	return "ok\0$friend";
 }
 
-sub msg_delete_friend {
+sub msg_friend_delete {
 	my ($sth, $msg) = @_;
 	return "err\0unimplemented";
 
@@ -383,7 +383,7 @@ sub msg_delete_friend {
 	# $mutual_friends_delete_sth->execute($device_id, $device_id);
 }
 
-sub msg_list_get {
+sub msg_lists_get {
 	my ($sth, $msg) = @_;
 
 	my ($err, $device_id) = split_fields($msg, 1);
@@ -427,7 +427,7 @@ sub msg_list_get {
 	return "ok\0" . join("\n", @lists);
 }
 
-sub msg_list_get_other {
+sub msg_lists_get_other {
 	my ($sth, $msg) = @_;
 
 	my ($err, $device_id) = split_fields($msg, 1);
@@ -477,7 +477,7 @@ sub msg_list_get_other {
 	return "ok\0" . join("\n", @lists);
 }
 
-sub msg_list_items {
+sub msg_list_items_get {
 	my ($sth, $msg) = @_;
 
 	my ($err, $device_id, $list_id) = split_fields($msg, 2);
@@ -511,7 +511,7 @@ sub msg_list_items {
 	return "ok\0$out";
 }
 
-sub msg_ok
+sub msg_device_ok
 {
 	my ($sth, $msg) = @_;
 

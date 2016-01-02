@@ -2,16 +2,16 @@
 
 protocol_version=0
 msg_types="
-	new_device
-	add_friend
-	new_list
-	join_list
-	leave_list
-	list_get
-	list_get_other
-	list_items
-	new_list_item
-	ok
+	device_add
+	device_ok
+	friend_add
+	list_add
+	list_join
+	list_leave
+	lists_get
+	lists_get_other
+	list_items_get
+	list_item_add
 "
 
 objc_path="ios/shlist/MsgTypes.h"

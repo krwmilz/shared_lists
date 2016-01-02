@@ -12,15 +12,15 @@ use test;
 my $phone_num = "4038675309";
 my $sock = new_socket();
 
-send_msg($sock, 'new_device', "$phone_num\0unix");
-my ($msg_data) = recv_msg($sock, 'new_device');
+send_msg($sock, 'device_add', "$phone_num\0unix");
+my ($msg_data) = recv_msg($sock, 'device_add');
 
 my $device_id = check_status($msg_data, 'ok');
 
 my %list_id_map;
 for my $name ("new list 1", "new list 2", "new list 3") {
-	send_msg($sock, 'new_list', "$device_id\0$name");
-	my ($msg_data) = recv_msg($sock, 'new_list');
+	send_msg($sock, 'list_add', "$device_id\0$name");
+	my ($msg_data) = recv_msg($sock, 'list_add');
 
 	my $data = check_status($msg_data, 'ok');
 	my ($id, $name, $member) = split("\0", $data);
@@ -28,8 +28,8 @@ for my $name ("new list 1", "new list 2", "new list 3") {
 	$list_id_map{$name} = $id;
 }
 
-send_msg($sock, 'list_get', $device_id);
-($msg_data) = recv_msg($sock, 'list_get');
+send_msg($sock, 'lists_get', $device_id);
+($msg_data) = recv_msg($sock, 'lists_get');
 
 my $lists = check_status($msg_data, 'ok');
 my $num_lists = 0;

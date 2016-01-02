@@ -4,7 +4,7 @@ use warnings;
 use test;
 
 # send message that's too long
-send_msg(new_socket(), 'new_device', "longstr" x 1000);
+send_msg(new_socket(), 'device_add', "longstr" x 1000);
 
 # send message size 0 to all message types
 my $sock = new_socket();

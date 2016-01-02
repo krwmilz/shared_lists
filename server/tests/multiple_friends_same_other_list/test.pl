@@ -10,32 +10,32 @@ use test;
 my ($sockets, $phnums, $device_ids) = create_devices(3);
 
 # 0 and 1 need to be mutual friends
-send_msg($$sockets[0], 'add_friend', "$$device_ids[0]\0$$phnums[1]");
-recv_msg($$sockets[0], 'add_friend');
-send_msg($$sockets[1], 'add_friend', "$$device_ids[1]\0$$phnums[0]");
-recv_msg($$sockets[1], 'add_friend');
+send_msg($$sockets[0], 'friend_add', "$$device_ids[0]\0$$phnums[1]");
+recv_msg($$sockets[0], 'friend_add');
+send_msg($$sockets[1], 'friend_add', "$$device_ids[1]\0$$phnums[0]");
+recv_msg($$sockets[1], 'friend_add');
 
 # 0 and 2 need to be mutual friends too
-send_msg($$sockets[0], 'add_friend', "$$device_ids[0]\0$$phnums[2]");
-recv_msg($$sockets[0], 'add_friend');
-send_msg($$sockets[2], 'add_friend', "$$device_ids[2]\0$$phnums[0]");
-recv_msg($$sockets[2], 'add_friend');
+send_msg($$sockets[0], 'friend_add', "$$device_ids[0]\0$$phnums[2]");
+recv_msg($$sockets[0], 'friend_add');
+send_msg($$sockets[2], 'friend_add', "$$device_ids[2]\0$$phnums[0]");
+recv_msg($$sockets[2], 'friend_add');
 
 # 1 and 2 need to be in the same list
-send_msg($$sockets[1], 'new_list', "$$device_ids[1]\0this is a new list");
-my ($msg_data) = recv_msg($$sockets[1], 'new_list');
+send_msg($$sockets[1], 'list_add', "$$device_ids[1]\0this is a new list");
+my ($msg_data) = recv_msg($$sockets[1], 'list_add');
 
 my $list_data = check_status($msg_data, 'ok');
 my ($list_id) = split("\0", $list_data);
 
-send_msg($$sockets[2], 'join_list', "$$device_ids[2]\0$list_id");
-($msg_data) = recv_msg($$sockets[2], 'join_list');
+send_msg($$sockets[2], 'list_join', "$$device_ids[2]\0$list_id");
+($msg_data) = recv_msg($$sockets[2], 'list_join');
 
 check_status($msg_data, 'ok');
 
 # 0 requests his other lists
-send_msg($$sockets[0], 'list_get_other', "$$device_ids[0]");
-($msg_data) = recv_msg($$sockets[0], 'list_get_other');
+send_msg($$sockets[0], 'lists_get_other', "$$device_ids[0]");
+($msg_data) = recv_msg($$sockets[0], 'lists_get_other');
 
 my $raw_lists = check_status($msg_data, 'ok');
 my @lists = split("\n", $raw_lists);

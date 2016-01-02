@@ -15,8 +15,9 @@ msg_types="
 "
 
 objc_path="ios/shlist/MsgTypes.h"
-perl_path="msgs.pl"
+perl_path="server/msgs.pl"
 java_path="android/shlist/app/src/main/java/drsocto/shlist/MsgTypes.java"
+test_path="server/tests/msgs.pl"
 
 generated_at="generated `date`"
 
@@ -67,6 +68,8 @@ EOF
 	print_table $perl_path "our %msg_num = (" "\$msg => \$i," ");"
 	print_table $perl_path "our @msg_str = (" "'\$msg'," ");"
 	print_table $perl_path "our @msg_func = (" "\\&msg_\$msg," ");"
+
+	cp $perl_path $test_path
 }
 
 gen_objc

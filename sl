@@ -280,6 +280,9 @@ sub msg_join_list
 	    return "err\0$err";
     }
 
+    my $err = list_id_valid($sth_ref, $list_id);
+    return "err\0$err" if ($err);
+
     log_print("join_list: device '$device_id'\n");
     log_print("join_list: list '$list_id'\n");
     
@@ -290,7 +293,8 @@ sub msg_join_list
         $sth{new_list_member}->execute($list_id, $device_id, $time);
         log_print("join_list: device '$device_id' has been added to list '$list_id'\n");
     } else {
-        log_print("join_list: tried to create a duplicate list member entry for device $device_id and list $list_id\n");
+        log_print("join_list: tried to create a duplicate list member entry for device '$device_id' and list '$list_id'\n");
+	return "err\0the device is already part of this list";
     }
 
     return "ok\0$list_id";
@@ -570,6 +574,23 @@ sub device_id_invalid
 	return;
 }
 
+sub list_id_valid {
+	my ($sth_ref, $list_id) = @_;
+
+	unless ($list_id =~ m/^[a-zA-Z0-9+\/=]*$/) {
+		log_print("list_id_valid: '$list_id' not base64\n");
+		return "the client sent a list id that was not base64";
+	}
+
+	$sth_ref->{list_select}->execute($list_id);
+	unless ($sth_ref->{list_select}->fetchrow_array()) {
+		log_print("list_id_valid: unknown list '$list_id'\n");
+		return "the client sent an unknown list id";
+	}
+
+	return;
+}
+
 sub create_tables {
 
 	my $db_handle = DBI->connect(
@@ -641,6 +662,9 @@ sub prepare_stmt_handles {
 	my $sql;
 
 	# list table queries
+	$sql = qq{select * from lists where list_id = ?};
+	$stmt_handles{list_select} = $dbh->prepare($sql);
+
 	$sql = qq{insert into lists (list_id, name, first_created, last_updated)
 	values (?, ?, ?, ?)};
 	$stmt_handles{new_list} = $dbh->prepare($sql);

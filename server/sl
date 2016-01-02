@@ -302,6 +302,9 @@ sub msg_leave_list {
     $err = device_id_valid($sth, $device_id);
     return "err\0$err" if ($err);
 
+    $err = list_id_valid($sth, $list_id);
+    return "err\0$err" if ($err);
+
     log_print("device '$device_id'\n");
     log_print("list '$list_id'\n");
 

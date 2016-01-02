@@ -3,26 +3,25 @@ use strict;
 use warnings;
 use test;
 
-# this test:
-# - creates a new device
-# - creates a new list
-# - leaves that list
-# - verifies list is gone
+# verify basic leave_list scenario where you create a list then leave it
 
 my $sock = new_socket();
+my $list_name = "this is a new list";
 
+# create a new device id
 send_msg($sock, 'new_device', "4038675309\0unix");
 my ($msg_data) = recv_msg($sock, 'new_device');
 
 my $device_id = check_status($msg_data, 'ok');
-my $list_name = "this is a new list";
 
+# create a new list
 send_msg($sock, 'new_list', "$device_id\0$list_name");
 ($msg_data) = recv_msg($sock, 'new_list');
 
 my $msg = check_status($msg_data, 'ok');
 my ($list_id) = split("\0", $msg);
 
+# leave the list
 send_msg($sock, 'leave_list', "$device_id\0$list_id");
 ($msg_data) = recv_msg($sock, 'leave_list');
 
@@ -35,4 +34,11 @@ send_msg($sock, 'list_get', $device_id);
 ($msg_data) = recv_msg($sock, 'list_get');
 
 my $lists = check_status($msg_data, 'ok');
+fail "expected no lists" if ($lists ne "");
+
+# verify we don't get this list back when requesting other lists
+send_msg($sock, 'list_get_other', $device_id);
+($msg_data) = recv_msg($sock, 'list_get_other');
+
+$lists = check_status($msg_data, 'ok');
 fail "expected no lists" if ($lists ne "");

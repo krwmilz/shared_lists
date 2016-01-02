@@ -37,8 +37,8 @@ my $listen_sock = new IO::Socket::INET (
 );
 die "Could not create socket: $!\n" unless $listen_sock;
 
-my ($laddr, $lport) = ($listen_sock->sockhost(), $listen_sock->sockport());
-log_print_bare("accepting connections on $laddr:$lport (pid = '$$')\n");
+my ($addr, $port) = ($listen_sock->sockhost(), $listen_sock->sockport());
+log_print_bare("accepting connections on $addr:$port (pid = '$$')\n");
 
 # every time accept() returns we have a new client trying to connect
 while (my $client_sock = $listen_sock->accept()) {
@@ -734,10 +734,10 @@ sub prepare_stmt_handles {
 	return \%stmt_handles;
 }
 
-my ($addr, $port) = ('', '');
+my ($log_addr, $log_port) = ('', '');
 sub log_set_peer_host_port {
 	my ($sock) = @_;
-	($addr, $port) = ($sock->peerhost(), $sock->peerport());
+	($log_addr, $log_port) = ($sock->peerhost(), $sock->peerport());
 }
 
 sub log_set_msg {
@@ -753,7 +753,7 @@ sub log_set_msg {
 
 sub log_print {
 	my $ftime = strftime("%F %T", localtime);
-	printf "%s %-15s %-5s> %s", $ftime, $addr, $port, $log_msg_type;
+	printf "%s %-15s %-5s> %s", $ftime, $log_addr, $log_port, $log_msg_type;
 	# we print potentially unsafe strings here, don't use printf
 	print @_;
 }

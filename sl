@@ -705,7 +705,7 @@ sub prepare_stmt_handles {
 
 	# lists/list_members compound queries
 	$sql = qq{select lists.list_id, lists.name from lists, list_members where
-	lists.list_id = list_members.list_id and device_id = ?};
+	lists.list_id = list_members.list_id and list_members.device_id = ?};
 	$stmt_handles{get_lists} = $dbh->prepare($sql);
 
 	# list_members table

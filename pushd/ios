@@ -76,8 +76,8 @@ tcp_connect $host, $port, sub {
 	eval {
 		$tls = AnyEvent::TLS->new(
 			method => "TLSv1_2",
-			cert_file => 'ssl/apn/aps.pem',
-			key_file => 'ssl/apn/aps.key'
+			cert_file => 'ssl/aps.pem',
+			key_file => 'ssl/aps.key'
 		);
 
 		# ALPN (Net-SSLeay > 1.55, openssl >= 1.0.2)

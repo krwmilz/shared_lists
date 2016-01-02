@@ -351,7 +351,7 @@ sub msg_friend_add {
 	}
 
 	# XXX: check they're not already a friend before doing this
-	$$sth{friends_map}->execute($device_id, $friend);
+	$$sth{friends}->execute($device_id, $friend);
 
 	# check if this added friend is a member already
 	$$sth{ph_num_exists}->execute($friend);
@@ -363,8 +363,8 @@ sub msg_friend_add {
 		my $phnum = get_phone_number($sth, $device_id);
 
 		# check if my phone number is in their friends list
-		$$sth{friends_map_select}->execute($fr_devid, $phnum);
-		if ($$sth{friends_map_select}->fetchrow_array()) {
+		$$sth{friends_select}->execute($fr_devid, $phnum);
+		if ($$sth{friends_select}->fetchrow_array()) {
 			log_print("found mutual friendship\n");
 			$$sth{mutual_friend_insert}->execute($device_id, $fr_devid);
 			$$sth{mutual_friend_insert}->execute($fr_devid, $device_id);
@@ -379,7 +379,7 @@ sub msg_friend_delete {
 	return "err\0unimplemented";
 
 	# delete all friends, remove mutual friend references
-	# $friends_map_delete_sth->execute($device_id);
+	# $friends_delete_sth->execute($device_id);
 	# $mutual_friends_delete_sth->execute($device_id, $device_id);
 }
 
@@ -619,7 +619,7 @@ sub create_tables {
 		first_seen int not null)
 	}) or die $DBI::errstr;
 
-	$db_handle->do(qq{create table if not exists friends_map(
+	$db_handle->do(qq{create table if not exists friends(
 		device_id text not null,
 		friend int not null,
 		primary key(device_id, friend),
@@ -686,15 +686,15 @@ sub prepare_stmt_handles {
 	$sql = qq{select * from devices where device_id = ?};
 	$stmt_handles{device_id_exists} = $dbh->prepare($sql);
 
-	# friends_map table queries
-	$sql = qq{insert into friends_map (device_id, friend) values (?, ?)};
-	$stmt_handles{friends_map} = $dbh->prepare($sql);
+	# friends table queries
+	$sql = qq{insert into friends (device_id, friend) values (?, ?)};
+	$stmt_handles{friends} = $dbh->prepare($sql);
 
-	$sql = qq{select * from friends_map where device_id = ? and friend = ?};
-	$stmt_handles{friends_map_select} = $dbh->prepare($sql);
+	$sql = qq{select * from friends where device_id = ? and friend = ?};
+	$stmt_handles{friends_select} = $dbh->prepare($sql);
 
-	$sql = qq{delete from friends_map where device_id = ?};
-	$stmt_handles{friends_map_delete} = $dbh->prepare($sql);
+	$sql = qq{delete from friends where device_id = ?};
+	$stmt_handles{friends_delete} = $dbh->prepare($sql);
 
 	# mutual_friends table
 	$sql = qq{insert into mutual_friends (device_id, mutual_friend) values (?, ?)};

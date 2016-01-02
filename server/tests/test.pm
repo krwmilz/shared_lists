@@ -11,13 +11,40 @@ use Time::HiRes qw(usleep);
 require "msgs.pl";
 our (%msg_num, @msg_str);
 
-our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str check_status rand_phnum);
+our @EXPORT = qw(new_socket fail send_msg recv_msg %msg_num @msg_str
+	check_status rand_phnum create_devices);
 
 sub fail {
 	my (undef, $file, $line) = caller;
 	print "$file:$line: " . shift . "\n";
 	exit 1;
 }
+
+sub create_devices {
+	my ($count) = @_;
+
+	my @sockets;
+	my @phnums;
+	my @device_ids;
+
+	# $count can potentially be 0
+	for (1..$count) {
+		my $sock = new_socket();
+		my $phnum = rand_phnum();
+
+		send_msg($sock, 'new_device', "$phnum\0unix");
+		my ($msg) = recv_msg($sock, 'new_device');
+
+		my $device_id = check_status($msg, 'ok');
+
+		push @sockets, $sock;
+		push @phnums, $phnum;
+		push @device_ids, $device_id;
+	}
+
+	return (\@sockets, \@phnums, \@device_ids);
+}
+
 
 my $string_gen = String::Random->new;
 sub rand_phnum {

@@ -1,0 +1,26 @@
+accepting connections on <ip>:<port> (pid = <digits>)
+new connection (pid = <digits>)
+ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
+new_device: success, <digits>:<base64> os <base64>
+join_list: device <base64>
+join_list: list <base64>
+join_list: device <base64> has been added to list <base64>
+list_get: gathering lists for <base64>
+list_get: found list <string> <base64>
+list_get: list has 1 members
+list_get: list has 0 items
+leave_list: device <base64>
+leave_list: list <base64>
+leave_list: device <base64> has been removed from list <base64>
+leave_list: list <base64> is empty... deleting
+disconnected!
+new connection (pid = <digits>)
+ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
+new_device: success, <digits>:<base64> os <base64>
+new_list: <string>
+new_list: adding first member devid = <base64>
+new_list: fingerprint = <base64>
+leave_list: device <base64>
+leave_list: list <base64>
+leave_list: device <base64> has been removed from list <base64>
+disconnected!

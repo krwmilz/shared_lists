@@ -29,10 +29,8 @@ fail "recv'd name '$name' not equal to '$list_name'" if ($name ne $list_name);
 fail "list does not have exactly 1 member" if (@members != 1);
 fail "got list member '$members[0]', expected '$phnum'" if ($members[0] ne $phnum);
 
-# verify a new_list request with an empty list name fails
+# verify a new_list request with an empty list name succeeds
 send_msg($sock, 'new_list', "$device_id\0");
 ($payload) = recv_msg($sock, 'new_list');
 
-my $msg = check_status($payload, 'err');
-my $msg_good = 'no list name was given';
-fail "unexpected error response '$msg', expecting '$msg_good'" if ($msg ne $msg_good);
+my $msg = check_status($payload, 'ok');

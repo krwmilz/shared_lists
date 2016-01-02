@@ -85,7 +85,7 @@ while (my $client_sock = $listen_sock->accept()) {
 		my ($msg_type, $msg) = recv_msg($client_sock);
 
 		$dbh->begin_work;
-		my $reply = $msg_func[$msg_type]->($dbh, $sths, $msg);
+		my $reply = $msg_func[$msg_type]->($sths, $msg);
 		$dbh->commit;
 
 		if ($@) {
@@ -175,24 +175,21 @@ sub send_all {
 	return;
 }
 
-sub msg_new_device
-{
-	my ($dbh, $sth_ref, $msg) = @_;
-	my %sth = %$sth_ref;
+sub msg_new_device {
+	my ($sth, $msg) = @_;
 
-	my ($ph_num, $os) = unpack("Z*Z*", $msg);
+	my ($err, $ph_num, $os) = split_fields($msg, 2);
+	return "err\0$err" if ($err);
 
 	unless (looks_like_number($ph_num)) {
 		log_print("new_device: phone number '$ph_num' invalid\n");
 		return "err\0the sent phone number is not a number";
 	}
-	if ($dbh->selectrow_array($sth{ph_num_exists}, undef, $ph_num)) {
+
+	$$sth{ph_num_exists}->execute($ph_num);
+	if ($$sth{ph_num_exists}->fetchrow_array()) {
 		log_print("new_device: phone number '$ph_num' already exists\n");
 		return "err\0the sent phone number already exists";
-	}
-	unless (defined $os) {
-		log_print("new_device: no operating system field sent\n");
-		return "err\0no operating system field sent";
 	}
 	if ($os ne 'unix' && $os ne 'android' && $os ne 'ios') {
 		log_print("new_device: unknown operating system '$os'\n");
@@ -204,29 +201,21 @@ sub msg_new_device
 	# XXX: need to check the db to make sure this isn't duplicate
 	my $token = sha256_base64(arc4random_bytes(32));
 
-	$sth{new_device}->execute($token, $ph_num, $os, time);
+	$$sth{new_device}->execute($token, $ph_num, $os, time);
 	my $fp = fingerprint($token);
 	log_print("new_device: success, '$ph_num':'$fp' os '$os'\n");
 
 	return "ok\0$token";
 }
 
-sub msg_new_list
-{
-	my ($dbh, $sth_ref, $msg) = @_;
-	my %sth = %$sth_ref;
+sub msg_new_list {
+	my ($sth, $msg) = @_;
 
-	# expecting two fields delimited by null
-	my ($device_id, $list_name) = split("\0", $msg);
+	my ($err, $device_id, $list_name) = split_fields($msg, 2);
+	return "err\0$err" if ($err);
 
-	if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
-		return "err\0$err";
-	}
-
-	unless ($list_name) {
-		log_print("new_list: error, no name\n");
-		return "err\0no list name was given";
-	}
+	$err = device_id_valid($sth, $device_id);
+	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
 	log_print("new_list: '$list_name'\n");
@@ -237,23 +226,25 @@ sub msg_new_list
 	log_print("new_list: fingerprint = '" .fingerprint($list_id). "'\n");
 
 	# add new list with single list member
-	$sth{new_list}->execute($list_id, $list_name, $time, $time);
-	$sth{new_list_member}->execute($list_id, $device_id, $time);
+	$$sth{new_list}->execute($list_id, $list_name, $time, $time);
+	$$sth{new_list_member}->execute($list_id, $device_id, $time);
 
 	# XXX: also send back the date and all that stuff
-	my $phone_number = get_phone_number($dbh, $sth_ref, $device_id);
+	my $phone_number = get_phone_number($sth, $device_id);
 	my $response = "$list_id\0$list_name\0$phone_number";
 
 	return "ok\0$response";
 }
 
-sub msg_new_list_item
-{
-    my ($dbh, $sth_ref, $msg) = @_;
+sub msg_new_list_item {
+    my ($sth, $msg) = @_;
 
-    if (my $err = device_id_invalid($dbh, $sth_ref, $msg)) {
-	    return "err\0$err";
-    }
+    my ($err, $device_id) = split_fields($msg, 1);
+    return "err\0$err" if ($err);
+
+    $err = device_id_valid($sth, $device_id);
+    return "err\0$err" if ($err);
+
     return "err\0unimplemented";
 
     # my ($list_id, $position, $text) = split ("\0", $msg);
@@ -270,27 +261,26 @@ sub msg_new_list_item
     # last_update 
 }
 
-sub msg_join_list
-{
-    my ($dbh, $sth_ref, $msg) = @_;
-    my %sth = %$sth_ref;
-    my ($device_id, $list_id) = split("\0", $msg);
+sub msg_join_list {
+    my ($sth, $msg) = @_;
 
-    if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
-	    return "err\0$err";
-    }
+    my ($err, $device_id, $list_id) = split_fields($msg, 2);
+    return "err\0$err" if ($err);
 
-    my $err = list_id_valid($sth_ref, $list_id);
+    $err = device_id_valid($sth, $device_id);
+    return "err\0$err" if ($err);
+
+    $err = list_id_valid($sth, $list_id);
     return "err\0$err" if ($err);
 
     log_print("join_list: device '$device_id'\n");
     log_print("join_list: list '$list_id'\n");
     
     my $time = time;
-    $sth{check_list_member}->execute($list_id, $device_id);
+    $$sth{check_list_member}->execute($list_id, $device_id);
 
-    if (!$sth{check_list_member}->fetchrow_array()) {
-        $sth{new_list_member}->execute($list_id, $device_id, $time);
+    if (!$$sth{check_list_member}->fetchrow_array()) {
+        $$sth{new_list_member}->execute($list_id, $device_id, $time);
         log_print("join_list: device '$device_id' has been added to list '$list_id'\n");
     } else {
         log_print("join_list: tried to create a duplicate list member entry for device '$device_id' and list '$list_id'\n");
@@ -300,38 +290,36 @@ sub msg_join_list
     return "ok\0$list_id";
 }
 
-sub msg_leave_list
-{
-    my ($dbh, $sth_ref, $msg) = @_;
-    my %sth = %$sth_ref;
+sub msg_leave_list {
+    my ($sth, $msg) = @_;
 
-    my ($device_id, $list_id) = split("\0", $msg);
+    my ($err, $device_id, $list_id) = split_fields($msg, 2);
+    return "err\0$err" if ($err);
 
-    if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
-	    return "err\0$err";
-    }
+    $err = device_id_valid($sth, $device_id);
+    return "err\0$err" if ($err);
 
     log_print("leave_list: device '$device_id'\n");
     log_print("leave_list: list '$list_id'\n");
 
-    $sth{check_list_member}->execute($list_id, $device_id);
+    $$sth{check_list_member}->execute($list_id, $device_id);
 
-    if ($sth{check_list_member}->fetchrow_array()) {
-        $sth{remove_list_member}->execute($list_id, $device_id);
+    if ($$sth{check_list_member}->fetchrow_array()) {
+        $$sth{remove_list_member}->execute($list_id, $device_id);
         log_print("leave_list: device '$device_id' has been removed from list '$list_id'\n");
     } else {
         log_print("leave_list: warn: tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n");
     }
-    $sth{check_list_member}->finish();
+    $$sth{check_list_member}->finish();
 
-    $sth{get_list_members}->execute($list_id);
+    $$sth{get_list_members}->execute($list_id);
     
     my $alive = 1;
 
-    if (!$sth{get_list_members}->fetchrow_array()) {
+    if (!$$sth{get_list_members}->fetchrow_array()) {
         log_print("leave_list: list '$list_id' is empty... deleting\n");
-        $sth{delete_list}->execute($list_id);
-        $sth{delete_list_data}->execute($list_id);
+        $$sth{delete_list}->execute($list_id);
+        $$sth{delete_list_data}->execute($list_id);
         $alive = 0;
     }
     my $out = "$list_id\0$alive";
@@ -339,17 +327,14 @@ sub msg_leave_list
     return "ok\0$out";
 }
 
-# update friend map
-sub msg_add_friend
-{
-	my ($dbh, $sth_ref, $msg) = @_;
-	my %sth = %$sth_ref;
+sub msg_add_friend {
+	my ($sth, $msg) = @_;
 
-	# device id followed by 1 friends number
-	my ($device_id, $friend) = split("\0", $msg);
-	if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
-		return "err\0$err";
-	}
+	my ($err, $device_id, $friend) = split_fields($msg, 2);
+	return "err\0$err" if ($err);
+
+	$err = device_id_valid($sth, $device_id);
+	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
 	log_print("add_friend: '$devid_fp' adding '$friend'\n");
@@ -360,31 +345,31 @@ sub msg_add_friend
 	}
 
 	# XXX: check they're not already a friend before doing this
-	$sth{friends_map}->execute($device_id, $friend);
+	$$sth{friends_map}->execute($device_id, $friend);
 
 	# check if this added friend is a member already
-	my ($fr_devid) = $dbh->selectrow_array($sth{ph_num_exists}, undef, $friend);
-	if ($fr_devid) {
+	$$sth{ph_num_exists}->execute($friend);
+	if (my ($fr_devid) = $$sth{ph_num_exists}->fetchrow_array()) {
 		my $friends_fp = fingerprint($fr_devid);
 		log_print("add_friend: added friend is a member\n");
 		log_print("add_friend: friends device id is '$friends_fp'\n");
 
-		my $phnum = get_phone_number($dbh, $sth_ref, $device_id);
+		my $phnum = get_phone_number($sth, $device_id);
 
 		# check if my phone number is in their friends list
-		if ($dbh->selectrow_array($sth{friends_map_select}, undef, $fr_devid, $phnum)) {
+		$$sth{friends_map_select}->execute($fr_devid, $phnum);
+		if ($$sth{friends_map_select}->fetchrow_array()) {
 			log_print("add_friend: found mutual friendship\n");
-			$sth{mutual_friend_insert}->execute($device_id, $fr_devid);
-			$sth{mutual_friend_insert}->execute($fr_devid, $device_id);
+			$$sth{mutual_friend_insert}->execute($device_id, $fr_devid);
+			$$sth{mutual_friend_insert}->execute($fr_devid, $device_id);
 		}
 	}
 
 	return "ok\0$friend";
 }
 
-sub msg_delete_friend
-{
-	my ($dbh, $sth_ref, $msg) = @_;
+sub msg_delete_friend {
+	my ($sth, $msg) = @_;
 	return "err\0unimplemented";
 
 	# delete all friends, remove mutual friend references
@@ -392,39 +377,38 @@ sub msg_delete_friend
 	# $mutual_friends_delete_sth->execute($device_id, $device_id);
 }
 
-# get lists that the device id is participating in
-sub msg_list_get
-{
-	my ($dbh, $sth_ref, $msg) = @_;
-	my %sth = %$sth_ref;
+sub msg_list_get {
+	my ($sth, $msg) = @_;
 
-	if (my $err = device_id_invalid($dbh, $sth_ref, $msg)) {
-		return "err\0$err";
-	}
+	my ($err, $device_id) = split_fields($msg, 1);
+	return "err\0$err" if ($err);
 
-	my $devid_fp = fingerprint($msg);
+	$err = device_id_valid($sth, $device_id);
+	return "err\0$err" if ($err);
+
+	my $devid_fp = fingerprint($device_id);
 	log_print("list_get: gathering lists for '$devid_fp'\n");
 
 	my @lists;
-	$sth{get_lists}->execute($msg);
-	while (my ($list_id, $list_name) = $sth{get_lists}->fetchrow_array()) {
+	$$sth{get_lists}->execute($device_id);
+	while (my ($list_id, $list_name) = $$sth{get_lists}->fetchrow_array()) {
 
 		my $list_fp = fingerprint($list_id);
 		log_print("list_get: found list '$list_name' '$list_fp'\n");
 
 		# find all members of this list
 		my @members;
-		$sth{get_list_members}->execute($list_id);
-		while (my ($device_id) = $sth{get_list_members}->fetchrow_array()) {
-			push @members, get_phone_number($dbh, $sth_ref, $device_id);
+		$$sth{get_list_members}->execute($list_id);
+		while (my ($device_id) = $$sth{get_list_members}->fetchrow_array()) {
+			push @members, get_phone_number($sth, $device_id);
 		}
 		my $members = join("\0", @members);
 		log_print("list_get: list has ". @members ." members\n");
 
 		# find how many items are complete in this list
 		my $num_items = 0;
-		$sth{get_list_items}->execute($list_id);
-		while (my @results = $sth{get_list_items}->fetchrow_array()) {
+		$$sth{get_list_items}->execute($list_id);
+		while (my @results = $$sth{get_list_items}->fetchrow_array()) {
 			my (undef, $item_name, $item_status) = @results;
 			# XXX: actually check the item status
 			$num_items++;
@@ -437,37 +421,38 @@ sub msg_list_get
 	return "ok\0" . join("\n", @lists);
 }
 
-# get friends lists that the device id isn't participating in
 sub msg_list_get_other {
-	my ($dbh, $sth_ref, $msg) = @_;
-	my %sth = %$sth_ref;
+	my ($sth, $msg) = @_;
 
-	if (my $err = device_id_invalid($dbh, $sth_ref, $msg)) {
-		return "err\0$err";
-	}
-	my $devid_fp = fingerprint($msg);
+	my ($err, $device_id) = split_fields($msg, 1);
+	return "err\0$err" if ($err);
+
+	$err = device_id_valid($sth, $device_id);
+	return "err\0$err" if ($err);
+
+	my $devid_fp = fingerprint($device_id);
 	log_print("list_get_other: gathering lists for '$devid_fp'\n");
 
 	my @list_ids;
-	$sth{get_lists}->execute($msg);
-	while (my ($list_id) = $sth{get_lists}->fetchrow_array()) {
+	$$sth{get_lists}->execute($device_id);
+	while (my ($list_id) = $$sth{get_lists}->fetchrow_array()) {
 		push @list_ids, $list_id;
 	}
 
 	# now calculate which lists this device id should see
 	my (%members, %names);
-	$sth{mutual_friend_select}->execute($msg);
-	while (my ($friend_id) = $sth{mutual_friend_select}->fetchrow_array()) {
+	$$sth{mutual_friend_select}->execute($device_id);
+	while (my ($friend_id) = $$sth{mutual_friend_select}->fetchrow_array()) {
 
 		my $friend_fp = fingerprint($friend_id);
 		log_print("list_get_other: found mutual friend '$friend_fp'\n");
 
 		# we can't send device id's back to the client
-		my $friend_phnum = get_phone_number($dbh, $sth_ref, $friend_id);
+		my $friend_phnum = get_phone_number($sth, $friend_id);
 
 		# find all of my friends lists
-		$sth{get_lists}->execute($friend_id);
-		while (my ($id, $name) = $sth{get_lists}->fetchrow_array()) {
+		$$sth{get_lists}->execute($friend_id);
+		while (my ($id, $name) = $$sth{get_lists}->fetchrow_array()) {
 
 			# filter out lists this device id is already in
 			next if (grep {$_ eq $id} @list_ids);
@@ -486,32 +471,31 @@ sub msg_list_get_other {
 	return "ok\0" . join("\n", @lists);
 }
 
-sub msg_list_items
-{
-	my ($dbh, $sth_ref, $msg) = @_;
-	my %sth = %$sth_ref;
+sub msg_list_items {
+	my ($sth, $msg) = @_;
 
-	my ($device_id, $list_id) = split("\0", $msg);
-	if (my $err = device_id_invalid($dbh, $sth_ref, $device_id)) {
-		return "err\0$err";
-	}
+	my ($err, $device_id, $list_id) = split_fields($msg, 2);
+	return "err\0$err" if ($err);
+
+	$err = device_id_valid($sth, $device_id);
+	return "err\0$err" if ($err);
 
 	if (!$list_id) {
 		log_print("list_items: received null list id");
 		return "err\0the sent list id was empty";
 	}
-	unless ($dbh->selectrow_array($sth{check_list_member}, undef, $list_id, $device_id)) {
-		# XXX: table list_members list_id's should always exist in table lists
-		log_print("list_items: $device_id not a member of $list_id\n");
-		return "err\0the sent device id is not a member of the list";
-	}
+	# unless ($dbh->selectrow_array($sth{check_list_member}, undef, $list_id, $device_id)) {
+	# 	# XXX: table list_members list_id's should always exist in table lists
+	# 	log_print("list_items: $device_id not a member of $list_id\n");
+	# 	return "err\0the sent device id is not a member of the list";
+	# }
 	log_print("list_items: $device_id request items for $list_id\n");
 
-	$sth{get_list_items}->execute($list_id);
+	$$sth{get_list_items}->execute($list_id);
 
 	my @items;
 	while (my ($list_id, $pos, $name, $status, $owner, undef) =
-		$sth{get_list_items}->fetchrow_array()) {
+		$$sth{get_list_items}->fetchrow_array()) {
 		log_print("list_items: list item #$pos $name\n");
 
 		push @items, "$pos:$name:$owner:$status";
@@ -523,12 +507,17 @@ sub msg_list_items
 
 sub msg_ok
 {
-	my ($dbh, $sth_ref, $msg) = @_;
-	if (my $err = device_id_invalid($dbh, $sth_ref, $msg)) {
-		return "err\0$err";
-	}
+	my ($sth, $msg) = @_;
 
-	log_print("ok: device '" . fingerprint($msg) . "' checking in\n");
+	my ($err, $device_id) = split_fields($msg, 1);
+	return "err\0$err" if ($err);
+
+	$err = device_id_valid($sth, $device_id);
+	return "err\0$err" if ($err);
+
+	my $fp = fingerprint($device_id);
+	log_print("ok: device '$fp' checking in\n");
+
 	return "ok\0";
 }
 
@@ -537,11 +526,26 @@ sub fingerprint
 	return substr shift, 0, 8;
 }
 
+sub split_fields {
+	my ($msg, $total_fields) = @_;
+
+	my @fields = split("\0", $msg, $total_fields);
+	if (@fields != $total_fields) {
+		my $fields = @fields;
+		log_print("split_fields: got $fields fields, expected $total_fields\n");
+		return ("wrong number of arguments");
+	}
+
+	return (undef, @fields);
+}
+
 sub get_phone_number
 {
-	my ($dbh, $sth, $device_id) = @_;
+	my ($sth, $device_id) = @_;
 
-	my (undef, $ph_num) = $dbh->selectrow_array($sth->{device_id_exists}, undef, $device_id);
+	$sth->{device_id_exists}->execute($device_id);
+	my (undef, $ph_num) = $sth->{device_id_exists}->fetchrow_array;
+
 	unless (defined $ph_num && looks_like_number($ph_num)) {
 		log_print("phone number lookup for $device_id failed!\n");
 		return "000";
@@ -550,23 +554,17 @@ sub get_phone_number
 	return $ph_num;
 }
 
-sub device_id_invalid
+sub device_id_valid
 {
-	my ($dbh, $sth_ref, $device_id) = @_;
+	my ($sth, $device_id) = @_;
 
-	unless ($device_id) {
-		log_print("device_id: got empty device id\n");
-		return "the client sent an empty device id";
-	}
-
-	# validate this at least looks like base64
-	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
+	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]*$/) {
 		log_print("device_id: '$device_id' not base64\n");
 		return "the client sent a device id that wasn't base64";
 	}
 
-	# make sure we know about this device id
-	unless ($dbh->selectrow_array($sth_ref->{device_id_exists}, undef, $device_id)) {
+	$$sth{device_id_exists}->execute($device_id);
+	unless ($$sth{device_id_exists}->fetchrow_array()) {
 		log_print("device_id: unknown device '$device_id'\n");
 		return "the client sent an unknown device id";
 	}
@@ -575,15 +573,15 @@ sub device_id_invalid
 }
 
 sub list_id_valid {
-	my ($sth_ref, $list_id) = @_;
+	my ($sth, $list_id) = @_;
 
 	unless ($list_id =~ m/^[a-zA-Z0-9+\/=]*$/) {
 		log_print("list_id_valid: '$list_id' not base64\n");
 		return "the client sent a list id that was not base64";
 	}
 
-	$sth_ref->{list_select}->execute($list_id);
-	unless ($sth_ref->{list_select}->fetchrow_array()) {
+	$$sth{list_select}->execute($list_id);
+	unless ($$sth{list_select}->fetchrow_array()) {
 		log_print("list_id_valid: unknown list '$list_id'\n");
 		return "the client sent an unknown list id";
 	}

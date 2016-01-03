@@ -350,12 +350,16 @@ sub msg_friend_add {
 		return "err\0friends phone number is not a valid phone number";
 	}
 
-	# XXX: check they're not already a friend before doing this
-	$$sth{friends}->execute($device_id, $friend);
-
 	# check if this added friend is a member already
 	$$sth{ph_num_exists}->execute($friend);
 	if (my ($fr_devid) = $$sth{ph_num_exists}->fetchrow_array()) {
+
+		# check if the device is trying to add itself
+		if ($fr_devid eq $device_id) {
+			log_print("device '$devid_fp' tried adding itself\n");
+			return "err\0device cannot add itself as a friend";
+		}
+
 		my $friends_fp = fingerprint($fr_devid);
 		log_print("added friend is a member\n");
 		log_print("friends device id is '$friends_fp'\n");
@@ -370,6 +374,8 @@ sub msg_friend_add {
 			$$sth{mutual_friend_insert}->execute($fr_devid, $device_id);
 		}
 	}
+
+	$$sth{friends_insert}->execute($device_id, $friend);
 
 	return "ok\0$friend";
 }
@@ -687,23 +693,23 @@ sub prepare_stmt_handles {
 	$stmt_handles{device_id_exists} = $dbh->prepare($sql);
 
 	# friends table queries
-	$sql = qq{insert into friends (device_id, friend) values (?, ?)};
-	$stmt_handles{friends} = $dbh->prepare($sql);
+	$sql = qq{insert or replace into friends (device_id, friend) values (?, ?)};
+	$stmt_handles{friends_insert} = $dbh->prepare($sql);
 
 	$sql = qq{select * from friends where device_id = ? and friend = ?};
 	$stmt_handles{friends_select} = $dbh->prepare($sql);
 
-	$sql = qq{delete from friends where device_id = ?};
+	$sql = qq{delete from friends where device_id = ? and friend = ?};
 	$stmt_handles{friends_delete} = $dbh->prepare($sql);
 
 	# mutual_friends table
-	$sql = qq{insert into mutual_friends (device_id, mutual_friend) values (?, ?)};
+	$sql = qq{insert or replace into mutual_friends (device_id, mutual_friend) values (?, ?)};
 	$stmt_handles{mutual_friend_insert} = $dbh->prepare($sql);
 
 	$sql = qq{select mutual_friend from mutual_friends where device_id = ?};
 	$stmt_handles{mutual_friend_select} = $dbh->prepare($sql);
 
-	$sql = qq{delete from mutual_friends where device_id = ? or mutual_friend = ?};
+	$sql = qq{delete from mutual_friends where device_id = ? and mutual_friend = ?};
 	$stmt_handles{mutual_friends_delete} = $dbh->prepare($sql);
 
 	# lists/list_members compound queries

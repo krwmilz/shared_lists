@@ -137,19 +137,22 @@ sub recv_msg {
 }
 
 sub read_all {
-	my ($sock, $bytes_total) = @_;
+	my ($sock, $bytes_left) = @_;
 
-	my $bytes_read = $sock->sysread(my $data, $bytes_total);
+	my $data;
+	while ($bytes_left > 0) {
+		my $bytes_read = $sock->sysread(my $tmp, $bytes_left);
 
-	if (!defined $bytes_read) {
-		log_print("error: read failed: $!\n");
-		exit 0;
-	} elsif ($bytes_read == 0) {
-		log_print("disconnected!\n");
-		exit 0;
-	} elsif ($bytes_read != $bytes_total) {
-		log_print("error: read $bytes_read instead of $bytes_total bytes\n");
-		exit 0;
+		if (!defined $bytes_read) {
+			log_print("error: read failed: $!\n");
+			exit 0;
+		} elsif ($bytes_read == 0) {
+			log_print("disconnected!\n");
+			exit 0;
+		}
+
+		$data .= $tmp;
+		$bytes_left -= $bytes_read;
 	}
 
 	return $data;

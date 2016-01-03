@@ -83,7 +83,7 @@ while (my $client_sock = $listen_sock->accept()) {
 	my $sths = prepare_stmt_handles($dbh);
 
 	while (1) {
-		my ($msg_type, $msg) = recv_msg($client_sock);
+		my ($ver, $msg_type, $msg) = recv_msg($client_sock);
 		log_set_msg($msg_str[$msg_type]);
 
 		$dbh->begin_work;
@@ -101,7 +101,7 @@ while (my $client_sock = $listen_sock->accept()) {
 		}
 
 		log_set_msg('');
-		send_msg($client_sock, $msg_type, $reply);
+		send_msg($client_sock, $ver, $msg_type, $reply);
 	}
 }
 print ">>>>>> got here\n";
@@ -110,8 +110,13 @@ print ">>>>>> got here\n";
 sub recv_msg {
 	my ($sock) = @_;
 
-	my $header = read_all($sock, 4);
-	my ($msg_type, $msg_size) = unpack("nn", $header);
+	my $header = read_all($sock, 6);
+	my ($version, $msg_type, $msg_size) = unpack("nnn", $header);
+
+	if ($version != 0) {
+		log_print("error: unsupported protocol version $version\n");
+		exit 0;
+	}
 
 	if ($msg_type >= @msg_str) {
 		log_print("error: unknown message type $msg_type\n");
@@ -124,11 +129,11 @@ sub recv_msg {
 	}
 	elsif ($msg_size == 0) {
 		# don't try and do another read, as a read of size 0 is EOF
-		return ($msg_type, "");
+		return ($version, $msg_type, "");
 	}
 
 	my $msg = read_all($sock, $msg_size);
-	return ($msg_type, $msg);
+	return ($version, $msg_type, $msg);
 }
 
 sub read_all {
@@ -151,15 +156,15 @@ sub read_all {
 }
 
 sub send_msg {
-	my ($sock, $msg_type, $msg) = @_;
+	my ($sock, $ver, $msg_type, $payload) = @_;
 
-	my $hdr_length = 4;
-	my $msg_length = length($msg);
+	my $header_len = 6;
+	my $payload_len = length($payload);
 
-	send_all($sock, pack("nn", $msg_type, $msg_length), $hdr_length);
-	send_all($sock, $msg, $msg_length);
+	send_all($sock, pack("nnn", $ver, $msg_type, $payload_len), $header_len);
+	send_all($sock, $payload, $payload_len);
 
-	return $hdr_length + $msg_length;
+	return $header_len + $payload_len;
 }
 
 sub send_all {

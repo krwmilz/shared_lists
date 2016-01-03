@@ -73,7 +73,7 @@ sub new_socket
 			if (time > $timeout) {
 				fail "server not ready after 5 seconds";
 			}
-			usleep(100 * 1000);
+			usleep(50 * 1000);
 			next;
 		}
 
@@ -88,19 +88,21 @@ sub new_socket
 }
 
 sub send_msg {
-	my ($sock, $msg_type, $msg) = @_;
+	my ($sock, $msg_type, $payload) = @_;
 
 	if (! exists $msg_num{$msg_type}) {
 		fail "send_msg: invalid message type '$msg_type'";
 	}
 
-	my $hdr_length = 4;
-	my $msg_length = length($msg);
+	my $header_len = 6;
+	my $version = 0;
+	my $num = $msg_num{$msg_type};
+	my $payload_len = length($payload);
 
-	send_all($sock, pack("nn", $msg_num{$msg_type}, $msg_length), $hdr_length);
-	send_all($sock, $msg, $msg_length);
+	send_all($sock, pack("nnn", $version, $num, $payload_len), $header_len);
+	send_all($sock, $payload, $payload_len);
 
-	return $hdr_length + $msg_length;
+	return $header_len + $payload_len;
 }
 
 sub send_all {
@@ -120,8 +122,12 @@ sub send_all {
 sub recv_msg {
 	my ($sock, $expected_type) = @_;
 
-	my $header = read_all($sock, 4);
-	my ($msg_type, $msg_size) = unpack("nn", $header);
+	my $header = read_all($sock, 6);
+	my ($version, $msg_type, $msg_size) = unpack("nnn", $header);
+
+	if ($version != 0) {
+		fail "recv_msg: unsupported protocol version $version";
+	}
 
 	if ($msg_type >= @msg_str) {
 		fail "recv_msg: unknown message type $msg_type";

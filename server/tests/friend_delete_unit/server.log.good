@@ -1,0 +1,9 @@
+accepting connections on <ip>:<port> (pid = <digits>)
+new connection (pid = <digits>)
+ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
+friend_delete: unknown device <base64>
+device_add: success, <digits>:<base64> os <base64>
+friend_delete: tried deleting friend <digits> but they weren't a friend
+friend_delete: bad friends number <base64>
+friend_delete: bad friends number <digits>
+disconnected!

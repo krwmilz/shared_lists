@@ -5,6 +5,7 @@ msg_types="
 	device_add
 	device_ok
 	friend_add
+	friend_delete
 	list_add
 	list_join
 	list_leave

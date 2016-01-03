@@ -387,11 +387,38 @@ sub msg_friend_add {
 
 sub msg_friend_delete {
 	my ($sth, $msg) = @_;
-	return "err\0unimplemented";
 
-	# delete all friends, remove mutual friend references
-	# $friends_delete_sth->execute($device_id);
-	# $mutual_friends_delete_sth->execute($device_id, $device_id);
+	my ($err, $device_id, $friend) = split_fields($msg, 2);
+	return "err\0$err" if ($err);
+
+	$err = device_id_valid($sth, $device_id);
+	return "err\0$err" if ($err);
+
+	unless (looks_like_number($friend)) {
+		log_print("bad friends number '$friend'\n");
+		return "err\0friends phone number is not a valid phone number";
+	}
+
+	$$sth{friends_select}->execute($device_id, $friend);
+	if ($$sth{friends_select}->fetchrow_array()) {
+		log_print("removing '$friend' from friends list\n");
+		$$sth{friends_delete}->execute($device_id, $friend);
+	}
+	else {
+		log_print("tried deleting friend '$friend' but they weren't a friend\n");
+		return "err\0friend sent for deletion was not a friend";
+	}
+
+	# now delete any mutual friend references
+	$$sth{ph_num_exists}->execute($friend);
+	if (my ($friend_id) = $$sth{ph_num_exists}->fetchrow_array()) {
+		my $friend_fp = fingerprint($friend_id);
+		log_print("friend '$friend' was registered as '$friend_fp'\n");
+		$$sth{mutual_friends_delete}->execute($device_id, $friend_id);
+		$$sth{mutual_friends_delete}->execute($friend_id, $device_id);
+	}
+
+	return "ok\0$friend";
 }
 
 sub msg_lists_get {

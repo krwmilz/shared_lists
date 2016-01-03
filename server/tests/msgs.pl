@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# generated 'Sat Jan  2 16:41:19 MST 2016'
+# generated Sat Jan  2 17:25:28 MST 2016
 use strict;
 use warnings;
 
@@ -8,18 +8,20 @@ our %msg_num = (
 	device_add => 0,
 	device_ok => 1,
 	friend_add => 2,
-	list_add => 3,
-	list_join => 4,
-	list_leave => 5,
-	lists_get => 6,
-	lists_get_other => 7,
-	list_items_get => 8,
-	list_item_add => 9,
+	friend_delete => 3,
+	list_add => 4,
+	list_join => 5,
+	list_leave => 6,
+	lists_get => 7,
+	lists_get_other => 8,
+	list_items_get => 9,
+	list_item_add => 10,
 );
 our @msg_str = (
 	'device_add',
 	'device_ok',
 	'friend_add',
+	'friend_delete',
 	'list_add',
 	'list_join',
 	'list_leave',
@@ -32,6 +34,7 @@ our @msg_func = (
 	\&msg_device_add,
 	\&msg_device_ok,
 	\&msg_friend_add,
+	\&msg_friend_delete,
 	\&msg_list_add,
 	\&msg_list_join,
 	\&msg_list_leave,

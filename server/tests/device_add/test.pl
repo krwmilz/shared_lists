@@ -1,22 +1,25 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
+
+use client;
 use test;
 
-# send a valid number and verify response is ok
-my $sock = new_socket();
+my $A = client->new();
 
-send_msg($sock, 'device_add', "4038675309\0unix");
-my ($msg_data, $length) = recv_msg($sock, 'device_add');
+# basic sanity check on the device_add message type
+my $phnum = rand_phnum();
+$A->device_add($phnum);
 
-my $msg = check_status($msg_data, 'ok');
-fail "expected response length of 46, got $length" if ($length != 46);
-fail "response '$msg' not base64" unless ($msg =~ m/^[a-zA-Z0-9+\/=]+$/);
+my $devid = $A->device_id();
+my $length = length($devid);
+fail "device id '$devid' not base64" unless ($devid =~ m/^[a-zA-Z0-9+\/=]+$/);
+fail "expected device id length of 43, got $length" if ($length != 43);
 
-# send a bad phone number and verify error response
-send_msg($sock, 'device_add', "403867530&\0unix");
-($msg_data) = recv_msg($sock, 'device_add');
+# try adding a device with a bad phone number 
+$A->device_add('403867530&', 'err');
+fail_msg_ne 'the sent phone number is not a number', $A->get_error();
 
-$msg = check_status($msg_data, 'err');
-my $fail_msg = 'the sent phone number is not a number';
-fail "expected failure message '$fail_msg' but got '$msg'" if ($msg ne $fail_msg);
+# try adding the same phone number again
+$A->device_add($phnum, 'err');
+fail_msg_ne 'the sent phone number already exists', $A->get_error();

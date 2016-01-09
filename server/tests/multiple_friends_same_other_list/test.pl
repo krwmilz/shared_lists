@@ -1,49 +1,39 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
+
 use test;
+use client;
 
 # this test makes sure that when 2 friends of yours are in the same list that
 # your not in, that the list doesn't show up twice in your list_get_other
 # request.
 
-my ($sockets, $phnums, $device_ids) = create_devices(3);
+my $A = client->new();
+my $B = client->new();
+my $C = client->new();
 
-# 0 and 1 need to be mutual friends
-send_msg($$sockets[0], 'friend_add', "$$device_ids[0]\0$$phnums[1]");
-recv_msg($$sockets[0], 'friend_add');
-send_msg($$sockets[1], 'friend_add', "$$device_ids[1]\0$$phnums[0]");
-recv_msg($$sockets[1], 'friend_add');
+$A->device_add(rand_phnum());
+$B->device_add(rand_phnum());
+$C->device_add(rand_phnum());
 
-# 0 and 2 need to be mutual friends too
-send_msg($$sockets[0], 'friend_add', "$$device_ids[0]\0$$phnums[2]");
-recv_msg($$sockets[0], 'friend_add');
-send_msg($$sockets[2], 'friend_add', "$$device_ids[2]\0$$phnums[0]");
-recv_msg($$sockets[2], 'friend_add');
+# A and B are mutual friends
+$A->friend_add($B->phnum());
+$B->friend_add($A->phnum());
 
-# 1 and 2 need to be in the same list
-send_msg($$sockets[1], 'list_add', "$$device_ids[1]\0this is a new list");
-my ($msg_data) = recv_msg($$sockets[1], 'list_add');
+# A and C are also mutual friends
+$A->friend_add($C->phnum());
+$C->friend_add($A->phnum());
 
-my $list_data = check_status($msg_data, 'ok');
-my ($list_id) = split("\0", $list_data);
+# B and C need to be in the same list
+$B->list_add('this is Bs new list');
+$C->list_join($B->lists(0)->{'id'});
 
-send_msg($$sockets[2], 'list_join', "$$device_ids[2]\0$list_id");
-($msg_data) = recv_msg($$sockets[2], 'list_join');
-
-check_status($msg_data, 'ok');
-
-# 0 requests his other lists
-send_msg($$sockets[0], 'lists_get_other', "$$device_ids[0]");
-($msg_data) = recv_msg($$sockets[0], 'lists_get_other');
-
-my $raw_lists = check_status($msg_data, 'ok');
-my @lists = split("\n", $raw_lists);
-fail "expected 1 list, got " . @lists if (@lists != 1);
-
-# 0 makes sure he got a single list with both members in it
-my ($id, $name, @members) = split("\0", $lists[0]);
-fail "expected 2 list members, got " . @members if (@members != 2);
-fail "bad list id '$id', expected '$list_id'" if ($id ne $list_id);
-fail "expected member '$$phnums[1]'" unless (grep {$_ eq $$phnums[1]} @$phnums);
-fail "expected member '$$phnums[2]'" unless (grep {$_ eq $$phnums[2]} @$phnums);
+# A makes sure he got a single list
+my @other = $A->lists_get_other();
+fail_num_ne 'wrong number of list members', $other[0]->{num_members}, 2;
+fail_msg_ne $other[0]->{id}, $B->lists(0)->{'id'};
+fail_num_ne 'wrong number of lists', scalar(@other), 1;
+fail "A found unexpectedly" if (grep {$_ eq $A->phnum()} @{$other[0]->{members}});
+fail "member B not found" unless (grep {$_ eq $B->phnum()} @{$other[0]->{members}});
+fail "member C not found" unless (grep {$_ eq $C->phnum()} @{$other[0]->{members}});

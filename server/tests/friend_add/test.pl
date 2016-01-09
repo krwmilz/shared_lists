@@ -1,55 +1,33 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
+
+use client;
 use test;
 
-# this test:
-# - gets a new device id
-# - adds a new friend
+my $A = client->new();
 
-my $sock = new_socket();
-my $phnum = "4038675309";
-my $friend1 = "4033217654";
-my $friend2 = "4033217654bad";
-my $msg_good = "friends phone number is not a valid phone number";
+# try adding a friend with an invalid device id
+$A->friend_add('12345', 'err');
+fail_msg_ne 'the client sent an unknown device id', $A->get_error();
 
-send_msg($sock, 'device_add', "$phnum\0unix");
-my ($msg_data) = recv_msg($sock, 'device_add');
-
-my $device_id = check_status($msg_data, 'ok');
+# all verifications after this use a valid device id
+$A->device_add(rand_phnum());
 
 # first verify that a normal add_friend message succeeds
-send_msg($sock, 'friend_add', "$device_id\0$friend1");
-($msg_data) = recv_msg($sock, 'friend_add');
+$A->friend_add('54321');
 
-my $msg = check_status($msg_data, 'ok');
-fail "got response ph num '$msg' expected '$friend1'" if ($msg ne $friend1);
+# add the same friend, again. not an error.
+$A->friend_add('54321');
 
-# add the same friend, again
-send_msg($sock, 'friend_add', "$device_id\0$friend1");
-($msg_data) = recv_msg($sock, 'friend_add');
+# verify that a non numeric friends phone number isn't accepted
+$A->friend_add('123asdf', 'err');
+fail_msg_ne 'friends phone number is not a valid phone number', $A->get_error();
 
-$msg = check_status($msg_data, 'ok');
-fail "got response ph num '$msg' expected '$friend1'" if ($msg ne $friend1);
-
-# also verify that a non numeric friends phone number isn't accepted
-send_msg($sock, 'friend_add', "$device_id\0$friend2");
-($msg_data) = recv_msg($sock, 'friend_add');
-
-$msg = check_status($msg_data, 'err');
-fail "unexpected error message '$msg', expecting '$msg_good'" if ($msg ne $msg_good);
-
-# also verify an empty phone number isn't accepted
-send_msg($sock, 'friend_add', "$device_id\0");
-($msg_data) = recv_msg($sock, 'friend_add');
-
-$msg = check_status($msg_data, 'err');
-fail "unexpected error message '$msg', expecting '$msg_good'" if ($msg ne $msg_good);
+# verify an empty phone number isn't accepted
+$A->friend_add('', 'err');
+fail_msg_ne 'friends phone number is not a valid phone number', $A->get_error();
 
 # also verify adding yourself doesn't work
-send_msg($sock, 'friend_add', "$device_id\0$phnum");
-($msg_data) = recv_msg($sock, 'friend_add');
-
-$msg = check_status($msg_data, 'err');
-$msg_good = "device cannot add itself as a friend";
-fail "unexecpted message '$msg', expected '$msg_good'" if ($msg ne $msg_good);
+$A->friend_add($A->phnum(), 'err');
+fail_msg_ne 'device cannot add itself as a friend', $A->get_error();

@@ -1,36 +1,28 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
+
+use client;
 use test;
+use Data::Dumper;
 
-# this test sanity checks the new_list message. it checks that
-# - a new list can be created, and has the correct fields
-# - a list with no name is rejected
+my $A = client->new();
 
-my $sock = new_socket();
-my $phnum = "4038675309";
-my $list_name = "this is a new list";
+# check that sending a list_add message before registering doesn't work
+$A->list_add('this is a new list', 'err');
+fail_msg_ne 'the client sent an unknown device id', $A->get_error();
 
-send_msg($sock, 'device_add', "$phnum\0unix");
-my ($payload) = recv_msg($sock, 'device_add');
+# make sure normal list_add works
+$A->device_add(rand_phnum());
+$A->list_add(my $name = 'this is a new list');
+my $list = $A->lists(0);
 
-my $device_id = check_status($payload, 'ok');
-
-# verify a normal new_list request succeeds and returns good information
-send_msg($sock, 'list_add', "$device_id\0$list_name");
-($payload) = recv_msg($sock, 'list_add');
-
-my $list_data = check_status($payload, 'ok');
-my ($id, $name, @members) = split("\0", $list_data);
-my $id_length = length($id);
-
-fail "bad id length $id_length != 43" if ($id_length != 43);
-fail "recv'd name '$name' not equal to '$list_name'" if ($name ne $list_name);
-fail "list does not have exactly 1 member" if (@members != 1);
-fail "got list member '$members[0]', expected '$phnum'" if ($members[0] ne $phnum);
+fail_num_ne "bad id length", length($list->{id}), 43;
+fail_msg_ne $name, $list->{name};
+fail_num_ne "wrong number of members", $list->{num_members}, 1;
+fail_msg_ne $list->{members}->[0], $A->phnum();
 
 # verify a new_list request with an empty list name succeeds
-send_msg($sock, 'list_add', "$device_id\0");
-($payload) = recv_msg($sock, 'list_add');
+$A->list_add('');
 
-my $msg = check_status($payload, 'ok');
+fail_num_ne "wrong number of lists", $A->num_lists(), 2;

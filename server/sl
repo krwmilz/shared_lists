@@ -654,7 +654,7 @@ sub create_tables {
 
 	$db_handle->do(qq{create table if not exists devices(
 		device_id text not null primary key,
-		phone_num int not null,
+		phone_num text not null,
 		os text,
 		push_token text,
 		first_seen int not null)

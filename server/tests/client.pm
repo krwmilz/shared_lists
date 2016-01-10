@@ -43,8 +43,8 @@ sub new {
 		die "failed connect or ssl handshake: $!,$SSL_ERROR";
 	}
 
-	$self->{device_id} = 'a';
-
+	# make sure we don't try and use this without setting it
+	$self->{device_id} = undef;
 	return $self;
 }
 
@@ -155,13 +155,15 @@ sub lists_get_other {
 sub device_add {
 	my $self = shift;
 	my $phone_number = shift || '4038675309';
+	my $os = shift || 'unix';
 	my $exp_status = shift || 'ok';
 
 	# always reset error messages to guard against stale state
 	$self->{err_msg} = undef;
+	$self->{msg_type} = $msg_num{'device_add'};
 
-	send_msg($self, 'device_add', "$phone_number\0unix");
-	my $msg = recv_msg($self, 'device_add');
+	send_msg($self, "$phone_number\0$os");
+	my $msg = recv_msg($self);
 
 	my ($status, $device_id) = parse_status($self, $msg);
 	fail "wrong message status '$status'" if ($status ne $exp_status);
@@ -175,12 +177,13 @@ sub communicate {
 
 	# always reset error messages to guard against stale state
 	$self->{err_msg} = undef;
+	$self->{msg_type} = $msg_num{$msg_type};
 
 	# prepend device id to @msg_args array
 	unshift @msg_args, $self->{device_id};
 
-	send_msg($self, $msg_type, join("\0", @msg_args));
-	my $msg = recv_msg($self, $msg_type);
+	send_msg($self, join("\0", @msg_args));
+	my $msg = recv_msg($self);
 
 	my ($status, $payload) = parse_status($self, $msg);
 	fail "wrong message status '$status'" if ($status ne $exp_status);
@@ -204,14 +207,14 @@ sub parse_status {
 }
 
 sub send_msg {
-	my ($self, $msg_type, $payload) = @_;
+	my ($self, $payload) = @_;
 
-	fail "invalid message type '$msg_type'" if (!exists $msg_num{$msg_type});
+	my $msg_type = $self->{msg_type};
+	fail "invalid message type $msg_type" if ($msg_type > @msg_str);
 
 	my $version = 0;
-	my $num = $msg_num{$msg_type};
 	my $payload_len = length($payload);
-	my $header = pack("nnn", $version, $num, $payload_len);
+	my $header = pack("nnn", $version, $msg_type, $payload_len);
 
 	my $sent_bytes = 0;
 	$sent_bytes += send_all($self, $header, length($header));
@@ -232,7 +235,7 @@ sub send_all {
 }
 
 sub recv_msg {
-	my ($self, $exp_type) = @_;
+	my ($self) = @_;
 
 	# read header part first
 	my $header = read_all($self, 6);
@@ -241,9 +244,7 @@ sub recv_msg {
 	fail "unsupported protocol version $version" if ($version != 0);
 	fail "unknown message type $msg_type" if ($msg_type >= @msg_str);
 	fail "$payload_size byte message too large" if ($payload_size > 4096);
-
-	my $msg_name = $msg_str[$msg_type];
-	fail "expected message type '$exp_type' but got '$msg_name'" if ($exp_type ne $msg_name);
+	fail "unexpected message type $self->{msg_type}" if ($self->{msg_type} != $msg_type);
 
 	# don't try a read_all() of size 0
 	return '' if ($payload_size == 0);
@@ -297,6 +298,16 @@ sub phnum {
 sub device_id {
 	my $self = shift;
 	return $self->{device_id};
+}
+
+sub set_device_id {
+	my ($self, $new_id) = @_;
+	$self->{device_id} = $new_id;
+}
+
+sub set_msg_type {
+	my ($self, $msg_num) = @_;
+	$self->{msg_type} = $msg_num{$msg_num};
 }
 
 sub get_error {

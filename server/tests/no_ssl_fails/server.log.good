@@ -1,0 +1,3 @@
+accepting connections on <ip>:<port> (pid = <digits>)
+new connection (pid = <digits>)
+error: SSL accept attempt failed because of handshake problems

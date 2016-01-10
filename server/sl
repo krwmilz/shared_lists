@@ -60,11 +60,15 @@ while (my $client_sock = $listen_sock->accept()) {
 	log_print("new connection (pid = '$$')\n");
 
 	# unconditionally upgrade connection to SSL
-	IO::Socket::SSL->start_SSL($client_sock,
+	my $ret = IO::Socket::SSL->start_SSL($client_sock,
 		SSL_server => 1,
 		SSL_cert_file => 'ssl/cert_chain.pem',
 		SSL_key_file => 'ssl/privkey.pem'
-	) or die "failed ssl handshake: $SSL_ERROR";
+	);
+	unless ($ret) {
+		log_print("error: $SSL_ERROR\n");
+		exit 0;
+	}
 
 	my $ssl_ver = $client_sock->get_sslversion();
 	my $ssl_cipher = $client_sock->get_cipher();

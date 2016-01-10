@@ -686,44 +686,43 @@ sub prepare_stmt_handles {
 	my $sql;
 
 	# list table queries
-	$sql = qq{select * from lists where list_id = ?};
+	$sql = 'select * from lists where list_id = ?';
 	$stmt_handles{list_select} = $dbh->prepare($sql);
 
-	$sql = qq{insert into lists (list_id, name, first_created, last_updated)
-	values (?, ?, ?, ?)};
+	$sql = 'insert into lists (list_id, name, first_created, last_updated) values (?, ?, ?, ?)';
 	$stmt_handles{new_list} = $dbh->prepare($sql);
 
-	$sql = qq{delete from lists where list_id = ?};
+	$sql = 'delete from lists where list_id = ?';
 	$stmt_handles{delete_list} = $dbh->prepare($sql);
 
 	# devices table queries
-	$sql = qq{insert into devices (device_id, phone_num, os, first_seen) values (?, ?, ?, ?)};
+	$sql = 'insert into devices (device_id, phone_num, os, first_seen) values (?, ?, ?, ?)';
 	$stmt_handles{new_device} = $dbh->prepare($sql);
 
-	$sql = qq{select * from devices where phone_num = ?};
+	$sql = 'select * from devices where phone_num = ?';
 	$stmt_handles{ph_num_exists} = $dbh->prepare($sql);
 
-	$sql = qq{select * from devices where device_id = ?};
+	$sql = 'select * from devices where device_id = ?';
 	$stmt_handles{device_id_exists} = $dbh->prepare($sql);
 
 	# friends table queries
-	$sql = qq{insert or replace into friends (device_id, friend) values (?, ?)};
+	$sql = 'insert or replace into friends (device_id, friend) values (?, ?)';
 	$stmt_handles{friends_insert} = $dbh->prepare($sql);
 
-	$sql = qq{select * from friends where device_id = ? and friend = ?};
+	$sql = 'select * from friends where device_id = ? and friend = ?';
 	$stmt_handles{friends_select} = $dbh->prepare($sql);
 
-	$sql = qq{delete from friends where device_id = ? and friend = ?};
+	$sql = 'delete from friends where device_id = ? and friend = ?';
 	$stmt_handles{friends_delete} = $dbh->prepare($sql);
 
 	# mutual_friends table
-	$sql = qq{insert or replace into mutual_friends (device_id, mutual_friend) values (?, ?)};
+	$sql = 'insert or replace into mutual_friends (device_id, mutual_friend) values (?, ?)';
 	$stmt_handles{mutual_friend_insert} = $dbh->prepare($sql);
 
-	$sql = qq{select mutual_friend from mutual_friends where device_id = ?};
+	$sql = 'select mutual_friend from mutual_friends where device_id = ?';
 	$stmt_handles{mutual_friend_select} = $dbh->prepare($sql);
 
-	$sql = qq{delete from mutual_friends where device_id = ? and mutual_friend = ?};
+	$sql = 'delete from mutual_friends where device_id = ? and mutual_friend = ?';
 	$stmt_handles{mutual_friends_delete} = $dbh->prepare($sql);
 
 	# lists/list_members compound queries
@@ -732,26 +731,26 @@ sub prepare_stmt_handles {
 	$stmt_handles{get_lists} = $dbh->prepare($sql);
 
 	# list_members table
-	$sql = qq{select device_id from list_members where list_id = ?};
+	$sql = 'select device_id from list_members where list_id = ?';
 	$stmt_handles{get_list_members} = $dbh->prepare($sql);
 
-	$sql = qq{insert into list_members (list_id, device_id, joined_date) values (?, ?, ?)};
+	$sql = 'insert into list_members (list_id, device_id, joined_date) values (?, ?, ?)';
 	$stmt_handles{new_list_member} = $dbh->prepare($sql);
 
-	$sql = qq{delete from list_members where list_id = ? and device_id = ?};
+	$sql = 'delete from list_members where list_id = ? and device_id = ?';
 	$stmt_handles{remove_list_member} = $dbh->prepare($sql);
 
-	$sql = qq{select device_id from list_members where list_id = ? and device_id = ?};
+	$sql = 'select device_id from list_members where list_id = ? and device_id = ?';
 	$stmt_handles{check_list_member} = $dbh->prepare($sql);
 
 	# list_data table
-	$sql = qq{delete from list_data where list_id = ?};
+	$sql = 'delete from list_data where list_id = ?';
 	$stmt_handles{delete_list_data} = $dbh->prepare($sql);
 
-	$sql = qq{select * from list_data where list_id = ?};
+	$sql = 'select * from list_data where list_id = ?';
 	$stmt_handles{get_list_items} = $dbh->prepare($sql);
 
-	$sql = qq{insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)};
+	$sql = 'insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)';
 	$stmt_handles{new_list_item} = $dbh->prepare($sql);
 
 	return \%stmt_handles;

@@ -556,22 +556,6 @@ sub msg_list_items_get {
 	return "ok\0$out";
 }
 
-sub msg_device_ok
-{
-	my ($sth, $msg) = @_;
-
-	my ($err, $device_id) = split_fields($msg, 1);
-	return "err\0$err" if ($err);
-
-	$err = device_id_valid($sth, $device_id);
-	return "err\0$err" if ($err);
-
-	my $fp = fingerprint($device_id);
-	log_print("device '$fp' checking in\n");
-
-	return "ok\0";
-}
-
 sub fingerprint
 {
 	return substr shift, 0, 8;

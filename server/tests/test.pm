@@ -9,7 +9,7 @@ our @EXPORT = qw(rand_phnum fail fail_msg_ne fail_num_ne);
 
 my $string_gen = String::Random->new;
 sub rand_phnum {
-	return $string_gen->randpattern('nnnnnnnnnn');
+	return '1403' . $string_gen->randpattern('nnnnnnn');
 }
 
 sub fail {
@@ -25,7 +25,7 @@ sub fail_msg_ne {
 	return if ($arg1 eq $arg2);
 
 	my (undef, $file, $line) = caller;
-	print "$file:$line: expected message '$arg1' but got '$arg2'\n";
+	print "$file:$line: expected string '$arg1' but got '$arg2'\n";
 	exit 1;
 }
 

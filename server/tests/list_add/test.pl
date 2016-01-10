@@ -7,13 +7,9 @@ use test;
 use Data::Dumper;
 
 my $A = client->new();
-
-# check that sending a list_add message before registering doesn't work
-$A->list_add('this is a new list', 'err');
-fail_msg_ne 'the client sent an unknown device id', $A->get_error();
+$A->device_add(rand_phnum());
 
 # make sure normal list_add works
-$A->device_add(rand_phnum());
 $A->list_add(my $name = 'this is a new list');
 my $list = $A->lists(0);
 

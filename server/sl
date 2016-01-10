@@ -431,10 +431,10 @@ sub msg_friend_delete {
 sub msg_lists_get {
 	my ($sth, $msg) = @_;
 
-	my ($err, $device_id) = split_fields($msg, 1);
-	return "err\0$err" if ($err);
+	# Don't split incoming message as we only take a single argument here.
+	my $device_id = $msg;
 
-	$err = device_id_valid($sth, $device_id);
+	my $err = device_id_valid($sth, $device_id);
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
@@ -475,10 +475,10 @@ sub msg_lists_get {
 sub msg_lists_get_other {
 	my ($sth, $msg) = @_;
 
-	my ($err, $device_id) = split_fields($msg, 1);
-	return "err\0$err" if ($err);
+	# Don't split incoming message as we only take a single argument here.
+	my $device_id = $msg;
 
-	$err = device_id_valid($sth, $device_id);
+	my $err = device_id_valid($sth, $device_id);
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);

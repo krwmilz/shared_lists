@@ -6,11 +6,6 @@ use client;
 use test;
 
 my $A = client->new();
-
-# send a leave list message with a bad device id
-$A->list_leave('aaaa', 'err');
-fail_msg_ne 'the client sent an unknown device id', $A->get_error();
-
 $A->device_add();
 
 # try leaving a list your not in

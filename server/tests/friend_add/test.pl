@@ -6,12 +6,6 @@ use client;
 use test;
 
 my $A = client->new();
-
-# try adding a friend with an invalid device id
-$A->friend_add('12345', 'err');
-fail_msg_ne 'the client sent an unknown device id', $A->get_error();
-
-# all verifications after this use a valid device id
 $A->device_add(rand_phnum());
 
 # first verify that a normal add_friend message succeeds

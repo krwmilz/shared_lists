@@ -6,12 +6,6 @@ use client;
 use test;
 
 my $A = client->new();
-
-# check that sending a list_join message without registering fails
-$A->list_join('aaaa', 'err');
-fail_msg_ne 'the client sent an unknown device id', $A->get_error();
-
-# register this client for the next tests
 $A->device_add(rand_phnum());
 
 # try joining a list that doesn't exist

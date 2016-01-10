@@ -447,8 +447,8 @@ sub msg_lists_get {
 		# find all members of this list
 		my @members;
 		$$sth{get_list_members}->execute($list_id);
-		while (my ($device_id) = $$sth{get_list_members}->fetchrow_array()) {
-			push @members, get_phone_number($sth, $device_id);
+		while (my ($devid) = $$sth{get_list_members}->fetchrow_array()) {
+			push @members, devid_to_phnum($sth, $devid);
 		}
 		my $members = join("\0", @members);
 		log_print("list has ". @members ." members\n");

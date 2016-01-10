@@ -229,7 +229,7 @@ sub msg_list_add {
 	my ($err, $device_id, $list_name) = split_fields($msg, 2);
 	return "err\0$err" if ($err);
 
-	$err = device_id_valid($sth, $device_id);
+	($err, my $phnum) = device_id_valid($sth, $device_id);
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
@@ -245,8 +245,7 @@ sub msg_list_add {
 	$$sth{new_list_member}->execute($list_id, $device_id, $time);
 
 	# XXX: also send back the date and all that stuff
-	my $phone_number = get_phone_number($sth, $device_id);
-	my $response = "$list_id\0$list_name\0$phone_number";
+	my $response = "$list_id\0$list_name\0$phnum";
 
 	return "ok\0$response";
 }
@@ -257,7 +256,7 @@ sub msg_list_item_add {
     my ($err, $device_id) = split_fields($msg, 1);
     return "err\0$err" if ($err);
 
-    $err = device_id_valid($sth, $device_id);
+    ($err) = device_id_valid($sth, $device_id);
     return "err\0$err" if ($err);
 
     return "err\0unimplemented";
@@ -282,7 +281,7 @@ sub msg_list_join {
     my ($err, $device_id, $list_id) = split_fields($msg, 2);
     return "err\0$err" if ($err);
 
-    $err = device_id_valid($sth, $device_id);
+    ($err) = device_id_valid($sth, $device_id);
     return "err\0$err" if ($err);
 
     $err = list_id_valid($sth, $list_id);
@@ -311,7 +310,7 @@ sub msg_list_leave {
     my ($err, $device_id, $list_id) = split_fields($msg, 2);
     return "err\0$err" if ($err);
 
-    $err = device_id_valid($sth, $device_id);
+    ($err) = device_id_valid($sth, $device_id);
     return "err\0$err" if ($err);
 
     $err = list_id_valid($sth, $list_id);
@@ -351,7 +350,7 @@ sub msg_friend_add {
 	my ($err, $device_id, $friend) = split_fields($msg, 2);
 	return "err\0$err" if ($err);
 
-	$err = device_id_valid($sth, $device_id);
+	($err, my $my_phnum) = device_id_valid($sth, $device_id);
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
@@ -376,10 +375,8 @@ sub msg_friend_add {
 		log_print("added friend is a member\n");
 		log_print("friends device id is '$friends_fp'\n");
 
-		my $phnum = get_phone_number($sth, $device_id);
-
 		# check if my phone number is in their friends list
-		$$sth{friends_select}->execute($fr_devid, $phnum);
+		$$sth{friends_select}->execute($fr_devid, $my_phnum);
 		if ($$sth{friends_select}->fetchrow_array()) {
 			log_print("found mutual friendship\n");
 			$$sth{mutual_friend_insert}->execute($device_id, $fr_devid);
@@ -398,7 +395,7 @@ sub msg_friend_delete {
 	my ($err, $device_id, $friend) = split_fields($msg, 2);
 	return "err\0$err" if ($err);
 
-	$err = device_id_valid($sth, $device_id);
+	($err) = device_id_valid($sth, $device_id);
 	return "err\0$err" if ($err);
 
 	unless (looks_like_number($friend)) {
@@ -434,7 +431,7 @@ sub msg_lists_get {
 	# Don't split incoming message as we only take a single argument here.
 	my $device_id = $msg;
 
-	my $err = device_id_valid($sth, $device_id);
+	my ($err) = device_id_valid($sth, $device_id);
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
@@ -478,7 +475,7 @@ sub msg_lists_get_other {
 	# Don't split incoming message as we only take a single argument here.
 	my $device_id = $msg;
 
-	my $err = device_id_valid($sth, $device_id);
+	my ($err) = device_id_valid($sth, $device_id);
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
@@ -499,7 +496,7 @@ sub msg_lists_get_other {
 		log_print("found mutual friend '$friend_fp'\n");
 
 		# we can't send device id's back to the client
-		my $friend_phnum = get_phone_number($sth, $friend_id);
+		my $friend_phnum = devid_to_phnum($sth, $friend_id);
 
 		# find all of my friends lists
 		$$sth{get_lists}->execute($friend_id);
@@ -528,7 +525,7 @@ sub msg_list_items_get {
 	my ($err, $device_id, $list_id) = split_fields($msg, 2);
 	return "err\0$err" if ($err);
 
-	$err = device_id_valid($sth, $device_id);
+	($err) = device_id_valid($sth, $device_id);
 	return "err\0$err" if ($err);
 
 	if (!$list_id) {
@@ -574,18 +571,11 @@ sub split_fields {
 	return (undef, @fields);
 }
 
-sub get_phone_number
-{
+sub devid_to_phnum {
 	my ($sth, $device_id) = @_;
 
 	$sth->{device_id_exists}->execute($device_id);
 	my (undef, $ph_num) = $sth->{device_id_exists}->fetchrow_array;
-
-	unless (defined $ph_num && looks_like_number($ph_num)) {
-		log_print("phone number lookup for $device_id failed!\n");
-		return "000";
-	}
-
 	return $ph_num;
 }
 
@@ -595,16 +585,16 @@ sub device_id_valid
 
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]*$/) {
 		log_print("'$device_id' not base64\n");
-		return "the client sent a device id that wasn't base64";
+		return ('the client sent a device id that was not base64');
 	}
 
 	$$sth{device_id_exists}->execute($device_id);
-	unless ($$sth{device_id_exists}->fetchrow_array()) {
-		log_print("unknown device '$device_id'\n");
-		return "the client sent an unknown device id";
+	if (my ($id, $phnum) = $$sth{device_id_exists}->fetchrow_array()) {
+		return (undef, $phnum);
 	}
 
-	return;
+	log_print("unknown device '$device_id'\n");
+	return ('the client sent an unknown device id');
 }
 
 sub list_id_valid {

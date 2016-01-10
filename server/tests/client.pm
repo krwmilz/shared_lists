@@ -20,7 +20,7 @@ sub new {
 	$self->{sock} = undef;
 	my $timeout = time + 5;
 	while (1) {
-		$self->{sock} = new IO::Socket::SSL->new(
+		$self->{sock} = IO::Socket::SSL->new(
 			PeerHost => 'localhost',
 			PeerPort => $ENV{PORT} || 5437,
 			# this is needed because PeerHost is localhost and our

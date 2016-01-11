@@ -6,7 +6,6 @@ use client;
 use test;
 
 my $A = client->new();
-$A->device_add(rand_phnum());
 
 $A->list_add('this list was made for leaving');
 $A->list_leave($A->lists(0)->{id});

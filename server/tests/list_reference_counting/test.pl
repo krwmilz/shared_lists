@@ -6,11 +6,8 @@ use client;
 use test;
 
 # test list reference counting to make sure they stay alive when needed
-
 my $A = client->new();
 my $B = client->new();
-$A->device_add(rand_phnum());
-$B->device_add(rand_phnum());
 
 # A creates a new list
 $A->list_add('this list will belong to B soon enough');

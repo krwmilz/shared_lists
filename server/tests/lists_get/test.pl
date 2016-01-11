@@ -12,7 +12,7 @@ use test;
 # - checks that what's received is what was sent
 
 my $A = client->new();
-$A->device_add(my $phnum = rand_phnum());
+my $phnum = $A->phnum();
 
 for ('new list 1', 'new list 2', 'new list 3') {
 	$A->list_add($_);

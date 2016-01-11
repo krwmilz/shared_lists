@@ -6,7 +6,6 @@ use client;
 use test;
 
 my $A = client->new();
-$A->device_add(rand_phnum());
 
 # check that adding the same list twice works
 my $name = 'some list thats going to be added twice';

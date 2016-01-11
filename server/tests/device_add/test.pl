@@ -5,10 +5,9 @@ use warnings;
 use client;
 use test;
 
-my $A = client->new();
 # basic sanity check on the device_add message type
-$A->device_add(my $phnum = rand_phnum());
-
+my $A = client->new();
+my $phnum = $A->phnum;
 my $devid = $A->device_id();
 my $length = length($devid);
 fail "device id '$devid' not base64" unless ($devid =~ m/^[a-zA-Z0-9+\/=]+$/);

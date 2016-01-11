@@ -8,9 +8,6 @@ use test;
 my $A = client->new();
 my $B = client->new();
 
-$A->device_add(rand_phnum());
-$B->device_add(rand_phnum());
-
 # make A and B mutual friends
 $A->friend_add($B->phnum());
 $B->friend_add($A->phnum());

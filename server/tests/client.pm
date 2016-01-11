@@ -13,6 +13,7 @@ our (%msg_num, @msg_str);
 
 sub new {
 	my $class = shift;
+	my $dont_register = shift || 0;
 
 	my $self = {};
 	bless ($self, $class);
@@ -45,6 +46,12 @@ sub new {
 
 	# make sure we don't try and use this without setting it
 	$self->{device_id} = undef;
+
+	# By default register this device immediately
+	if ($dont_register == 0) {
+		$self->device_add(rand_phnum());
+	}
+
 	return $self;
 }
 

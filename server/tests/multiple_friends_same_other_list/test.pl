@@ -13,10 +13,6 @@ my $A = client->new();
 my $B = client->new();
 my $C = client->new();
 
-$A->device_add(rand_phnum());
-$B->device_add(rand_phnum());
-$C->device_add(rand_phnum());
-
 # A and B are mutual friends
 $A->friend_add($B->phnum());
 $B->friend_add($A->phnum());

@@ -5,7 +5,6 @@ use client;
 use test;
 
 my $A = client->new();
-$A->device_add(rand_phnum());
 
 # try deleting someone who is not your friend
 $A->friend_delete('12345', 'err');

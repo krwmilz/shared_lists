@@ -7,7 +7,6 @@ use test;
 use Data::Dumper;
 
 my $A = client->new();
-$A->device_add(rand_phnum());
 
 # make sure normal list_add works
 $A->list_add(my $name = 'this is a new list');

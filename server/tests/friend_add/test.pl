@@ -6,7 +6,6 @@ use client;
 use test;
 
 my $A = client->new();
-$A->device_add(rand_phnum());
 
 # first verify that a normal add_friend message succeeds
 $A->friend_add('54321');

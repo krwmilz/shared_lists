@@ -6,7 +6,6 @@ use client;
 use test;
 
 my $A = client->new();
-$A->device_add();
 
 # try leaving a list your not in
 $A->list_leave('somenonexistentlistid', 'err');

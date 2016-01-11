@@ -6,7 +6,6 @@ use client;
 use test;
 
 my $A = client->new();
-$A->device_add(rand_phnum());
 
 # try joining a list that doesn't exist
 $A->list_join('somenonexistentlist', 'err');

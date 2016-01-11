@@ -8,4 +8,11 @@ list_join: unknown device <digits>
 list_leave: unknown device <digits>
 lists_get: unknown device <digits>
 lists_get_other: unknown device <digits>
+friend_add: 'somebull$hit' not base64
+friend_delete: 'somebull$hit' not base64
+list_add: 'somebull$hit' not base64
+list_join: 'somebull$hit' not base64
+list_leave: 'somebull$hit' not base64
+lists_get: 'somebull$hit' not base64
+lists_get_other: 'somebull$hit' not base64
 disconnected!

@@ -56,13 +56,7 @@ for t in `ls tests/*/Makefile`; do
 	ok $test_dir
 done
 
-echo
-if [ $passed -ne 0 ]; then
-	printf "%i %sok%s " $passed $green $reset
-fi
-if [ $failed -ne 0 ]; then
-	printf "%i %sfailed%s " $failed $red $reset
-fi
+printf "\n%i %sok%s %i %sfailed%s " $passed $green $reset $failed $red $reset
 printf "(%i min %i sec)\n" $((SECONDS / 60)) $((SECONDS % 60))
 
 exit $failed;

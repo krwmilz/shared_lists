@@ -8,12 +8,10 @@ use File::Temp;
 use Digest::SHA qw(sha256_base64);
 use Getopt::Std;
 use IO::Socket::SSL;
-use POSIX;
 use Scalar::Util qw(looks_like_number);
 
 require "msgs.pl";
 our (%msg_num, @msg_str, @msg_func, $protocol_ver);
-my $log_msg_type = '';
 
 my %args;
 getopts("p:t", \%args);
@@ -25,8 +23,11 @@ my $db_file = "db";
 # EXLOCK needs to be 0 because SQLite expects it to be
 $db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
-log_print_bare("creating new database '$db_file'\n") unless (-e $db_file);
-create_tables();
+my $log = logger->new();
+$log->print_bare("using database '$db_file'\n");
+
+my $db = database->new();
+$db->create_tables();
 
 my $listen_sock = new IO::Socket::INET (
 	LocalHost => '0.0.0.0',
@@ -38,7 +39,7 @@ my $listen_sock = new IO::Socket::INET (
 die "Could not create socket: $!\n" unless $listen_sock;
 
 my ($addr, $port) = ($listen_sock->sockhost(), $listen_sock->sockport());
-log_print_bare("accepting connections on $addr:$port (pid = '$$')\n");
+$log->print_bare("accepting connections on $addr:$port (pid = '$$')\n");
 
 # every time accept() returns we have a new client trying to connect
 while (my $client_sock = $listen_sock->accept()) {
@@ -56,8 +57,8 @@ while (my $client_sock = $listen_sock->accept()) {
 	# in child: on linux we must stir the random pool after fork()'s
 	close $listen_sock;
 	arc4random_stir();
-	log_set_peer_host_port($client_sock);
-	log_print("new connection (pid = '$$')\n");
+	$log->set_peer_host_port($client_sock);
+	$log->print("new connection (pid = '$$')\n");
 
 	# unconditionally upgrade connection to SSL
 	my $ret = IO::Socket::SSL->start_SSL($client_sock,
@@ -66,29 +67,21 @@ while (my $client_sock = $listen_sock->accept()) {
 		SSL_key_file => 'ssl/privkey.pem'
 	);
 	unless ($ret) {
-		log_print("error: $SSL_ERROR\n");
+		$log->print("error: $SSL_ERROR\n");
 		exit 0;
 	}
 
 	my $ssl_ver = $client_sock->get_sslversion();
 	my $ssl_cipher = $client_sock->get_cipher();
-	log_print("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
+	$log->print("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
 
-	# open a new database connection
-	my $dbh = DBI->connect(
-		"dbi:SQLite:dbname=$db_file",
-		"", "",
-		{ RaiseError => 1 }
-	) or die $DBI::errstr;
-
-	# foreign keys are off by default, autocommit is needed for transactions
-	$dbh->do("PRAGMA foreign_keys = ON");
-	$dbh->{AutoCommit} = 1;
-	my $sths = prepare_stmt_handles($dbh);
+	my $db = database->new();
+	my $sths = $db->prepare_stmt_handles();
+	my $dbh = $db->{dbh};
 
 	while (1) {
 		my ($ver, $msg_type, $msg) = recv_msg($client_sock);
-		log_set_msg($msg_str[$msg_type]);
+		$log->set_msg($msg_str[$msg_type]);
 
 		$dbh->begin_work;
 		my $reply = $msg_func[$msg_type]->($sths, $msg);
@@ -99,12 +92,12 @@ while (my $client_sock = $listen_sock->accept()) {
 			# but do it in an eval{} as it may also fail
 			eval { $dbh->rollback };
 
-			log_print("discarding reply '$reply'\n");
-			log_print("db transaction aborted: $@\n");
+			$log->print("discarding reply '$reply'\n");
+			$log->print("db transaction aborted: $@\n");
 			$reply = "err\0database transaction aborted";
 		}
 
-		log_set_msg('');
+		$log->set_msg('');
 		send_msg($client_sock, $ver, $msg_type, $reply);
 	}
 }
@@ -118,17 +111,15 @@ sub recv_msg {
 	my ($version, $msg_type, $msg_size) = unpack("nnn", $header);
 
 	if ($version != 0) {
-		log_print("error: unsupported protocol version $version\n");
+		$log->print("error: unsupported protocol version $version\n");
 		exit 0;
 	}
-
-	if ($msg_type >= @msg_str) {
-		log_print("error: unknown message type $msg_type\n");
+	elsif ($msg_type >= @msg_str) {
+		$log->print("error: unknown message type $msg_type\n");
 		exit 0;
 	}
-
-	if ($msg_size > 4096) {
-		log_print("error: $msg_size byte message too large\n");
+	elsif ($msg_size > 4096) {
+		$log->print("error: $msg_size byte message too large\n");
 		exit 0;
 	}
 	elsif ($msg_size == 0) {
@@ -148,10 +139,10 @@ sub read_all {
 		my $bytes_read = $sock->sysread(my $tmp, $bytes_left);
 
 		if (!defined $bytes_read) {
-			log_print("error: read failed: $!\n");
+			$log->print("error: read failed: $!\n");
 			exit 0;
 		} elsif ($bytes_read == 0) {
-			log_print("disconnected!\n");
+			$log->print("disconnected!\n");
 			exit 0;
 		}
 
@@ -180,10 +171,10 @@ sub send_all {
 	my $bytes_written = $socket->syswrite($bytes);
 
 	if (!defined $bytes_written) {
-		log_print("error: write failed: $!\n");
+		$log->print("error: write failed: $!\n");
 		exit 0;
 	} elsif ($bytes_written != $bytes_total) {
-		log_print("error: wrote $bytes_written instead of $bytes_total bytes\n");
+		$log->print("error: wrote $bytes_written instead of $bytes_total bytes\n");
 		exit 0;
 	}
 
@@ -197,17 +188,17 @@ sub msg_device_add {
 	return "err\0$err" if ($err);
 
 	unless (looks_like_number($ph_num)) {
-		log_print("phone number '$ph_num' invalid\n");
+		$log->print("phone number '$ph_num' invalid\n");
 		return "err\0the sent phone number is not a number";
 	}
 
 	$$sth{ph_num_exists}->execute($ph_num);
 	if ($$sth{ph_num_exists}->fetchrow_array()) {
-		log_print("phone number '$ph_num' already exists\n");
+		$log->print("phone number '$ph_num' already exists\n");
 		return "err\0the sent phone number already exists";
 	}
 	if ($os ne 'unix' && $os ne 'android' && $os ne 'ios') {
-		log_print("unknown operating system '$os'\n");
+		$log->print("unknown operating system '$os'\n");
 		return "err\0operating system not supported";
 	}
 
@@ -218,7 +209,7 @@ sub msg_device_add {
 
 	$$sth{new_device}->execute($token, $ph_num, $os, time);
 	my $fp = fingerprint($token);
-	log_print("success, '$ph_num':'$fp' os '$os'\n");
+	$log->print("success, '$ph_num':'$fp' os '$os'\n");
 
 	return "ok\0$token";
 }
@@ -233,12 +224,12 @@ sub msg_list_add {
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
-	log_print("'$list_name'\n");
-	log_print("adding first member devid = '$devid_fp'\n");
+	$log->print("'$list_name'\n");
+	$log->print("adding first member devid = '$devid_fp'\n");
 
 	my $time = time;
 	my $list_id = sha256_base64(arc4random_bytes(32));
-	log_print("fingerprint = '" .fingerprint($list_id). "'\n");
+	$log->print("fingerprint = '" .fingerprint($list_id). "'\n");
 
 	# add new list with single list member
 	$$sth{new_list}->execute($list_id, $list_name, $time, $time);
@@ -287,17 +278,17 @@ sub msg_list_join {
     $err = list_id_valid($sth, $list_id);
     return "err\0$err" if ($err);
 
-    log_print("device '$device_id'\n");
-    log_print("list '$list_id'\n");
+    $log->print("device '$device_id'\n");
+    $log->print("list '$list_id'\n");
     
     my $time = time;
     $$sth{check_list_member}->execute($list_id, $device_id);
 
     if (!$$sth{check_list_member}->fetchrow_array()) {
         $$sth{new_list_member}->execute($list_id, $device_id, $time);
-        log_print("device '$device_id' has been added to list '$list_id'\n");
+        $log->print("device '$device_id' has been added to list '$list_id'\n");
     } else {
-        log_print("tried to create a duplicate list member entry for device '$device_id' and list '$list_id'\n");
+        $log->print("tried to create a duplicate list member entry for device '$device_id' and list '$list_id'\n");
 	return "err\0the device is already part of this list";
     }
 
@@ -316,16 +307,16 @@ sub msg_list_leave {
     $err = list_id_valid($sth, $list_id);
     return "err\0$err" if ($err);
 
-    log_print("device '$device_id'\n");
-    log_print("list '$list_id'\n");
+    $log->print("device '$device_id'\n");
+    $log->print("list '$list_id'\n");
 
     $$sth{check_list_member}->execute($list_id, $device_id);
 
     if ($$sth{check_list_member}->fetchrow_array()) {
         $$sth{remove_list_member}->execute($list_id, $device_id);
-        log_print("device '$device_id' has been removed from list '$list_id'\n");
+        $log->print("device '$device_id' has been removed from list '$list_id'\n");
     } else {
-        log_print("warn: tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n");
+        $log->print("tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n");
     }
     $$sth{check_list_member}->finish();
 
@@ -334,7 +325,7 @@ sub msg_list_leave {
     my $alive = 1;
 
     if (!$$sth{get_list_members}->fetchrow_array()) {
-        log_print("list '$list_id' is empty... deleting\n");
+        $log->print("list '$list_id' is empty... deleting\n");
         $$sth{delete_list}->execute($list_id);
         $$sth{delete_list_data}->execute($list_id);
         $alive = 0;
@@ -354,10 +345,10 @@ sub msg_friend_add {
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
-	log_print("'$devid_fp' adding '$friend'\n");
+	$log->print("'$devid_fp' adding '$friend'\n");
 
 	unless (looks_like_number($friend)) {
-		log_print("bad friends number '$friend'\n");
+		$log->print("bad friends number '$friend'\n");
 		return "err\0friends phone number is not a valid phone number";
 	}
 
@@ -367,18 +358,18 @@ sub msg_friend_add {
 
 		# check if the device is trying to add itself
 		if ($fr_devid eq $device_id) {
-			log_print("device '$devid_fp' tried adding itself\n");
+			$log->print("device '$devid_fp' tried adding itself\n");
 			return "err\0device cannot add itself as a friend";
 		}
 
 		my $friends_fp = fingerprint($fr_devid);
-		log_print("added friend is a member\n");
-		log_print("friends device id is '$friends_fp'\n");
+		$log->print("added friend is a member\n");
+		$log->print("friends device id is '$friends_fp'\n");
 
 		# check if my phone number is in their friends list
 		$$sth{friends_select}->execute($fr_devid, $my_phnum);
 		if ($$sth{friends_select}->fetchrow_array()) {
-			log_print("found mutual friendship\n");
+			$log->print("found mutual friendship\n");
 			$$sth{mutual_friend_insert}->execute($device_id, $fr_devid);
 			$$sth{mutual_friend_insert}->execute($fr_devid, $device_id);
 		}
@@ -399,17 +390,17 @@ sub msg_friend_delete {
 	return "err\0$err" if ($err);
 
 	unless (looks_like_number($friend)) {
-		log_print("bad friends number '$friend'\n");
+		$log->print("bad friends number '$friend'\n");
 		return "err\0friends phone number is not a valid phone number";
 	}
 
 	$$sth{friends_select}->execute($device_id, $friend);
 	if ($$sth{friends_select}->fetchrow_array()) {
-		log_print("removing '$friend' from friends list\n");
+		$log->print("removing '$friend' from friends list\n");
 		$$sth{friends_delete}->execute($device_id, $friend);
 	}
 	else {
-		log_print("tried deleting friend '$friend' but they weren't a friend\n");
+		$log->print("tried deleting friend '$friend' but they weren't a friend\n");
 		return "err\0friend sent for deletion was not a friend";
 	}
 
@@ -417,7 +408,7 @@ sub msg_friend_delete {
 	$$sth{ph_num_exists}->execute($friend);
 	if (my ($friend_id) = $$sth{ph_num_exists}->fetchrow_array()) {
 		my $friend_fp = fingerprint($friend_id);
-		log_print("friend '$friend' was registered as '$friend_fp'\n");
+		$log->print("friend '$friend' was registered as '$friend_fp'\n");
 		$$sth{mutual_friends_delete}->execute($device_id, $friend_id);
 		$$sth{mutual_friends_delete}->execute($friend_id, $device_id);
 	}
@@ -435,14 +426,14 @@ sub msg_lists_get {
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
-	log_print("gathering lists for '$devid_fp'\n");
+	$log->print("gathering lists for '$devid_fp'\n");
 
 	my @lists;
 	$$sth{get_lists}->execute($device_id);
 	while (my ($list_id, $list_name) = $$sth{get_lists}->fetchrow_array()) {
 
 		my $list_fp = fingerprint($list_id);
-		log_print("found list '$list_name' '$list_fp'\n");
+		$log->print("found list '$list_name' '$list_fp'\n");
 
 		# find all members of this list
 		my @members;
@@ -451,7 +442,7 @@ sub msg_lists_get {
 			push @members, devid_to_phnum($sth, $devid);
 		}
 		my $members = join("\0", @members);
-		log_print("list has ". @members ." members\n");
+		$log->print("list has ". @members ." members\n");
 
 		# find how many items are complete in this list
 		my $num_items = 0;
@@ -461,7 +452,7 @@ sub msg_lists_get {
 			# XXX: actually check the item status
 			$num_items++;
 		}
-		log_print("list has $num_items items\n");
+		$log->print("list has $num_items items\n");
 
 		push @lists, "$list_id\0$list_name\0$num_items\0$members";
 	}
@@ -479,7 +470,7 @@ sub msg_lists_get_other {
 	return "err\0$err" if ($err);
 
 	my $devid_fp = fingerprint($device_id);
-	log_print("gathering lists for '$devid_fp'\n");
+	$log->print("gathering lists for '$devid_fp'\n");
 
 	my @list_ids;
 	$$sth{get_lists}->execute($device_id);
@@ -493,7 +484,7 @@ sub msg_lists_get_other {
 	while (my ($friend_id) = $$sth{mutual_friend_select}->fetchrow_array()) {
 
 		my $friend_fp = fingerprint($friend_id);
-		log_print("found mutual friend '$friend_fp'\n");
+		$log->print("found mutual friend '$friend_fp'\n");
 
 		# we can't send device id's back to the client
 		my $friend_phnum = devid_to_phnum($sth, $friend_id);
@@ -507,7 +498,7 @@ sub msg_lists_get_other {
 
 			push(@{ $members{$id} }, $friend_phnum);
 			$names{$id} = $name;
-			log_print("found list '$name'\n");
+			$log->print("found list '$name'\n");
 		}
 	}
 
@@ -529,22 +520,22 @@ sub msg_list_items_get {
 	return "err\0$err" if ($err);
 
 	if (!$list_id) {
-		log_print("received null list id");
+		$log->print("received null list id");
 		return "err\0the sent list id was empty";
 	}
 	# unless ($dbh->selectrow_array($sth{check_list_member}, undef, $list_id, $device_id)) {
 	# 	# XXX: table list_members list_id's should always exist in table lists
-	# 	log_print("list_items: $device_id not a member of $list_id\n");
+	# 	$log->print("list_items: $device_id not a member of $list_id\n");
 	# 	return "err\0the sent device id is not a member of the list";
 	# }
-	log_print("$device_id request items for $list_id\n");
+	$log->print("$device_id request items for $list_id\n");
 
 	$$sth{get_list_items}->execute($list_id);
 
 	my @items;
 	while (my ($list_id, $pos, $name, $status, $owner, undef) =
 		$$sth{get_list_items}->fetchrow_array()) {
-		log_print("list item #$pos $name\n");
+		$log->print("list item #$pos $name\n");
 
 		push @items, "$pos:$name:$owner:$status";
 	}
@@ -564,8 +555,8 @@ sub split_fields {
 	my @fields = split("\0", $msg, $total_fields);
 	if (@fields != $total_fields) {
 		my $fields = @fields;
-		log_print("got $fields fields, expected $total_fields\n");
-		return ("wrong number of arguments");
+		$log->print("got $fields fields, expected $total_fields\n");
+		return ("the wrong number of message arguments were sent");
 	}
 
 	return (undef, @fields);
@@ -584,7 +575,7 @@ sub device_id_valid
 	my ($sth, $device_id) = @_;
 
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]*$/) {
-		log_print("'$device_id' not base64\n");
+		$log->print("'$device_id' not base64\n");
 		return ('the client sent a device id that was not base64');
 	}
 
@@ -593,7 +584,7 @@ sub device_id_valid
 		return (undef, $phnum);
 	}
 
-	log_print("unknown device '$device_id'\n");
+	$log->print("unknown device '$device_id'\n");
 	return ('the client sent an unknown device id');
 }
 
@@ -601,27 +592,45 @@ sub list_id_valid {
 	my ($sth, $list_id) = @_;
 
 	unless ($list_id =~ m/^[a-zA-Z0-9+\/=]*$/) {
-		log_print("'$list_id' not base64\n");
+		$log->print("'$list_id' not base64\n");
 		return "the client sent a list id that was not base64";
 	}
 
 	$$sth{list_select}->execute($list_id);
 	unless ($$sth{list_select}->fetchrow_array()) {
-		log_print("unknown list '$list_id'\n");
+		$log->print("unknown list '$list_id'\n");
 		return "the client sent an unknown list id";
 	}
 
 	return;
 }
 
-sub create_tables {
 
-	my $db_handle = DBI->connect(
+package database;
+
+sub new {
+	my $class = shift;
+
+	my $self = {};
+	bless ($self, $class);
+
+	$self->{dbh} = DBI->connect(
 		"dbi:SQLite:dbname=$db_file",
 		"", "",
 		{ RaiseError => 1 }
 	) or die $DBI::errstr;
-	$db_handle->do("PRAGMA foreign_keys = ON");
+
+	$self->{dbh}->do("PRAGMA foreign_keys = ON");
+	$self->{dbh}->{AutoCommit} = 1;
+
+	return $self;
+}
+
+sub create_tables {
+	my ($self) = @_;
+
+	my $db_handle = $self->{dbh};
+	$db_handle->begin_work;
 
 	$db_handle->do(qq{create table if not exists lists(
 		list_id int not null primary key,
@@ -629,7 +638,7 @@ sub create_tables {
 		date int,
 		first_created int not null,
 		last_updated int not null)
-	}) or die $DBI::errstr;
+	});
 
 	$db_handle->do(qq{create table if not exists devices(
 		device_id text not null primary key,
@@ -637,14 +646,14 @@ sub create_tables {
 		os text,
 		push_token text,
 		first_seen int not null)
-	}) or die $DBI::errstr;
+	});
 
 	$db_handle->do(qq{create table if not exists friends(
 		device_id text not null,
 		friend int not null,
 		primary key(device_id, friend),
 		foreign key(device_id) references devices(device_id))
-	}) or die $DBI::errstr;
+	});
 
 	$db_handle->do(qq{create table if not exists mutual_friends(
 		device_id text not null,
@@ -652,7 +661,7 @@ sub create_tables {
 		primary key(device_id, mutual_friend),
 		foreign key(device_id) references devices(device_id),
 		foreign key(mutual_friend) references devices(device_id))
-	}) or die $DBI::errstr;
+	});
 
 	$db_handle->do(qq{create table if not exists list_members(
 		list_id int not null,
@@ -661,7 +670,7 @@ sub create_tables {
 		primary key(list_id, device_id),
 		foreign key(list_id) references lists(list_id),
 		foreign key(device_id) references devices(device_id))
-	}) or die $DBI::errstr;
+	});
 
 	$db_handle->do(qq{create table if not exists list_data(
 		list_id int not null,
@@ -673,16 +682,18 @@ sub create_tables {
 		primary key(list_id, name),
 		foreign key(list_id) references lists(list_id),
 		foreign key(owner) references devices(device_id))
-	}) or die $DBI::errstr;
+	});
 
-	$db_handle->disconnect();
-	$db_handle = undef;
+	$db_handle->commit;
+	$self->{dbh}->disconnect();
+	$self->{dbh} = undef;
 }
 
 sub prepare_stmt_handles {
-	my $dbh = shift;
+	my ($self) = @_;
 
 	my %stmt_handles;
+	my $dbh = $self->{dbh};
 	my $sql;
 
 	# list table queries
@@ -756,32 +767,49 @@ sub prepare_stmt_handles {
 	return \%stmt_handles;
 }
 
-my ($log_addr, $log_port) = ('', '');
-sub log_set_peer_host_port {
-	my ($sock) = @_;
-	($log_addr, $log_port) = ($sock->peerhost(), $sock->peerport());
+package logger;
+use POSIX;
+
+sub new {
+	my $class = shift;
+
+	my $self = {};
+	bless ($self, $class);
+
+	$self->{addr} = '';
+	$self->{port} = '';
+	$self->{msg_type} = '';
+	return $self;
 }
 
-sub log_set_msg {
-	my ($msg_type) = @_;
+sub set_peer_host_port {
+	my ($self, $sock) = @_;
+	($self->{addr}, $self->{port}) = ($sock->peerhost(), $sock->peerport());
+}
+
+sub set_msg {
+	my ($self, $msg_type) = @_;
 
 	if ($msg_type ne '') {
-		$log_msg_type = "$msg_type: ";
-	}
-	else {
-		$log_msg_type = '';
+		$self->{msg_type} = "$msg_type: ";
+	} else {
+		$self->{msg_type} = '';
 	}
 }
 
-sub log_print {
+sub print {
+	my ($self, @args) = @_;
+
 	my $ftime = strftime("%F %T", localtime);
-	printf "%s %-15s %-5s> %s", $ftime, $log_addr, $log_port, $log_msg_type;
+	printf "%s %-15s %-5s> %s", $ftime, $self->{addr}, $self->{port}, $self->{msg_type};
 	# we print potentially unsafe strings here, don't use printf
-	print @_;
+	print @args;
 }
 
-sub log_print_bare {
+sub print_bare {
+	my ($self, @args) = @_;
+
 	my $ftime = strftime("%F %T", localtime);
 	printf "%s> ", $ftime;
-	printf @_;
+	printf @args;
 }

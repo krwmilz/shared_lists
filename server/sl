@@ -20,7 +20,6 @@ $SIG{TERM} = sub { exit };
 $SIG{INT} = sub { exit };
 
 my $db_file = "db";
-# EXLOCK needs to be 0 because SQLite expects it to be
 $db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
 my $log = logger->new();
@@ -101,9 +100,7 @@ while (my $client_sock = $listen_sock->accept()) {
 		send_msg($client_sock, $ver, $msg_type, $reply);
 	}
 }
-print ">>>>>> got here\n";
 
-# any header parsing errors or message read errors are fatal
 sub recv_msg {
 	my ($sock) = @_;
 
@@ -544,8 +541,7 @@ sub msg_list_items_get {
 	return "ok\0$out";
 }
 
-sub fingerprint
-{
+sub fingerprint {
 	return substr shift, 0, 8;
 }
 
@@ -570,8 +566,7 @@ sub devid_to_phnum {
 	return $ph_num;
 }
 
-sub device_id_valid
-{
+sub device_id_valid {
 	my ($sth, $device_id) = @_;
 
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]*$/) {

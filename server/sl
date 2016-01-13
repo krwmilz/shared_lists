@@ -312,6 +312,7 @@ sub msg_list_leave {
         $log->print("device '$device_id' has been removed from list '$list_id'\n");
     } else {
         $log->print("tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n");
+        return "err\0the client was not a member of the list";
     }
     $$sth{check_list_member}->finish();
 

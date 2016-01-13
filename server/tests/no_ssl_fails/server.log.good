@@ -1,3 +1,2 @@
-accepting connections on <ip>:<port> (pid = <digits>)
 new connection (pid = <digits>)
-error: SSL accept attempt failed because of handshake problems
+error: SSL accept attempt failed error:140760FC:SSL routines:SSL23_GET_CLIENT_HELLO:unknown protocol

@@ -10,12 +10,15 @@ process-server-log:
 		-e 's/[0-9]\.[0-9]\.[0-9]\.[0-9]:[0-9]*/<ip>:<port>/' \
 		server.log
 
-ifndef DIFF_MOD
+ifeq ($(DIFF_MOD), none)
+diff:
+	rm -f server.log
+else ifeq ($(DIFF_MOD), sort)
 diff: process-server-log
+	LC_ALL=C sort -o server.log < server.log
 	diff -u server.log.good server.log
 else
 diff: process-server-log
-	LC_ALL=C sort -o server.log < server.log
 	diff -u server.log.good server.log
 endif
 

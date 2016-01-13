@@ -23,6 +23,9 @@ ok() {
 	passed=`expr $passed + 1`
 }
 
+perl -T sl -p $PORT -t > server.log &
+server_pid=$!
+
 passed=0
 failed=0
 count=0
@@ -31,20 +34,15 @@ for t in `ls tests/*/Makefile`; do
 	test_dir=`dirname ${t}`
 	make -s -C $test_dir clean
 
-	perl -T sl -p $PORT -t > $test_dir/server.log &
-	server_pid=$!
-
 	# run test, complain if it failed
 	if ! make -s -C $test_dir test; then
 		fail $test_dir "test failed"
-		kill $server_pid
-		wait 2>/dev/null
 		continue
 	fi
 
-	# kill the server and wait for it to shut down
-	kill $server_pid
-	wait 2>/dev/null
+	# copy server log aside for diff'ing
+	cp server.log $test_dir/server.log
+	> server.log
 
 	# diff the server's output log
 	if ! make -s -C $test_dir diff; then
@@ -55,6 +53,10 @@ for t in `ls tests/*/Makefile`; do
 	make -s -C $test_dir clean
 	ok $test_dir
 done
+
+kill $server_pid
+wait 2>/dev/null
+rm server.log
 
 printf "\n%i %sok%s %i %sfailed%s " $passed $green $reset $failed $red $reset
 printf "(%i min %i sec)\n" $((SECONDS / 60)) $((SECONDS % 60))

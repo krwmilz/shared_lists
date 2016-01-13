@@ -2,10 +2,7 @@ package client;
 use strict;
 use warnings;
 
-use Data::Dumper;
-use Errno;
 use IO::Socket::SSL;
-use Time::HiRes qw(usleep);
 use test;
 
 require "msgs.pl";
@@ -18,28 +15,13 @@ sub new {
 	my $self = {};
 	bless ($self, $class);
 
-	$self->{sock} = undef;
-	my $timeout = time + 5;
-	while (1) {
-		$self->{sock} = IO::Socket::SSL->new(
-			PeerHost => 'localhost',
-			PeerPort => $ENV{PORT} || 5437,
-			# this is needed because PeerHost is localhost and our
-			# SSL certificates are signed with amp.ca
-			SSL_verifycn_name => "absentmindedproductions.ca",
-		);
-
-		if ($!{ECONNREFUSED}) {
-			if (time > $timeout) {
-				fail "server not ready after 5 seconds";
-			}
-			usleep(50 * 1000);
-			next;
-		}
-
-		last;
-	}
-
+	$self->{sock} = IO::Socket::SSL->new(
+		PeerHost => 'localhost',
+		PeerPort => $ENV{PORT} || 5437,
+		# this is needed because PeerHost is localhost and our SSL
+		# certificates are signed with absentmindedproductions.ca
+		SSL_verifycn_name => "absentmindedproductions.ca",
+	);
 	unless ($self->{sock}) {
 		die "failed connect or ssl handshake: $!,$SSL_ERROR";
 	}

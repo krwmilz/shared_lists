@@ -1,4 +1,3 @@
-accepting connections on <ip>:<port> (pid = <digits>)
 device_add: success, <digits>:<base64> os <base64>
 device_add: success, <digits>:<base64> os <base64>
 disconnected!

@@ -26,11 +26,10 @@ my $db = database->new();
 $db->create_tables();
 
 my $listen_sock = new IO::Socket::INET (
-	LocalHost => '0.0.0.0',
 	LocalPort => $args{p} || '5437',
 	Proto => 'tcp',
-	Listen => 100,
-	Reuse => 1,
+	Listen => 1,
+	ReuseAddr => 1,
 );
 die "Could not create socket: $!\n" unless $listen_sock;
 

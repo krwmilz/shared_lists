@@ -1,26 +1,25 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
-
 use client;
 use test;
 
 my $A = client->new();
 
-# first verify that a normal add_friend message succeeds
+# Normal message
 $A->friend_add('54321');
 
-# add the same friend, again. not an error.
+# Re-add same friend
 $A->friend_add('54321');
 
-# verify that a non numeric friends phone number isn't accepted
+# Non numeric phone number
 $A->friend_add('123asdf', 'err');
 fail_msg_ne 'friends phone number is not a valid phone number', $A->get_error();
 
-# verify an empty phone number isn't accepted
+# Empty phone number
 $A->friend_add('', 'err');
 fail_msg_ne 'friends phone number is not a valid phone number', $A->get_error();
 
-# also verify adding yourself doesn't work
+# Friending yourself
 $A->friend_add($A->phnum(), 'err');
 fail_msg_ne 'device cannot add itself as a friend', $A->get_error();

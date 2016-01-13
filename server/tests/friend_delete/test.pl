@@ -1,15 +1,13 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
-
 use client;
 use test;
 
-# create A and B
 my $A = client->new();
 my $B = client->new();
 
-# A friends B, B friends A
+# A and B are mutual friends
 $A->friend_add($B->phnum());
 $B->friend_add($A->phnum());
 
@@ -25,7 +23,7 @@ $B->list_join($A->lists(0)->{'id'});
 # A deletes B's friendship
 $A->friend_delete($B->phnum());
 
-# check that:
+# Check that:
 # - A and B are both in A's first list
 # - B can't see A's other list
 # - A can't see B's other list

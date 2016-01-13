@@ -16,9 +16,6 @@ our (%msg_num, @msg_str, @msg_func, $protocol_ver);
 my %args;
 getopts("p:t", \%args);
 
-$SIG{TERM} = sub { exit };
-$SIG{INT} = sub { exit };
-
 my $db_file = "db";
 $db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
@@ -39,6 +36,8 @@ die "Could not create socket: $!\n" unless $listen_sock;
 
 my ($addr, $port) = ($listen_sock->sockhost(), $listen_sock->sockport());
 $log->print_bare("accepting connections on $addr:$port (pid = '$$')\n");
+
+$SIG{CHLD} = 'IGNORE';
 
 # every time accept() returns we have a new client trying to connect
 while (my $client_sock = $listen_sock->accept()) {

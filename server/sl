@@ -428,11 +428,16 @@ sub msg_lists_get {
 		my $list_fp = fingerprint($list_id);
 		$log->print("found list '$list_name' '$list_fp'\n");
 
-		# find all members of this list
+		# Find all members of this list
 		my @members;
 		$$sth{get_list_members}->execute($list_id);
-		while (my ($devid) = $$sth{get_list_members}->fetchrow_array()) {
-			push @members, devid_to_phnum($sth, $devid);
+		while (my ($member_id) = $$sth{get_list_members}->fetchrow_array()) {
+			# Don't re look-up our own number
+			if ($member_id eq $device_id) {
+				push @members, $phnum;
+				next;
+			}
+			push @members, devid_to_phnum($sth, $member_id);
 		}
 		my $members = join("\0", @members);
 		$log->print("list has ". @members ." members\n");

@@ -42,12 +42,21 @@ sub list_add {
 	my $name = shift;
 	my $status = shift || 'ok';
 
-	my $list_data = communicate($self, 'list_add', $status, $name);
+	my $list_data = communicate($self, 'list_add', $status, 0, $name, 0);
 
-	# if we made it this far we know that $status is correct
 	return if ($status eq 'err');
-
 	save_list($self, $list_data);
+}
+
+sub list_update {
+	my $self = shift;
+	my $num = shift;
+	my $name = shift;
+	my $date = shift || 0;
+	my $status = shift || 'ok';
+
+	my $list_data = communicate($self, 'list_add', $status, $num, $name, $date);
+	return if ($status eq 'err');
 }
 
 sub list_join {
@@ -70,9 +79,9 @@ sub save_list {
 	my $self = shift;
 	my $list_data = shift;
 
-	my ($id, $name, @members) = split("\0", $list_data);
+	my ($num, $name, $date, @members) = split("\0", $list_data);
 	my $list = {
-		id => $id,
+		id => $num,
 		name => $name,
 		members => \@members,
 		num_members => scalar(@members),

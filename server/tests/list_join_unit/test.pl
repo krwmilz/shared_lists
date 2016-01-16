@@ -8,8 +8,8 @@ use test;
 my $A = client->new();
 
 # try joining a list that doesn't exist
-$A->list_join('somenonexistentlist', 'err');
-fail_msg_ne 'the client sent an unknown list id', $A->get_error();
+$A->list_join('12345678', 'err');
+fail_msg_ne 'the client sent an unknown list number', $A->get_error();
 
 # test joining a list your already in
 $A->list_add('my new test list');

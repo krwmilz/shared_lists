@@ -2,13 +2,13 @@ new connection (pid = <digits>)
 ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
 device_add: success, <digits>:<base64> os <base64>
 list_leave: device <base64>
-list_leave: list <base64>
-list_leave: tried to leave a list the user was not in for device <base64> and list <base64>
+list_leave: list <digits>
+list_leave: tried to leave a list the user was not in for device <base64> and list <digits>
 disconnected!
 new connection (pid = <digits>)
 ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
 device_add: success, <digits>:<base64> os <base64>
-list_add: <string>
-list_add: adding first member devid = <base64>
-list_add: fingerprint = <base64>
+list_add: device <base64>
+list_add: new list name <string>
+list_add: new list number is <digits>
 disconnected!

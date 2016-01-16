@@ -9,11 +9,11 @@ friend_add: added friend is a member
 friend_add: found mutual friendship
 friend_add: friends device id is <base64>
 friend_add: friends device id is <base64>
-list_add: <string>
-list_add: adding first member devid = <base64>
-list_add: fingerprint = <base64>
+list_add: device <base64>
+list_add: new list name <string>
+list_add: new list number is <digits>
 lists_get_other: found list <string>
-lists_get_other: found mutual friend <base64>
+lists_get_other: found mutual friend <digits>
 lists_get_other: gathering lists for <base64>
 new connection (pid = <digits>)
 new connection (pid = <digits>)

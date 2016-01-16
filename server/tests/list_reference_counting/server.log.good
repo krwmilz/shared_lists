@@ -2,20 +2,20 @@ device_add: success, <digits>:<base64> os <base64>
 device_add: success, <digits>:<base64> os <base64>
 disconnected!
 disconnected!
-list_add: <string>
-list_add: adding first member devid = <base64>
-list_add: fingerprint = <base64>
+list_add: device <base64>
+list_add: new list name <string>
+list_add: new list number is <digits>
 list_join: device <base64>
-list_join: device <base64> has been added to list <base64>
-list_join: list <base64>
+list_join: device <base64> has been added to list <digits>
+list_join: list <digits>
 list_leave: device <base64>
 list_leave: device <base64>
-list_leave: device <base64> has been removed from list <base64>
-list_leave: device <base64> has been removed from list <base64>
-list_leave: list <base64>
-list_leave: list <base64>
-list_leave: list <base64> is empty... deleting
-lists_get: found list <string> <base64>
+list_leave: device <base64> has been removed from list <digits>
+list_leave: device <base64> has been removed from list <digits>
+list_leave: list <digits>
+list_leave: list <digits>
+list_leave: list <digits> is empty... deleting
+lists_get: found list <digits>:<string>
 lists_get: gathering lists for <base64>
 lists_get: list has 0 items
 lists_get: list has 1 members

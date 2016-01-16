@@ -73,21 +73,20 @@ while (my $client_sock = $listen_sock->accept()) {
 	$log->print("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
 
 	my $db = database->new();
-	my $sths = $db->prepare_stmt_handles();
-	my $dbh = $db->{dbh};
+	$db->prepare_stmt_handles();
 
 	while (1) {
 		my ($ver, $msg_type, $msg) = recv_msg($client_sock);
 		$log->set_msg($msg_str[$msg_type]);
 
-		$dbh->begin_work;
-		my $reply = $msg_func[$msg_type]->($sths, $msg);
-		$dbh->commit;
+		$db->{dbh}->begin_work;
+		my $reply = $msg_func[$msg_type]->($db, $msg);
+		$db->{dbh}->commit;
 
 		if ($@) {
 			# now rollback to undo the incomplete changes
 			# but do it in an eval{} as it may also fail
-			eval { $dbh->rollback };
+			eval { $db->{dbh}->rollback };
 
 			$log->print("discarding reply '$reply'\n");
 			$log->print("db transaction aborted: $@\n");
@@ -177,7 +176,7 @@ sub send_all {
 }
 
 sub msg_device_add {
-	my ($sth, $msg) = @_;
+	my ($db, $msg) = @_;
 
 	my ($err, $ph_num, $os) = split_fields($msg, 2);
 	return "err\0$err" if ($err);
@@ -187,8 +186,8 @@ sub msg_device_add {
 		return "err\0the sent phone number is not a number";
 	}
 
-	$$sth{ph_num_exists}->execute($ph_num);
-	if ($$sth{ph_num_exists}->fetchrow_array()) {
+	$db->{ph_num_exists}->execute($ph_num);
+	if ($db->{ph_num_exists}->fetchrow_array()) {
 		$log->print("phone number '$ph_num' already exists\n");
 		return "err\0the sent phone number already exists";
 	}
@@ -197,52 +196,79 @@ sub msg_device_add {
 		return "err\0operating system not supported";
 	}
 
-	# make a new device id, the client will supply this on all
-	# further communication
-	# XXX: need to check the db to make sure this isn't duplicate
-	my $token = sha256_base64(arc4random_bytes(32));
+	my $device_id = sha256_base64(arc4random_bytes(32));
+	my $fp = fingerprint($device_id);
 
-	$$sth{new_device}->execute($token, $ph_num, $os, time);
-	my $fp = fingerprint($token);
+	# Check the database to make sure this isn't duplicate
+	$db->{select_device_id}->execute($device_id);
+	if ($db->{select_device_id}->fetchrow_array()) {
+		$log->print("id generation collision for '$device_id'\n");
+		return "err\0device id collision, please try again"
+	}
+
+	$db->{new_device}->execute($device_id, $ph_num, $os, undef, time, time);
 	$log->print("success, '$ph_num':'$fp' os '$os'\n");
 
-	return "ok\0$token";
+	return "ok\0$device_id";
 }
 
 sub msg_list_add {
-	my ($sth, $msg) = @_;
+	my ($db, $msg) = @_;
 
-	my ($err, $device_id, $list_name) = split_fields($msg, 2);
+	my ($err, $dev_id, $list_num, $list_name, $list_date) = split_fields($msg, 4);
 	return "err\0$err" if ($err);
 
-	($err, my $phnum) = device_id_valid($sth, $device_id);
+	my ($dev_err, $dev_num, $dev_fp, $phnum) = device_id_valid($db, $dev_id);
+	return "err\0$dev_err" if ($dev_err);
+
+	# Sending a list number of 0 triggers new list mode
+	if ($list_num == 0) {
+		$log->print("device '$dev_fp'\n");
+		$log->print("new list name '$list_name'\n");
+
+		my $now = time;
+		$db->{new_list}->execute($list_name, $list_date, $now, $now);
+
+		$list_num = $db->{dbh}->last_insert_id("", "", "", "");
+		$log->print("new list number is '$list_num'\n");
+
+		$db->{new_list_member}->execute($list_num, $dev_num, $now);
+
+		# XXX: send push notifications to all my mutual friends to
+		# update their 'other lists' section
+
+		return "ok\0$list_num\0$list_name\0$list_date\0$phnum";
+	}
+
+	# Otherwise we're in list update mode
+	$err = list_number_valid($db, $list_num);
 	return "err\0$err" if ($err);
 
-	my $devid_fp = fingerprint($device_id);
-	$log->print("'$list_name'\n");
-	$log->print("adding first member devid = '$devid_fp'\n");
+	# Check that the device is in the list it wants to update
+	$db->{check_list_member}->execute($list_num, $dev_num);
+	unless ($db->{check_list_member}->fetchrow_array()) {
+		$log->print("device '$dev_fp' not in list '$list_num'\n");
+		return "err\0client tried to update a list it was not in";
+	}
 
-	my $time = time;
-	my $list_id = sha256_base64(arc4random_bytes(32));
-	$log->print("fingerprint = '" .fingerprint($list_id). "'\n");
+	# Do the update
+	$db->{update_list}->execute($list_name, $list_date, time, $list_num);
+	$log->print("updated list '$list_num'\n");
 
-	# add new list with single list member
-	$$sth{new_list}->execute($list_id, $list_name, $time, $time);
-	$$sth{new_list_member}->execute($list_id, $device_id, $time);
+	# XXX: send push notifications to all my mutual friends to update their
+	# 'other lists' section, also tell all list members to update their
+	# 'lists' section
 
-	# XXX: also send back the date and all that stuff
-	my $response = "$list_id\0$list_name\0$phnum";
-
-	return "ok\0$response";
+	return "ok\0$list_num\0$list_name\0$list_date\0$phnum";
 }
 
 sub msg_list_item_add {
-    my ($sth, $msg) = @_;
+    my ($db, $msg) = @_;
 
     my ($err, $device_id) = split_fields($msg, 1);
     return "err\0$err" if ($err);
 
-    ($err) = device_id_valid($sth, $device_id);
+    ($err) = device_id_valid($db, $device_id);
     return "err\0$err" if ($err);
 
     return "err\0unimplemented";
@@ -262,237 +288,238 @@ sub msg_list_item_add {
 }
 
 sub msg_list_join {
-    my ($sth, $msg) = @_;
+    my ($db, $msg) = @_;
 
-    my ($err, $device_id, $list_id) = split_fields($msg, 2);
+    my ($err, $dev_id, $list_num) = split_fields($msg, 2);
     return "err\0$err" if ($err);
 
-    ($err) = device_id_valid($sth, $device_id);
+    my ($err2, $dev_num, $dev_fp) = device_id_valid($db, $dev_id);
+    return "err\0$err2" if ($err2);
+
+    $err = list_number_valid($db, $list_num);
     return "err\0$err" if ($err);
 
-    $err = list_id_valid($sth, $list_id);
-    return "err\0$err" if ($err);
-
-    $log->print("device '$device_id'\n");
-    $log->print("list '$list_id'\n");
+    $log->print("device '$dev_fp'\n");
+    $log->print("list '$list_num'\n");
     
     my $time = time;
-    $$sth{check_list_member}->execute($list_id, $device_id);
+    $db->{check_list_member}->execute($list_num, $dev_num);
 
-    if (!$$sth{check_list_member}->fetchrow_array()) {
-        $$sth{new_list_member}->execute($list_id, $device_id, $time);
-        $log->print("device '$device_id' has been added to list '$list_id'\n");
+    if (!$db->{check_list_member}->fetchrow_array()) {
+        $db->{new_list_member}->execute($list_num, $dev_num, $time);
+        $log->print("device '$dev_fp' has been added to list '$list_num'\n");
     } else {
-        $log->print("tried to create a duplicate list member entry for device '$device_id' and list '$list_id'\n");
+        $log->print("tried to create a duplicate list member entry for device '$dev_fp' and list '$list_num'\n");
 	return "err\0the device is already part of this list";
     }
 
-    return "ok\0$list_id";
+    return "ok\0$list_num";
 }
 
 sub msg_list_leave {
-    my ($sth, $msg) = @_;
+    my ($db, $msg) = @_;
 
-    my ($err, $device_id, $list_id) = split_fields($msg, 2);
+    my ($split_err, $dev_id, $list_num) = split_fields($msg, 2);
+    return "err\0$split_err" if ($split_err);
+
+    my ($dev_err, $dev_num, $dev_fp) = device_id_valid($db, $dev_id);
+    return "err\0$dev_err" if ($dev_err);
+
+    my $err = list_number_valid($db, $list_num);
     return "err\0$err" if ($err);
 
-    ($err) = device_id_valid($sth, $device_id);
-    return "err\0$err" if ($err);
+    $log->print("device '$dev_fp'\n");
+    $log->print("list '$list_num'\n");
 
-    $err = list_id_valid($sth, $list_id);
-    return "err\0$err" if ($err);
+    $db->{check_list_member}->execute($list_num, $dev_num);
 
-    $log->print("device '$device_id'\n");
-    $log->print("list '$list_id'\n");
-
-    $$sth{check_list_member}->execute($list_id, $device_id);
-
-    if ($$sth{check_list_member}->fetchrow_array()) {
-        $$sth{remove_list_member}->execute($list_id, $device_id);
-        $log->print("device '$device_id' has been removed from list '$list_id'\n");
+    if ($db->{check_list_member}->fetchrow_array()) {
+        $db->{remove_list_member}->execute($list_num, $dev_num);
+        $log->print("device '$dev_fp' has been removed from list '$list_num'\n");
     } else {
-        $log->print("tried to leave a list the user was not in for device '$device_id' and list '$list_id'\n");
+        $log->print("tried to leave a list the user was not in for device '$dev_fp' and list '$list_num'\n");
         return "err\0the client was not a member of the list";
     }
-    $$sth{check_list_member}->finish();
+    $db->{check_list_member}->finish();
 
-    $$sth{get_list_members}->execute($list_id);
+    $db->{get_list_members}->execute($list_num);
     
     my $alive = 1;
 
-    if (!$$sth{get_list_members}->fetchrow_array()) {
-        $log->print("list '$list_id' is empty... deleting\n");
-        $$sth{delete_list}->execute($list_id);
-        $$sth{delete_list_data}->execute($list_id);
+    if (!$db->{get_list_members}->fetchrow_array()) {
+        $log->print("list '$list_num' is empty... deleting\n");
+        $db->{delete_list}->execute($list_num);
+        $db->{delete_list_data}->execute($list_num);
         $alive = 0;
     }
-    my $out = "$list_id\0$alive";
 
-    return "ok\0$out";
+    return "ok\0$list_num\0$alive";
 }
 
 sub msg_friend_add {
-	my ($sth, $msg) = @_;
+	my ($db, $msg) = @_;
 
-	my ($err, $device_id, $friend) = split_fields($msg, 2);
+	my ($err, $dev_id, $friend_phnum) = split_fields($msg, 2);
 	return "err\0$err" if ($err);
 
-	($err, my $my_phnum) = device_id_valid($sth, $device_id);
-	return "err\0$err" if ($err);
+	my ($dev_err, $dev_num, $dev_fp, $dev_phnum) = device_id_valid($db, $dev_id);
+	return "err\0$dev_err" if ($dev_err);
 
-	my $devid_fp = fingerprint($device_id);
-	$log->print("'$devid_fp' adding '$friend'\n");
+	$log->print("'$dev_fp' adding '$friend_phnum'\n");
 
-	unless (looks_like_number($friend)) {
-		$log->print("bad friends number '$friend'\n");
+	unless (looks_like_number($friend_phnum)) {
+		$log->print("bad friends number '$friend_phnum'\n");
 		return "err\0friends phone number is not a valid phone number";
 	}
 
-	# check if this added friend is a member already
-	$$sth{ph_num_exists}->execute($friend);
-	if (my ($fr_devid) = $$sth{ph_num_exists}->fetchrow_array()) {
+	# Check if I'm adding myself as a friend
+	if ($dev_phnum eq $friend_phnum) {
+		$log->print("device '$dev_fp' tried adding itself\n");
+		return "err\0device cannot add itself as a friend";
+	}
 
-		# check if the device is trying to add itself
-		if ($fr_devid eq $device_id) {
-			$log->print("device '$devid_fp' tried adding itself\n");
-			return "err\0device cannot add itself as a friend";
-		}
+	# Add a 1 way friendship for this person
+	$db->{friends_insert}->execute($dev_num, $friend_phnum);
 
-		my $friends_fp = fingerprint($fr_devid);
+	# Check if the added friend has registered their phone number
+	$db->{ph_num_exists}->execute($friend_phnum);
+	if (my ($friend_num, $friend_devid) = $db->{ph_num_exists}->fetchrow_array()) {
+
 		$log->print("added friend is a member\n");
-		$log->print("friends device id is '$friends_fp'\n");
+		my $friend_fp = fingerprint($friend_devid);
+		$log->print("friends device id is '$friend_fp'\n");
 
-		# check if my phone number is in their friends list
-		$$sth{friends_select}->execute($fr_devid, $my_phnum);
-		if ($$sth{friends_select}->fetchrow_array()) {
+		# Check if my phone number is in their friends list
+		$db->{friends_select}->execute($friend_num, $dev_phnum);
+		if ($db->{friends_select}->fetchrow_array()) {
 			$log->print("found mutual friendship\n");
-			$$sth{mutual_friend_insert}->execute($device_id, $fr_devid);
-			$$sth{mutual_friend_insert}->execute($fr_devid, $device_id);
+
+			# Adding both is technically not necessary but makes
+			# lookups easier
+			$db->{mutual_friend_insert}->execute($dev_num, $friend_num);
+			$db->{mutual_friend_insert}->execute($friend_num, $dev_num);
 		}
 	}
 
-	$$sth{friends_insert}->execute($device_id, $friend);
 
-	return "ok\0$friend";
+	return "ok\0$friend_phnum";
 }
 
 sub msg_friend_delete {
-	my ($sth, $msg) = @_;
+	my ($db, $msg) = @_;
 
-	my ($err, $device_id, $friend) = split_fields($msg, 2);
+	my ($err, $dev_id, $friend_phnum) = split_fields($msg, 2);
 	return "err\0$err" if ($err);
 
-	($err) = device_id_valid($sth, $device_id);
-	return "err\0$err" if ($err);
+	my ($dev_err, $dev_num, $dev_fp) = device_id_valid($db, $dev_id);
+	return "err\0$dev_err" if ($dev_err);
 
-	unless (looks_like_number($friend)) {
-		$log->print("bad friends number '$friend'\n");
+	unless (looks_like_number($friend_phnum)) {
+		$log->print("bad friends number '$friend_phnum'\n");
 		return "err\0friends phone number is not a valid phone number";
 	}
 
-	$$sth{friends_select}->execute($device_id, $friend);
-	if ($$sth{friends_select}->fetchrow_array()) {
-		$log->print("removing '$friend' from friends list\n");
-		$$sth{friends_delete}->execute($device_id, $friend);
+	$db->{friends_select}->execute($dev_num, $friend_phnum);
+	if ($db->{friends_select}->fetchrow_array()) {
+		$log->print("removing '$friend_phnum' from friends list\n");
+		$db->{friends_delete}->execute($dev_num, $friend_phnum);
 	}
 	else {
-		$log->print("tried deleting friend '$friend' but they weren't a friend\n");
+		$log->print("tried deleting friend '$friend_phnum' but they weren't a friend\n");
 		return "err\0friend sent for deletion was not a friend";
 	}
 
-	# now delete any mutual friend references
-	$$sth{ph_num_exists}->execute($friend);
-	if (my ($friend_id) = $$sth{ph_num_exists}->fetchrow_array()) {
-		my $friend_fp = fingerprint($friend_id);
-		$log->print("friend '$friend' was registered as '$friend_fp'\n");
-		$$sth{mutual_friends_delete}->execute($device_id, $friend_id);
-		$$sth{mutual_friends_delete}->execute($friend_id, $device_id);
+	# Check for and delete any mutual friend references
+	$db->{ph_num_exists}->execute($friend_phnum);
+	if (my ($friend_num) = $db->{ph_num_exists}->fetchrow_array()) {
+
+		$log->print("also removing mutual friend relationship\n");
+		$db->{mutual_friends_delete}->execute($dev_num, $friend_num);
+		$db->{mutual_friends_delete}->execute($friend_num, $dev_num);
 	}
 
-	return "ok\0$friend";
+	return "ok\0$friend_phnum";
 }
 
 sub msg_lists_get {
-	my ($sth, $device_id) = @_;
+	my ($db, $dev_id) = @_;
 
-	my ($err, $phnum) = device_id_valid($sth, $device_id);
+	my ($err, $dev_num, $dev_fp, $phnum) = device_id_valid($db, $dev_id);
 	return "err\0$err" if ($err);
 
-	my $devid_fp = fingerprint($device_id);
-	$log->print("gathering lists for '$devid_fp'\n");
+	$log->print("gathering lists for '$dev_fp'\n");
 
 	my @lists;
-	$$sth{get_lists}->execute($device_id);
-	while (my ($list_id, $list_name) = $$sth{get_lists}->fetchrow_array()) {
+	$db->{get_lists}->execute($dev_num);
+	while (my ($list_num, $list_name) = $db->{get_lists}->fetchrow_array()) {
 
-		my $list_fp = fingerprint($list_id);
-		$log->print("found list '$list_name' '$list_fp'\n");
+		$log->print("found list '$list_num':'$list_name'\n");
 
 		# Find all members of this list
 		my @members;
-		$$sth{get_list_members}->execute($list_id);
-		while (my ($member_id) = $$sth{get_list_members}->fetchrow_array()) {
+		$db->{get_list_members}->execute($list_num);
+		while (my ($member_num) = $db->{get_list_members}->fetchrow_array()) {
+
 			# Don't re look-up our own number
-			if ($member_id eq $device_id) {
+			if ($member_num eq $dev_num) {
 				push @members, $phnum;
 				next;
 			}
-			push @members, devid_to_phnum($sth, $member_id);
+
+			push @members, devnum_to_phnum($db, $member_num);
 		}
 		my $members = join("\0", @members);
-		$log->print("list has ". @members ." members\n");
+		$log->print("list has " . @members . " members\n");
 
-		# find how many items are complete in this list
+		# Find how many items are complete in this list
 		my $num_items = 0;
-		$$sth{get_list_items}->execute($list_id);
-		while (my @results = $$sth{get_list_items}->fetchrow_array()) {
+		$db->{get_list_items}->execute($list_num);
+		while (my @results = $db->{get_list_items}->fetchrow_array()) {
 			my (undef, $item_name, $item_status) = @results;
 			# XXX: actually check the item status
 			$num_items++;
 		}
 		$log->print("list has $num_items items\n");
 
-		push @lists, "$list_id\0$list_name\0$num_items\0$members";
+		push @lists, "$list_num\0$list_name\0$num_items\0$members";
 	}
 
 	return "ok\0" . join("\n", @lists);
 }
 
 sub msg_lists_get_other {
-	my ($sth, $device_id) = @_;
+	my ($db, $dev_id) = @_;
 
-	my ($err) = device_id_valid($sth, $device_id);
+	my ($err, $dev_num, $dev_fp) = device_id_valid($db, $dev_id);
 	return "err\0$err" if ($err);
 
-	my $devid_fp = fingerprint($device_id);
-	$log->print("gathering lists for '$devid_fp'\n");
+	$log->print("gathering lists for '$dev_fp'\n");
 
-	my @list_ids;
-	$$sth{get_lists}->execute($device_id);
-	while (my ($list_id) = $$sth{get_lists}->fetchrow_array()) {
-		push @list_ids, $list_id;
+	my @list_nums;
+	$db->{get_lists}->execute($dev_num);
+	while (my ($list_num) = $db->{get_lists}->fetchrow_array()) {
+		push @list_nums, $list_num;
 	}
 
-	# now calculate which lists this device id should see
+	# Find all mutual friends of this device number
 	my (%members, %names);
-	$$sth{mutual_friend_select}->execute($device_id);
-	while (my ($friend_id) = $$sth{mutual_friend_select}->fetchrow_array()) {
+	$db->{mutual_friend_select}->execute($dev_num);
+	while (my ($friend_num) = $db->{mutual_friend_select}->fetchrow_array()) {
 
-		my $friend_fp = fingerprint($friend_id);
-		$log->print("found mutual friend '$friend_fp'\n");
+		# We can't send device id's back to the client
+		my $friend_phnum = devnum_to_phnum($db, $friend_num);
 
-		# we can't send device id's back to the client
-		my $friend_phnum = devid_to_phnum($sth, $friend_id);
+		$log->print("found mutual friend '$friend_phnum'\n");
 
-		# find all of my friends lists
-		$$sth{get_lists}->execute($friend_id);
-		while (my ($id, $name) = $$sth{get_lists}->fetchrow_array()) {
+		# Find all of the lists my mutual friend is in (but not me)
+		$db->{get_lists}->execute($friend_num);
+		while (my ($num, $name) = $db->{get_lists}->fetchrow_array()) {
 
 			# filter out lists this device id is already in
-			next if (grep {$_ eq $id} @list_ids);
+			next if (grep {$_ eq $num} @list_nums);
 
-			push(@{ $members{$id} }, $friend_phnum);
-			$names{$id} = $name;
+			push(@{ $members{$num} }, $friend_phnum);
+			$names{$num} = $name;
 			$log->print("found list '$name'\n");
 		}
 	}
@@ -506,12 +533,12 @@ sub msg_lists_get_other {
 }
 
 sub msg_list_items_get {
-	my ($sth, $msg) = @_;
+	my ($db, $msg) = @_;
 
 	my ($err, $device_id, $list_id) = split_fields($msg, 2);
 	return "err\0$err" if ($err);
 
-	($err) = device_id_valid($sth, $device_id);
+	($err) = device_id_valid($db, $device_id);
 	return "err\0$err" if ($err);
 
 	if (!$list_id) {
@@ -525,11 +552,11 @@ sub msg_list_items_get {
 	# }
 	$log->print("$device_id request items for $list_id\n");
 
-	$$sth{get_list_items}->execute($list_id);
+	$db->{get_list_items}->execute($list_id);
 
 	my @items;
 	while (my ($list_id, $pos, $name, $status, $owner, undef) =
-		$$sth{get_list_items}->fetchrow_array()) {
+		$db->{get_list_items}->fetchrow_array()) {
 		$log->print("list item #$pos $name\n");
 
 		push @items, "$pos:$name:$owner:$status";
@@ -556,43 +583,45 @@ sub split_fields {
 	return (undef, @fields);
 }
 
-sub devid_to_phnum {
-	my ($sth, $device_id) = @_;
+sub devnum_to_phnum {
+	my ($db, $dev_num) = @_;
 
-	$sth->{device_id_exists}->execute($device_id);
-	my (undef, $ph_num) = $sth->{device_id_exists}->fetchrow_array;
+	$db->{select_device_num}->execute($dev_num);
+	my (undef, undef, $ph_num) = $db->{select_device_num}->fetchrow_array;
+
 	return $ph_num;
 }
 
 sub device_id_valid {
-	my ($sth, $device_id) = @_;
+	my ($db, $device_id) = @_;
 
 	unless ($device_id =~ m/^[a-zA-Z0-9+\/=]*$/) {
 		$log->print("'$device_id' not base64\n");
 		return ('the client sent a device id that was not base64');
 	}
 
-	$$sth{device_id_exists}->execute($device_id);
-	if (my ($id, $phnum) = $$sth{device_id_exists}->fetchrow_array()) {
-		return (undef, $phnum);
+	$db->{select_device_id}->execute($device_id);
+	if (my ($num, $id, $phnum) = $db->{select_device_id}->fetchrow_array()) {
+		my $fp = fingerprint($id);
+		return (undef, $num, $fp, $phnum);
 	}
 
 	$log->print("unknown device '$device_id'\n");
 	return ('the client sent an unknown device id');
 }
 
-sub list_id_valid {
-	my ($sth, $list_id) = @_;
+sub list_number_valid {
+	my ($db, $list_num) = @_;
 
-	unless ($list_id =~ m/^[a-zA-Z0-9+\/=]*$/) {
-		$log->print("'$list_id' not base64\n");
-		return "the client sent a list id that was not base64";
+	unless (looks_like_number($list_num)) {
+		$log->print("'$list_num' is not a number\n");
+		return "the client sent a list number that was not a number";
 	}
 
-	$$sth{list_select}->execute($list_id);
-	unless ($$sth{list_select}->fetchrow_array()) {
-		$log->print("unknown list '$list_id'\n");
-		return "the client sent an unknown list id";
+	$db->{list_select}->execute($list_num);
+	unless ($db->{list_select}->fetchrow_array()) {
+		$log->print("unknown list number '$list_num'\n");
+		return "the client sent an unknown list number";
 	}
 
 	return;
@@ -625,56 +654,65 @@ sub create_tables {
 	my $db_handle = $self->{dbh};
 	$db_handle->begin_work;
 
-	$db_handle->do(qq{create table if not exists lists(
-		list_id int not null primary key,
+	$db_handle->do(qq{
+		create table if not exists lists (
+		num integer primary key,
 		name text not null,
 		date int,
-		first_created int not null,
+		created int not null,
 		last_updated int not null)
 	});
 
-	$db_handle->do(qq{create table if not exists devices(
-		device_id text not null primary key,
+	$db_handle->do(qq{
+		create table if not exists devices (
+		num integer primary key,
+		id text not null,
 		phone_num text not null,
 		os text,
 		push_token text,
-		first_seen int not null)
+		seen_first int not null,
+		seen_last int not null)
 	});
 
-	$db_handle->do(qq{create table if not exists friends(
-		device_id text not null,
-		friend int not null,
-		primary key(device_id, friend),
-		foreign key(device_id) references devices(device_id))
+	$db_handle->do(qq{
+		create table if not exists friends (
+		device integer not null,
+		friend text not null,
+		primary key(device, friend),
+		foreign key(device) references devices(num))
 	});
 
-	$db_handle->do(qq{create table if not exists mutual_friends(
-		device_id text not null,
-		mutual_friend text not null,
-		primary key(device_id, mutual_friend),
-		foreign key(device_id) references devices(device_id),
-		foreign key(mutual_friend) references devices(device_id))
+	$db_handle->do(qq{
+		create table if not exists mutual_friends (
+		device integer not null,
+		mutual_friend integer not null,
+		primary key(device, mutual_friend),
+		foreign key(device) references devices(num),
+		foreign key(mutual_friend) references devices(num))
 	});
 
-	$db_handle->do(qq{create table if not exists list_members(
-		list_id int not null,
-		device_id text not null,
-		joined_date int not null,
-		primary key(list_id, device_id),
-		foreign key(list_id) references lists(list_id),
-		foreign key(device_id) references devices(device_id))
+	$db_handle->do(qq{
+		create table if not exists list_members (
+		list integer,
+		device integer,
+		joined int not null,
+		primary key(list, device),
+		foreign key(list) references lists(num),
+		foreign key(device) references devices(num))
 	});
 
-	$db_handle->do(qq{create table if not exists list_data(
-		list_id int not null,
-		name text not null,
+	$db_handle->do(qq{
+		create table if not exists list_data (
+		num integer primary key,
+		list integer,
+		name text,
+		owner integer,
 		status int not null default 0,
 		quantity,
-		owner text,
+		created int not null,
 		last_updated int not null,
-		primary key(list_id, name),
-		foreign key(list_id) references lists(list_id),
-		foreign key(owner) references devices(device_id))
+		foreign key(list) references lists(num),
+		foreign key(owner) references devices(num))
 	});
 
 	$db_handle->commit;
@@ -685,79 +723,82 @@ sub create_tables {
 sub prepare_stmt_handles {
 	my ($self) = @_;
 
-	my %stmt_handles;
 	my $dbh = $self->{dbh};
 	my $sql;
 
 	# list table queries
-	$sql = 'select * from lists where list_id = ?';
-	$stmt_handles{list_select} = $dbh->prepare($sql);
+	$sql = 'select * from lists where num = ?';
+	$self->{list_select} = $dbh->prepare($sql);
 
-	$sql = 'insert into lists (list_id, name, first_created, last_updated) values (?, ?, ?, ?)';
-	$stmt_handles{new_list} = $dbh->prepare($sql);
+	$sql = 'insert into lists (name, date, created, last_updated) values (?, ?, ?, ?)';
+	$self->{new_list} = $dbh->prepare($sql);
 
-	$sql = 'delete from lists where list_id = ?';
-	$stmt_handles{delete_list} = $dbh->prepare($sql);
+	$sql = 'update lists set name = ?, date = ?, last_updated = ? where num = ?';
+	$self->{update_list} = $dbh->prepare($sql);
+
+	$sql = 'delete from lists where num = ?';
+	$self->{delete_list} = $dbh->prepare($sql);
 
 	# devices table queries
-	$sql = 'insert into devices (device_id, phone_num, os, first_seen) values (?, ?, ?, ?)';
-	$stmt_handles{new_device} = $dbh->prepare($sql);
+	$sql = 'insert into devices (id, phone_num, os, push_token, seen_first, seen_last) values (?, ?, ?, ?, ?, ?)';
+	$self->{new_device} = $dbh->prepare($sql);
 
 	$sql = 'select * from devices where phone_num = ?';
-	$stmt_handles{ph_num_exists} = $dbh->prepare($sql);
+	$self->{ph_num_exists} = $dbh->prepare($sql);
 
-	$sql = 'select * from devices where device_id = ?';
-	$stmt_handles{device_id_exists} = $dbh->prepare($sql);
+	$sql = 'select * from devices where id = ?';
+	$self->{select_device_id} = $dbh->prepare($sql);
+
+	$sql = 'select * from devices where num = ?';
+	$self->{select_device_num} = $dbh->prepare($sql);
 
 	# friends table queries
-	$sql = 'insert or replace into friends (device_id, friend) values (?, ?)';
-	$stmt_handles{friends_insert} = $dbh->prepare($sql);
+	$sql = 'insert or replace into friends (device, friend) values (?, ?)';
+	$self->{friends_insert} = $dbh->prepare($sql);
 
-	$sql = 'select * from friends where device_id = ? and friend = ?';
-	$stmt_handles{friends_select} = $dbh->prepare($sql);
+	$sql = 'select * from friends where device = ? and friend = ?';
+	$self->{friends_select} = $dbh->prepare($sql);
 
-	$sql = 'delete from friends where device_id = ? and friend = ?';
-	$stmt_handles{friends_delete} = $dbh->prepare($sql);
+	$sql = 'delete from friends where device = ? and friend = ?';
+	$self->{friends_delete} = $dbh->prepare($sql);
 
-	# mutual_friends table
-	$sql = 'insert or replace into mutual_friends (device_id, mutual_friend) values (?, ?)';
-	$stmt_handles{mutual_friend_insert} = $dbh->prepare($sql);
+	# mutual_friends table queries
+	$sql = 'insert or replace into mutual_friends (device, mutual_friend) values (?, ?)';
+	$self->{mutual_friend_insert} = $dbh->prepare($sql);
 
-	$sql = 'select mutual_friend from mutual_friends where device_id = ?';
-	$stmt_handles{mutual_friend_select} = $dbh->prepare($sql);
+	$sql = 'select mutual_friend from mutual_friends where device = ?';
+	$self->{mutual_friend_select} = $dbh->prepare($sql);
 
-	$sql = 'delete from mutual_friends where device_id = ? and mutual_friend = ?';
-	$stmt_handles{mutual_friends_delete} = $dbh->prepare($sql);
+	$sql = 'delete from mutual_friends where device = ? and mutual_friend = ?';
+	$self->{mutual_friends_delete} = $dbh->prepare($sql);
 
 	# lists/list_members compound queries
-	$sql = qq{select lists.list_id, lists.name from lists, list_members where
-	lists.list_id = list_members.list_id and list_members.device_id = ?};
-	$stmt_handles{get_lists} = $dbh->prepare($sql);
+	$sql = qq{select lists.num, lists.name from lists, list_members where
+		lists.num = list_members.list and list_members.device = ?};
+	$self->{get_lists} = $dbh->prepare($sql);
 
-	# list_members table
-	$sql = 'select device_id from list_members where list_id = ?';
-	$stmt_handles{get_list_members} = $dbh->prepare($sql);
+	# list_members table queries
+	$sql = 'select device from list_members where list = ?';
+	$self->{get_list_members} = $dbh->prepare($sql);
 
-	$sql = 'insert into list_members (list_id, device_id, joined_date) values (?, ?, ?)';
-	$stmt_handles{new_list_member} = $dbh->prepare($sql);
+	$sql = 'insert into list_members (list, device, joined) values (?, ?, ?)';
+	$self->{new_list_member} = $dbh->prepare($sql);
 
-	$sql = 'delete from list_members where list_id = ? and device_id = ?';
-	$stmt_handles{remove_list_member} = $dbh->prepare($sql);
+	$sql = 'delete from list_members where list = ? and device = ?';
+	$self->{remove_list_member} = $dbh->prepare($sql);
 
-	$sql = 'select device_id from list_members where list_id = ? and device_id = ?';
-	$stmt_handles{check_list_member} = $dbh->prepare($sql);
+	$sql = 'select device from list_members where list = ? and device = ?';
+	$self->{check_list_member} = $dbh->prepare($sql);
 
-	# list_data table
-	$sql = 'delete from list_data where list_id = ?';
-	$stmt_handles{delete_list_data} = $dbh->prepare($sql);
+	# list_data table queries
+	$sql = 'delete from list_data where list = ?';
+	$self->{delete_list_data} = $dbh->prepare($sql);
 
-	$sql = 'select * from list_data where list_id = ?';
-	$stmt_handles{get_list_items} = $dbh->prepare($sql);
+	$sql = 'select * from list_data where list = ?';
+	$self->{get_list_items} = $dbh->prepare($sql);
 
-	$sql = 'insert into list_data (list_id, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)';
-	$stmt_handles{new_list_item} = $dbh->prepare($sql);
-
-	return \%stmt_handles;
+	$sql = 'insert into list_data (list, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)';
+	$self->{new_list_item} = $dbh->prepare($sql);
 }
 
 package logger;

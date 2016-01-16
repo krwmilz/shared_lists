@@ -9,24 +9,24 @@ friend_add: added friend is a member
 friend_add: found mutual friendship
 friend_add: friends device id is <base64>
 friend_add: friends device id is <base64>
-friend_delete: friend <digits> was registered as <base64>
+friend_delete: also removing mutual friend relationship
 friend_delete: removing <digits> from friends list
-list_add: <string>s first list'
-list_add: <string>s first list'
-list_add: <string>s second list'
-list_add: adding first member devid = <base64>
-list_add: adding first member devid = <base64>
-list_add: adding first member devid = <base64>
-list_add: fingerprint = <base64>
-list_add: fingerprint = <base64>
-list_add: fingerprint = <base64>
+list_add: device <base64>
+list_add: device <base64>
+list_add: device <base64>
+list_add: new list name <string>s first list'
+list_add: new list name <string>s first list'
+list_add: new list name <string>s second list'
+list_add: new list number is <digits>
+list_add: new list number is <digits>
+list_add: new list number is <digits>
 list_join: device <base64>
-list_join: device <base64> has been added to list <base64>
-list_join: list <base64>
-lists_get: found list <string>s first list' <base64>
-lists_get: found list <string>s first list' <base64>
-lists_get: found list <string>s first list' <base64>
-lists_get: found list <string>s second list' <base64>
+list_join: device <base64> has been added to list <digits>
+list_join: list <digits>
+lists_get: found list <digits>:<string>s first list'
+lists_get: found list <digits>:<string>s first list'
+lists_get: found list <digits>:<string>s first list'
+lists_get: found list <digits>:<string>s second list'
 lists_get: gathering lists for <base64>
 lists_get: gathering lists for <base64>
 lists_get: list has 0 items

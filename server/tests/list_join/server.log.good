@@ -9,13 +9,13 @@ friend_add: added friend is a member
 friend_add: found mutual friendship
 friend_add: friends device id is <base64>
 friend_add: friends device id is <base64>
-list_add: <string>
-list_add: adding first member devid = <base64>
-list_add: fingerprint = <base64>
+list_add: device <base64>
+list_add: new list name <string>
+list_add: new list number is <digits>
 list_join: device <base64>
-list_join: device <base64> has been added to list <base64>
-list_join: list <base64>
-lists_get: found list <string> <base64>
+list_join: device <base64> has been added to list <digits>
+list_join: list <digits>
+lists_get: found list <digits>:<string>
 lists_get: gathering lists for <base64>
 lists_get: list has 0 items
 lists_get: list has 2 members

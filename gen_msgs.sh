@@ -15,15 +15,18 @@ msg_types="
 "
 
 objc_path="ios/shlist/MsgTypes.h"
-perl_path="server/msgs.pl"
 java_path="android/shlist/app/src/main/java/drsocto/shlist/MsgTypes.java"
+perl_path="server/msgs.pl"
 test_path="server/tests/msgs.pl"
 
 generated_at="generated `date`"
 
-# enumerate messages and make a table
+# Helper function to enumerate messages and make tables
+# arg 1: path to output file
+# arg 2: array/list/hash/whatever declaration
+# arg 3: a string that's interpreted in the loop below, like "$msg => $i"
+# arg 4: closing parenthesis/curly braces/whatever
 print_table() {
-	# print header
 	echo "${2}" >> ${1}
 
 	i=0
@@ -65,8 +68,11 @@ use warnings;
 
 our \$protocol_ver = $protocol_version;
 EOF
-	print_table $perl_path "our %msg_num = (" "\$msg => \$i," ");"
-	print_table $perl_path "our @msg_str = (" "'\$msg'," ");"
+
+	# We want message name to number map, number to name array, and function
+	# pointer array
+	print_table $perl_path "our %msg_num = ("  "\$msg => \$i," ");"
+	print_table $perl_path "our @msg_str = ("  "'\$msg',"      ");"
 	print_table $perl_path "our @msg_func = (" "\\&msg_\$msg," ");"
 
 	cp $perl_path $test_path

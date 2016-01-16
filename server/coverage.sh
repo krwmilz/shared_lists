@@ -21,6 +21,7 @@ for t in `ls tests/*/Makefile`; do
 	if ! make -s -C $test_dir test; then
 		printf ">>> %3s %s: test failed\n" $count $test_dir
 		failed=`expr $failed + 1`
+		continue
 	fi
 
 	printf ">>> %3s %s: ok\n" $count $test_dir
@@ -30,6 +31,8 @@ done
 # Kill the server to flush all coverage data
 kill $server_pid
 wait
+
+sleep 1
 
 printf ">>> %i ok %i failed " $passed $failed
 printf "(%i min %i sec)\n" $((SECONDS / 60)) $((SECONDS % 60))

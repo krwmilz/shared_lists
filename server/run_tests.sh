@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# try not to connect to a production instance with this script!
+# Try not to connect to the production server with this script!
 export PORT=4729
 
 if which tput > /dev/null; then
@@ -32,7 +32,6 @@ count=0
 for t in `ls tests/*/Makefile`; do
 	count=`expr $count + 1`
 	test_dir=`dirname ${t}`
-	make -s -C $test_dir clean
 
 	# run test, complain if it failed
 	if ! make -s -C $test_dir test; then

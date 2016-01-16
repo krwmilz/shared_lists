@@ -25,40 +25,38 @@ $log->print_bare("using database '$db_file'\n");
 my $db = database->new();
 $db->create_tables();
 
-my $listen_sock = new IO::Socket::INET (
+my $server_socket = new IO::Socket::INET (
 	LocalPort => $args{p} || '5437',
 	Proto => 'tcp',
 	Listen => 1,
 	ReuseAddr => 1,
 );
-die "Could not create socket: $!\n" unless $listen_sock;
+die "Could not create socket: $!\n" unless($server_socket);
 
-my ($addr, $port) = ($listen_sock->sockhost(), $listen_sock->sockport());
+my ($addr, $port) = ($server_socket->sockhost(), $server_socket->sockport());
 $log->print_bare("accepting connections on $addr:$port (pid = '$$')\n");
 
 $SIG{CHLD} = 'IGNORE';
+while (my $client_socket = $server_socket->accept()) {
 
-# every time accept() returns we have a new client trying to connect
-while (my $client_sock = $listen_sock->accept()) {
-
-	# create a child process to handle this client
-	my $pid = fork;
+	# Create a child process to handle this client
+	my $pid = fork();
 	if (!defined $pid) {
 		die "error: can't fork: $!\n";
 	} elsif ($pid) {
-		# in parent: close our copy of $client_sock and listen again
-		close $client_sock;
+		# In parent: close our copy of the client socket and listen again
+		close $client_socket;
 		next;
 	}
 
 	# in child: on linux we must stir the random pool after fork()'s
-	close $listen_sock;
+	close $server_socket;
 	arc4random_stir();
-	$log->set_peer_host_port($client_sock);
+	$log->set_peer_host_port($client_socket);
 	$log->print("new connection (pid = '$$')\n");
 
 	# unconditionally upgrade connection to SSL
-	my $ret = IO::Socket::SSL->start_SSL($client_sock,
+	my $ret = IO::Socket::SSL->start_SSL($client_socket,
 		SSL_server => 1,
 		SSL_cert_file => 'ssl/cert_chain.pem',
 		SSL_key_file => 'ssl/privkey.pem'
@@ -68,15 +66,15 @@ while (my $client_sock = $listen_sock->accept()) {
 		exit 0;
 	}
 
-	my $ssl_ver = $client_sock->get_sslversion();
-	my $ssl_cipher = $client_sock->get_cipher();
+	my $ssl_ver = $client_socket->get_sslversion();
+	my $ssl_cipher = $client_socket->get_cipher();
 	$log->print("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
 
 	my $db = database->new();
 	$db->prepare_stmt_handles();
 
 	while (1) {
-		my ($ver, $msg_type, $msg) = recv_msg($client_sock);
+		my ($ver, $msg_type, $msg) = recv_msg($client_socket);
 		$log->set_msg($msg_str[$msg_type]);
 
 		$db->{dbh}->begin_work;
@@ -94,7 +92,7 @@ while (my $client_sock = $listen_sock->accept()) {
 		}
 
 		$log->set_msg('');
-		send_msg($client_sock, $ver, $msg_type, $reply);
+		send_msg($client_socket, $ver, $msg_type, $reply);
 	}
 }
 

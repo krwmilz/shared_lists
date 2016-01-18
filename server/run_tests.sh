@@ -29,7 +29,7 @@ server_pid=$!
 passed=0
 failed=0
 count=0
-for t in `ls tests/*/Makefile`; do
+for t in `LC_ALL=C ls tests/*/Makefile`; do
 	count=`expr $count + 1`
 	test_dir=`dirname ${t}`
 

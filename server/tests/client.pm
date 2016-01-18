@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 use IO::Socket::SSL;
+use JSON::PP;
 use test;
 
 require "msgs.pl";
@@ -26,10 +27,9 @@ sub new {
 		die "failed connect or ssl handshake: $!,$SSL_ERROR";
 	}
 
-	# make sure we don't try and use this without setting it
 	$self->{device_id} = undef;
 
-	# By default register this device immediately
+	# Register this device immediately by default
 	if ($dont_register == 0) {
 		$self->device_add(rand_phnum());
 	}
@@ -39,173 +39,132 @@ sub new {
 
 sub list_add {
 	my $self = shift;
-	my $name = shift;
+	my $list = {
+		num => 0,
+		name => shift,
+		date => 0
+	};
 	my $status = shift || 'ok';
 
-	my $list_data = communicate($self, 'list_add', $status, 0, $name, 0);
-
+	my $response = communicate($self, 'list_add', $status, { list => $list });
 	return if ($status eq 'err');
-	save_list($self, $list_data);
+
+	push @{$self->{lists}}, $response->{list};
 }
 
 sub list_update {
 	my $self = shift;
-	my $num = shift;
-	my $name = shift;
-	my $date = shift || 0;
+	my $list = {
+		num => shift,
+		name => shift,
+		date => shift
+	};
 	my $status = shift || 'ok';
 
-	my $list_data = communicate($self, 'list_add', $status, $num, $name, $date);
+	my $list_data = communicate($self, 'list_add', $status, { list => $list });
 	return if ($status eq 'err');
 }
 
 sub list_join {
 	my $self = shift;
-	my $list_id = shift;
+	my $msg_args = {
+		list_num => shift,
+	};
 	my $status = shift || 'ok';
 
-	my $list_data = communicate($self, 'list_join', $status, $list_id);
+	my $list_data = communicate($self, 'list_join', $status, $msg_args);
 }
 
 sub list_leave {
 	my $self = shift;
-	my $id = shift;
+	my $msg_args = {
+		list_num => shift,
+	};
 	my $status = shift || 'ok';
 
-	my $list_data = communicate($self, 'list_leave', $status, $id);
-}
-
-sub save_list {
-	my $self = shift;
-	my $list_data = shift;
-
-	my ($num, $name, $date, @members) = split("\0", $list_data);
-	my $list = {
-		id => $num,
-		name => $name,
-		members => \@members,
-		num_members => scalar(@members),
-	};
-	push @{$self->{lists}}, $list;
+	my $list_data = communicate($self, 'list_leave', $status, $msg_args);
 }
 
 sub friend_add {
 	my $self = shift;
-	my $friend = shift;
+	my $msg_args = {
+		friend_phnum => shift,
+	};
 	my $status = shift || 'ok';
 
-	communicate($self, 'friend_add', $status, $friend);
+	communicate($self, 'friend_add', $status, $msg_args);
 }
 
 sub friend_delete {
 	my $self = shift;
-	my $friend = shift;
+	my $msg_args = {
+		friend_phnum => shift,
+	};
 	my $status = shift || 'ok';
 
-	communicate($self, 'friend_delete', $status, $friend);
+	communicate($self, 'friend_delete', $status, $msg_args);
 }
 
 sub lists_get {
 	my $self = shift;
 	my $status = shift || 'ok';
 
-	my $list_data = communicate($self, 'lists_get', $status);
-	my @lists;
+	my $response = communicate($self, 'lists_get', $status);
+	return if ($response->{status} eq 'err');
 
-	for (split("\n", $list_data)) {
-		my ($id, $name, $num, @members) = split("\0", $_);
-		# fail "bad list" unless ($id && $name && @members != 0);
-
-		my %tmp = (
-			id => $id,
-			name => $name,
-			num => $num,
-			members => \@members,
-			num_members => scalar(@members),
-		);
-		push @lists, \%tmp;
-	}
-	return @lists;
+	return @{ $response->{lists} };
 }
 
 sub lists_get_other {
 	my $self = shift;
 	my $status = shift || 'ok';
 
-	my $list_data = communicate($self, 'lists_get_other', $status);
-	my @lists;
+	my $response = communicate($self, 'lists_get_other', $status);
+	return if ($response->{status} eq 'err');
 
-	for (split("\n", $list_data)) {
-		my ($id, $name, @members) = split("\0", $_);
-		# fail "bad other list" unless ($id && $name && @members != 0);
-
-		my %tmp = (
-			id => $id,
-			name => $name,
-			members => \@members,
-			num_members => scalar(@members)
-		);
-		push @lists, \%tmp;
-	}
-	return @lists;
+	return @{ $response->{other_lists} };
 }
 
 sub device_add {
 	my $self = shift;
-	my $phone_number = shift || '4038675309';
-	my $os = shift || 'unix';
+	my $msg_args = {
+		phone_number => shift || '4038675309',
+		os => shift || 'unix'
+	};
 	my $exp_status = shift || 'ok';
 
-	# always reset error messages to guard against stale state
+	# Reset error messages to guard against stale state
 	$self->{err_msg} = undef;
 	$self->{msg_type} = $msg_num{'device_add'};
 
-	send_msg($self, "$phone_number\0$os");
-	my $msg = recv_msg($self);
+	send_msg($self, $msg_args);
+	my $response = recv_msg($self, $exp_status);
 
-	my ($status, $device_id) = parse_status($self, $msg);
-	fail "wrong message status '$status'" if ($status ne $exp_status);
-
-	$self->{phnum} = $phone_number;
-	$self->{device_id} = $device_id;
+	if ($response->{status} eq 'ok') {
+		$self->{phnum} = $msg_args->{phone_number};
+		$self->{device_id} = $response->{device_id};
+	}
 }
 
 sub communicate {
-	my ($self, $msg_type, $exp_status, @msg_args) = @_;
+	my ($self, $msg_type, $exp_status, $msg_args) = @_;
 
-	# always reset error messages to guard against stale state
+	# Reset error message so it doesn't get reused
 	$self->{err_msg} = undef;
 	$self->{msg_type} = $msg_num{$msg_type};
 
-	# prepend device id to @msg_args array
-	unshift @msg_args, $self->{device_id};
+	# Add device id to message arguments
+	$msg_args->{device_id} = $self->{device_id};
 
-	send_msg($self, join("\0", @msg_args));
-	my $msg = recv_msg($self);
-
-	my ($status, $payload) = parse_status($self, $msg);
-	fail "wrong message status '$status'" if ($status ne $exp_status);
-
-	return $payload;
-}
-
-sub parse_status {
-	my ($self, $msg) = @_;
-
-	my $first_null = index($msg, "\0");
-	fail "no null byte found in response" if ($first_null == -1);
-
-	my $msg_status = substr($msg, 0, $first_null);
-	my $msg_rest = substr($msg, $first_null + 1);
-
-	# if this is an error message keep track of it right now
-	$self->{err_msg} = $msg_rest if ($msg_status eq 'err');
-
-	return ($msg_status, $msg_rest);
+	send_msg($self, $msg_args);
+	return recv_msg($self, $exp_status);
 }
 
 sub send_msg {
-	my ($self, $payload) = @_;
+	my ($self, $request) = @_;
+
+	# Request comes in as a hash ref, do this now to figure out length
+	my $payload = encode_json($request);
 
 	my $msg_type = $self->{msg_type};
 	fail "invalid message type $msg_type" if ($msg_type > @msg_str);
@@ -233,22 +192,28 @@ sub send_all {
 }
 
 sub recv_msg {
-	my ($self) = @_;
+	my ($self, $exp_status) = @_;
 
-	# read header part first
+	# Read header
 	my $header = read_all($self, 6);
 	my ($version, $msg_type, $payload_size) = unpack("nnn", $header);
 
+	# Check some things
 	fail "unsupported protocol version $version" if ($version != 0);
 	fail "unknown message type $msg_type" if ($msg_type >= @msg_str);
 	fail "$payload_size byte message too large" if ($payload_size > 4096);
+	fail "0 byte payload" if ($payload_size == 0);
 	fail "unexpected message type $self->{msg_type}" if ($self->{msg_type} != $msg_type);
 
-	# don't try a read_all() of size 0
-	return '' if ($payload_size == 0);
-
+	# Read again for payload, $payload_size > 0
 	my $payload = read_all($self, $payload_size);
-	return $payload;
+	my $response = decode_json($payload);
+
+	my $status = $response->{status};
+	fail "wrong message status '$status'" if ($status ne $exp_status);
+	$self->{err_msg} = $response->{reason} if ($status eq 'err');
+
+	return $response;
 }
 
 sub read_all {
@@ -269,32 +234,22 @@ sub read_all {
 }
 
 sub num_lists {
-	my $self = shift;
+	my ($self) = @_;
 	return scalar(@{$self->{lists}});
 }
 
 sub lists {
-	my $self = shift;
-	my $i = shift;
-
-	my $num_lists = scalar(@{$self->{lists}});
-	fail "tried accessing out of bounds index $i" if ($i > $num_lists);
-
+	my ($self, $i) = @_;
 	return $self->{lists}[$i];
 }
 
-sub lists_all {
-	my $self = shift;
-	return $self->{lists};
-}
-
 sub phnum {
-	my $self = shift;
+	my ($self) = @_;
 	return $self->{phnum};
 }
 
 sub device_id {
-	my $self = shift;
+	my ($self) = @_;
 	return $self->{device_id};
 }
 

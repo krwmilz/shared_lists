@@ -11,7 +11,7 @@ my $A = client->new();
 $A->list_add(my $name = 'this is a new list');
 my $list = $A->lists(0);
 
-fail "list num isn't numeric" unless (looks_like_number($list->{id}));
+fail "list num isn't numeric" unless (looks_like_number($list->{num}));
 fail_msg_ne $name, $list->{name};
 fail_num_ne "wrong number of members", $list->{num_members}, 1;
 fail_msg_ne $list->{members}->[0], $A->phnum();

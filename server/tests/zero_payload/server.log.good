@@ -1,13 +1,13 @@
 new connection (pid = <digits>)
 ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
-device_add: got 0 fields, expected 2
-friend_add: got 0 fields, expected 2
-friend_delete: got 0 fields, expected 2
-list_add: got 0 fields, expected 4
-list_join: got 0 fields, expected 2
-list_leave: got 0 fields, expected 2
-lists_get: unknown device <digits>
-lists_get_other: unknown device <digits>
-list_items_get: got 0 fields, expected 2
-list_item_add: got 0 fields, expected 1
+device_add: bad request, missing key 'phone_number'
+friend_add: bad request, missing key 'device_id'
+friend_delete: bad request, missing key 'device_id'
+list_add: bad request, missing key 'device_id'
+list_join: bad request, missing key 'device_id'
+list_leave: bad request, missing key 'device_id'
+lists_get: bad request, missing key 'device_id'
+lists_get_other: bad request, missing key 'device_id'
+list_items_get: bad request, missing key 'device_id'
+list_item_add: bad request, missing key 'device_id'
 disconnected!

@@ -1,14 +1,13 @@
 #!/usr/bin/perl -I../
 use strict;
 use warnings;
-
 use client;
 use test;
 
 my $A = client->new();
 
 $A->list_add('this list was made for leaving');
-$A->list_leave($A->lists(0)->{id});
+$A->list_leave($A->lists(0)->{num});
 
 # verify we don't get this list back when requesting all lists
 my @lists = $A->lists_get();

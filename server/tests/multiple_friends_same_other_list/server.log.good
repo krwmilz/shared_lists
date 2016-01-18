@@ -25,7 +25,6 @@ list_join: device <base64>
 list_join: device <base64> has been added to list <digits>
 list_join: list <digits>
 lists_get_other: found list <string>
-lists_get_other: found list <string>
 lists_get_other: found mutual friend <digits>
 lists_get_other: found mutual friend <digits>
 lists_get_other: gathering lists for <base64>

@@ -20,7 +20,7 @@ $B->friend_add($A->phnum());
 
 # A adds a new list, B joins A's new list
 $A->list_add('as new list');
-$B->list_join($A->lists(0)->{'id'});
+$B->list_join($A->lists(0)->{num});
 
 # A should only see B's list that it never joined
 my @other = $A->lists_get_other();

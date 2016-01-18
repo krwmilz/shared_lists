@@ -12,5 +12,5 @@ my $B = client->new();
 $A->list_add('this is a new list for a');
 
 # B tries to update A's list without joining it first
-$B->list_update($A->lists(0)->{id}, 'some new title', 123, 'err');
+$B->list_update($A->lists(0)->{num}, 'some new title', 123, 'err');
 fail_msg_ne 'client tried to update a list it was not in', $B->get_error();

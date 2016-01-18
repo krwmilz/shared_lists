@@ -23,12 +23,12 @@ $C->friend_add($A->phnum());
 
 # B and C need to be in the same list
 $B->list_add('this is Bs new list');
-$C->list_join($B->lists(0)->{'id'});
+$C->list_join($B->lists(0)->{num});
 
 # A makes sure he got a single list
 my @other = $A->lists_get_other();
 fail_num_ne 'wrong number of list members', $other[0]->{num_members}, 2;
-fail_msg_ne $other[0]->{id}, $B->lists(0)->{'id'};
+fail_msg_ne $other[0]->{num}, $B->lists(0)->{num};
 fail_num_ne 'wrong number of lists', scalar(@other), 1;
 fail "A found unexpectedly" if (grep {$_ eq $A->phnum()} @{$other[0]->{members}});
 fail "member B not found" unless (grep {$_ eq $B->phnum()} @{$other[0]->{members}});

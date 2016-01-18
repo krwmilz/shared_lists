@@ -18,7 +18,7 @@ $A->list_add("this is a's second list");
 $B->list_add("this is b's first list");
 
 # B joins one of A's list
-$B->list_join($A->lists(0)->{'id'});
+$B->list_join($A->lists(0)->{num});
 
 # A deletes B's friendship
 $A->friend_delete($B->phnum());

@@ -17,7 +17,7 @@ my $list_name = "this is a new list";
 $A->list_add($list_name);
 
 # B joins A's list
-$B->list_join($A->lists(0)->{'id'});
+$B->list_join($A->lists(0)->{num});
 
 # B requests its lists to make sure its committed to the list
 my @lists = $B->lists_get();

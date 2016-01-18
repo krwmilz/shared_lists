@@ -11,7 +11,7 @@ my $B = client->new();
 
 # A creates a new list
 $A->list_add('this list will belong to B soon enough');
-my $list_id = $A->lists(0)->{'id'};
+my $list_id = $A->lists(0)->{num};
 
 # XXX: missing steps
 # - A and B become mutual friends

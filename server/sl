@@ -682,7 +682,10 @@ sub new {
 	$self->{dbh} = DBI->connect(
 		"dbi:SQLite:dbname=$db_file",
 		"", "",
-		{ RaiseError => 1 }
+		{
+			RaiseError => 1,
+			sqlite_unicode => 1,
+		}
 	) or die $DBI::errstr;
 
 	$self->{dbh}->do("PRAGMA foreign_keys = ON");

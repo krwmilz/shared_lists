@@ -36,6 +36,7 @@ for t in `ls tests/*/Makefile`; do
 	# run test, complain if it failed
 	if ! make -s -C $test_dir test; then
 		fail $test_dir "test failed"
+		> server.log
 		continue
 	fi
 

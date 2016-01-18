@@ -20,8 +20,10 @@ $A->list_add($list_name);
 $B->list_join($A->lists(0)->{num});
 
 # B requests its lists to make sure its committed to the list
-my @lists = $B->lists_get();
+my ($list) = $B->lists_get();
 
-# fail "request list id mismatch: '$id' ne '$list_id'" if ($id ne $list_id);
-# fail "unexpected name '$name', expected '$list_name'" if ($name ne $list_name);
-# fail "expected 2 list members, got ". @members if (@members != 2);
+# Verify what we get from server
+my $stored_list = $A->lists(0);
+for ('num', 'name', 'date') {
+	fail_msg_ne $stored_list->{$_}, $list->{$_};
+}

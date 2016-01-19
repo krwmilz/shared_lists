@@ -7,24 +7,26 @@ import android.util.Log;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+
+import javax.net.SocketFactory;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 /**
  * Created by David on 7/12/2015.
  */
 public class NetMan {
-    private final int NEW_DEVICE_MESSAGE_TYPE= 0;
-    private final int NEW_LIST_MESSAGE_TYPE= 1;
-    private final int LIST_REQUEST_MESSAGE_TYPE=3;
-    private final int JOIN_LIST_MESSAGE_TYPE=4;
-    private final int LEAVE_LIST_MESSAGE_TYPE=5;
     private String addr;
     private int port;
-    Socket socket;
+    SocketFactory sf = SSLSocketFactory.getDefault();
+    SSLSocket socket;
     Context context;
 
     public NetMan(String addr, int port, Context theContext) {
@@ -35,7 +37,7 @@ public class NetMan {
 
     public int openSocket() {
         try {
-            socket = new Socket(addr, port);
+            socket = (SSLSocket) sf.createSocket(addr, port);
             return 0;
         } catch (UnknownHostException e) {
             Log.d("NetMan", "Unknown Host Excetion");
@@ -56,59 +58,85 @@ public class NetMan {
         }
     }
 
-    public String sendMessage(String[] message) {
+    public String sendMessage(String[] args) {
+        // Setup Header
+        int mType = Integer.parseInt(args[1]);
+        String message = args[0];
         Log.d("NetMan", "In sendMessage");
-        int mTypeInt = lookupMessageType(message[1]);
-        byte[] type = toByteArray(mTypeInt);
-        Log.d("NetMan", "Type is: " + mTypeInt);
-        Log.d("NetMan", "message is: " + message[0]);
-        byte[] length = toByteArray(message[0].length());
-        //Log.d("HomeScreen", "Resulting type array is of size: " + type.length);
-        //Log.d("HomeScreen", "Resulting length array is of size: " + type.length);
+        Log.d("NetMan", "First Type: " + mType);
+        Log.d("NetMan", "Message: " + message + " | Type: " + mType);
+        byte[] version = toByteArray(MsgTypes.protocol_version);
+        byte[] type = toByteArray(mType);
+        byte[] length = toByteArray(message.length());
+        // Send Message
         if (openSocket() == 0) {
             try {
+                Log.d("NetMan", "In socket open");
                 PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+
+                socket.getOutputStream().write(version);
                 socket.getOutputStream().write(type);
                 socket.getOutputStream().write(length);
-                out.print(message[0]);
+                out.print(message);
                 out.flush();
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                String response = in.readLine();
-                if (mTypeInt == NEW_DEVICE_MESSAGE_TYPE) {
-                    Log.d("NetMan", "Received Device ID: " + response.substring(4));
-                    DBHelper dbh = new DBHelper("shlist.db", context);
-                    dbh.openOrCreateDB();
-                    dbh.setDeviceID(response.substring(4), message[0]);
-                    dbh.closeDB();
-                } else if (mTypeInt == NEW_LIST_MESSAGE_TYPE) {
-                    String[] messageParts = message[0].split("\0");
-                    response = messageParts[1] + ":" + response.substring(4);
-                } else if (mTypeInt == LIST_REQUEST_MESSAGE_TYPE) {
-                    Log.d("NetMan", response.substring(4));
-                }
-                return response;
 
-            } catch (IOException e) {
-                Log.d("NetMan", "IOException" + e);
+                InputStream in = socket.getInputStream();
+                int count = in.read(version);
+                count = in.read(type);
+                count = in.read(length);
+
+                int vInt = fromByteArray(version);
+                int tInt = fromByteArray(type);
+                int lInt = fromByteArray(length);
+
+                Log.d("NetMan", "Header Read");
+                Log.d("NetMan", "Version: " + vInt + " | Type: " + tInt + " | Length: " + lInt);
+
+                BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+                char[] response = new char[lInt];
+                Log.d("NetMan", "Message Length: " + response.length);
+                count = br.read(response);
+
+                String response_str = "";
+
+                for (int i = 0; i < response.length; ++i) {
+                    response_str += response[i];
+                }
+
+                Log.d("netman", "Response: " + response_str);
+
+                if (!response_str.isEmpty()) {
+                    int first_null = response_str.indexOf("\0");
+                    String err_code = response_str.substring(0, first_null);
+                    String payload = response_str.substring(first_null + 1);
+                    if (err_code.compareTo("err") != 0) {
+                        Log.d("netman", "Payload: " + payload);
+                        switch (mType) {
+                            case MsgTypes.DEVICE_ADD_TYPE:
+                                return payload;
+                            case MsgTypes.ADD_LIST_TYPE:
+                                return payload;
+                            case MsgTypes.GET_LISTS_TYPE:
+                                return payload;
+                        }
+                    } else {
+                        Log.d("netman", "Error: " + payload);
+                    }
+                } else {
+                    Log.d("netman", "Error: empty payload");
+                }
+
+            } catch (java.io.IOException e) {
+                Log.d("NetMan", "Exception: " + e);
             }
             closeSocket();
         }
-        return "Failed";
+        return "failed";
     }
 
-    public int lookupMessageType(String mTypeStr) {
-        if (mTypeStr.equals("new_list")) {
-            return NEW_LIST_MESSAGE_TYPE;
-        } else if (mTypeStr.equals("new_device")) {
-            return NEW_DEVICE_MESSAGE_TYPE;
-        } else if (mTypeStr.equals("get_lists")) {
-            return LIST_REQUEST_MESSAGE_TYPE;
-        } else if (mTypeStr.equals("join_list")) {
-            return JOIN_LIST_MESSAGE_TYPE;
-        } else if (mTypeStr.equals("leave_list")) {
-            return LEAVE_LIST_MESSAGE_TYPE;
-        }
-        return -1;
+    public static int fromByteArray(byte[] bytes) {
+        return (bytes[0] & 0xFF) << 8 | (bytes[1] & 0xFF);
     }
 
     public static byte[] toByteArray(long value)

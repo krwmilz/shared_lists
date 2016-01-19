@@ -12,9 +12,11 @@ import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.view.ContextMenu;
 import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -51,6 +53,7 @@ public class HomeScreen extends ActionBarActivity {
     private ArrayList<String> list2;
     private long phoneNum;
     private String id;
+    private String mPhoneNumber;
     private TextView cListsTV;
     private TextView oListsTV;
     private String joinLeaveMessage;
@@ -70,17 +73,20 @@ public class HomeScreen extends ActionBarActivity {
         nm = new NetMan(SERVER_ADDRESS, SERVER_PORT, this);
 
         TelephonyManager tMgr = (TelephonyManager) this.getSystemService(Context.TELEPHONY_SERVICE);
-        String mPhoneNumber = tMgr.getLine1Number().substring(2);
+        mPhoneNumber = tMgr.getLine1Number().substring(2);
         //Log.d("HomeScreen", "Phone Number: " + mPhoneNumber);
         // remove '+' before parsing
         phoneNum = Long.parseLong(mPhoneNumber);
-
+        //dbHelper.setDeviceID("lHWisR7leI1DmQQ9GlEgXODeeE7LAyFlpIHCcX1dNRI", mPhoneNumber);
         id = dbHelper.getDeviceID();
+
+        Log.d("netman", "id is: " + id);
 
         dbHelper.closeDB();
 
         if (id == null) {
-            AsyncTask sndmt = new sendNewDeviceMessageTask().execute(mPhoneNumber, "new_device");
+            String message = phoneNum + "\0android";
+            AsyncTask sndmt = new sendNewDeviceMessageTask().execute(message, "" + MsgTypes.DEVICE_ADD_TYPE);
             try {
                 sndmt.get(1000, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
@@ -92,16 +98,16 @@ public class HomeScreen extends ActionBarActivity {
             }
         }
 
-
         list1 = new ArrayList<String>();
 
-        adapter1 = new ArrayAdapter<String>(this, R.layout.list_row, R.id.r_text, list1);
+        adapter1 = new ArrayAdapter<String>(this, R.layout.list_row, R.id.list_name, list1);
 
         ListView lv1 = (ListView) findViewById(R.id.currentLists);
+        registerForContextMenu(lv1);
 
         list2 = new ArrayList<String>();
 
-        adapter2 = new ArrayAdapter<String>(this, R.layout.list_row, R.id.r_text, list2);
+        adapter2 = new ArrayAdapter<String>(this, R.layout.list_row, R.id.list_name, list2);
 
         ListView lv2 = (ListView) findViewById(R.id.openLists);
 
@@ -142,7 +148,7 @@ public class HomeScreen extends ActionBarActivity {
         });
 
         if (id != null) {
-            new sendGetListsMessageTask().execute(id, "get_lists");
+            new sendGetListsMessageTask().execute(id, "" + MsgTypes.GET_LISTS_TYPE);
         }
 
 
@@ -173,6 +179,34 @@ public class HomeScreen extends ActionBarActivity {
     }
 
     @Override
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+        super.onCreateContextMenu(menu, v, menuInfo);
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.context_menu_home_screen, menu);
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item) {
+        AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
+        switch (item.getItemId()) {
+            case R.id.leave_list:
+                int position = (int) info.id;
+                joinLeavePosition = position;
+                String list_entry = adapter1.getItem(position);
+                Log.d("main", "Tried to leave list: " + list_entry);
+                String list_entry_split[] = list_entry.split(":");
+                String list_name = list_entry_split[0];
+                String list_id = list_entry_split[1];
+                String device_id = id;
+                String message = device_id + "\0" + list_id;
+                new sendLeaveListMessageTask().execute(message, "" + MsgTypes.LEAVE_LIST_TYPE);
+                return true;
+            default:
+                return super.onContextItemSelected(item);
+        }
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle action bar item clicks here. The action bar will
         // automatically handle clicks on the Home/Up button, so long
@@ -183,8 +217,7 @@ public class HomeScreen extends ActionBarActivity {
         if (id == R.id.action_settings) {
             return true;
         } else if (id == R.id.action_add) {
-            Log.d(DEBUG_TAG, "ADD PLAN CLICKED");
-            addPlanDialog();
+            addListDialog();
         } else if(id == R.id.delete_db) {
             dbHelper.deleteDB();
         } else if(id == R.id.action_contacts) {
@@ -214,13 +247,13 @@ public class HomeScreen extends ActionBarActivity {
         String device_id = dbHelper.getDeviceID();
         dbHelper.closeDB();
         String message = device_id + "\0" + name;
-        new sendNewListMessageTask().execute(message, "new_list");
+        new sendNewListMessageTask().execute(message, "" + MsgTypes.ADD_LIST_TYPE);
         // send pair to server
         // get list id message
         // create list item, add list item
     }
 
-    public void addPlanDialog() {
+    public void addListDialog() {
         LayoutInflater inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
         View layout = inflater.inflate(R.layout.add_list_prompt, (ViewGroup) findViewById(R.id.addListPromptLayout));
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -256,6 +289,12 @@ public class HomeScreen extends ActionBarActivity {
         }
         @Override
         protected void onPostExecute(String result) {
+            if (result.compareTo("failed") != 0) {
+                dbHelper.openOrCreateDB();
+                dbHelper.setDeviceID(result, mPhoneNumber);
+                dbHelper.closeDB();
+                id = mPhoneNumber;
+            }
             //TextView tv = (TextView) findViewById(R.id.deviceID);
             //tv.setText("Device ID (From Server): " + result + " Phone Number: " + phoneNum);
             Log.d("NetMan", "New Device End");
@@ -290,14 +329,14 @@ public class HomeScreen extends ActionBarActivity {
         }
         @Override
         protected void onPostExecute(String result) {
-            result = result.substring(4);
+            /*result = result.substring(4);
             String[] parts = result.split("\0");
             Log.d("NetMan", "List id: " + parts[0]);
             Log.d("NetMan", "Alive: " + parts[1]);
             Log.d("NetMan", "Leave List End");
             if (parts[1].equals("1")) {
                 list2.add(joinLeaveMessage);
-            }
+            }*/
             list1.remove(joinLeavePosition);
             adapter1.notifyDataSetChanged();
             adapter2.notifyDataSetChanged();
@@ -315,50 +354,17 @@ public class HomeScreen extends ActionBarActivity {
         }
         @Override
         protected void onPostExecute(String result) {
-            Log.d("NetMan", "Get Lists Done");
-            result = result.substring(4);
-            if (!result.equals("\0\0")) {
-                Log.d("NetMan", "Got Response: " + result);
-                String[] halves = result.split("\0\0");
-                Log.d("NetMan", "halves size: " + halves.length);
-                String[] cur_lists = halves[0].split("\0");
-                if (halves.length > 1) {
-                    String[] ava_lists = halves[1].split("\0");
-                    for (int i = 0; i < ava_lists.length; ++i) {
-                        String[] temp = ava_lists[i].split(":");
-                        Log.d("NetMan", "-------------------");
-                        Log.d("NetMan", "List (Available): " + (i+1));
-                        Log.d("NetMan", "-------------------");
-                        Log.d("NetMan", "Name: " + temp[0]);
-                        list2.add(temp[0] + ":" + temp[1]);
-                        Log.d("NetMan", "ID: " + temp[1]);
-                        for (int j = 2; j < temp.length; ++j) {
-                            Log.d("NetMan", "Member: " + temp[j]);
-                        }
-                    }
+            String lists[] = result.split("\n");
+            for (int i = 0; i < lists.length; ++i) {
+                Log.d("netman", "List: " + lists[i]);
+                String list_split[] = lists[i].split("\0");
+                if (list_split.length > 1) {
+                    String list_name = list_split[1];
+                    list1.add(list_name + ":" + list_split[0]);
                 }
-                if (!cur_lists[0].equals("")) {
-                    for (int i = 0; i < cur_lists.length; ++i) {
-                        String[] temp = cur_lists[i].split(":");
-                        Log.d("NetMan", "-------------------");
-                        Log.d("NetMan", "List (Current): " + (i + 1));
-                        Log.d("NetMan", "-------------------");
-                        Log.d("NetMan", "Name: " + temp[0]);
-                        Log.d("NetMan", "ID: " + temp[1]);
-                        list1.add(temp[0] + ":" + temp[1]);
-                        for (int j = 2; j < temp.length; ++j) {
-                            Log.d("NetMan", "Member: " + temp[j]);
-                        }
-                    }
-                }
-
-                adapter1.notifyDataSetChanged();
-                adapter2.notifyDataSetChanged();
-                cListsTV.setText("Current Lists (" + list1.size() + ")");
-                oListsTV.setText("Available Lists (" + list2.size() + ")");
-            } else {
-                Log.d("NetMan", "No Lists");
             }
+            cListsTV.setText("Current Lists (" + list1.size() + ")");
+            adapter1.notifyDataSetChanged();
         }
     }
 
@@ -370,7 +376,13 @@ public class HomeScreen extends ActionBarActivity {
         }
         @Override
         protected void onPostExecute(String result) {
-            list1.add(result);
+            String results[] = result.split("\0");
+            String list_id = results[0];
+            String list_name = results[1];
+            dbHelper.openOrCreateDB();
+            dbHelper.addList(list_id, list_name);
+            dbHelper.closeDB();
+            list1.add(list_name + ":" + list_id);
             cListsTV.setText("Current Lists (" + list1.size() + ")");
             adapter1.notifyDataSetChanged();
         }

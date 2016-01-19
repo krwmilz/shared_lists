@@ -20,7 +20,8 @@ public class DBHelper {
 
     public void openOrCreateDB() {
         theDB = theContext.openOrCreateDatabase(dbName, theContext.MODE_PRIVATE, null);
-        theDB.execSQL("CREATE TABLE IF NOT EXISTS device(id VARCHAR, phone_number int)");
+        theDB.execSQL("CREATE TABLE IF NOT EXISTS device(id VARCHAR not null, phone_number int not null)");
+        theDB.execSQL("CREATE TABLE IF NOT EXISTS my_lists(id VARCHAR not null, name VARCHAR not null, date int)");
         // TODO: create the rest of the tables here as well, can we check the return of that command?
         // ie if that creates the table then create everything else? Or should we create when the tables are new.
     }
@@ -46,6 +47,12 @@ public class DBHelper {
         Log.d("DBHelper", "Added Entry To device: " + deviceID + " - " + phoneNumber);
         String query = "insert into device VALUES(?,?)";
         theDB.execSQL(query, new String[] {deviceID, phoneNumber});
+    }
+
+    public void addList(String listID, String listName) {
+        Log.d("dbhelper", "Added Entry To My Lists: " + listID + " - " + listName);
+        String query = "insert into my_lists VALUES(?,?,?)";
+        theDB.execSQL(query, new String[] {listID, listName, ""});
     }
 
 }

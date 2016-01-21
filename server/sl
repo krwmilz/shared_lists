@@ -8,7 +8,7 @@ use DBI;
 use File::Temp;
 use Getopt::Std;
 use IO::Socket::SSL;
-use JSON::PP;
+use JSON::XS;
 use Scalar::Util qw(looks_like_number);
 
 require "msgs.pl";

@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 use IO::Socket::SSL;
-use JSON::PP;
+use JSON::XS;
 use test;
 
 require "msgs.pl";

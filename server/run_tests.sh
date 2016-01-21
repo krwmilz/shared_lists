@@ -13,21 +13,12 @@ if [ `uname` = "OpenBSD" ]; then
 	alias make=gmake
 fi
 
-fail() {
-	printf "%3s %s: $red%s$reset\n" $count "$1" "$2"
-	failed=`expr $failed + 1`
-}
-
-ok() {
-	printf "%3s %s: $green%s$reset\n" $count "$1" "ok"
-	passed=`expr $passed + 1`
-}
-
 perl -T sl -p $PORT -t > server.log &
 server_pid=$!
 
-passed=0
-failed=0
+ok=0
+test_failed=0
+diff_failed=0
 count=0
 for t in `LC_ALL=C ls tests/*/Makefile`; do
 	count=`expr $count + 1`
@@ -35,7 +26,8 @@ for t in `LC_ALL=C ls tests/*/Makefile`; do
 
 	# run test, complain if it failed
 	if ! make -s -C $test_dir test; then
-		fail $test_dir "test failed"
+		printf "%3s %s: $red%s$reset\n" $count $test_dir "test failed"
+		test_failed=$((test_failed + 1))
 		> server.log
 		continue
 	fi
@@ -46,19 +38,21 @@ for t in `LC_ALL=C ls tests/*/Makefile`; do
 
 	# diff the server's output log
 	if ! make -s -C $test_dir diff; then
-		fail $test_dir "diff failed"
+		printf "%3s %s: $red%s$reset\n" $count $test_dir "diff failed"
+		diff_failed=$((diff_failed + 1))
 		continue
 	fi
 
 	make -s -C $test_dir clean
-	ok $test_dir
+	printf "%3s %s: $green%s$reset\n" $count $test_dir "ok"
+	ok=$((ok + 1))
 done
 
 kill $server_pid
 wait 2>/dev/null
 rm server.log
 
-printf "\n%i %sok%s %i %sfailed%s " $passed $green $reset $failed $red $reset
+printf "\n%i ok, %i test + %i diff fail " $ok $test_failed $diff_failed
 printf "(%i min %i sec)\n" $((SECONDS / 60)) $((SECONDS % 60))
 
 exit $failed;

@@ -28,6 +28,10 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,8 +89,15 @@ public class HomeScreen extends ActionBarActivity {
         dbHelper.closeDB();
 
         if (id == null) {
-            String message = phoneNum + "\0android";
-            AsyncTask sndmt = new sendNewDeviceMessageTask().execute(message, "" + MsgTypes.DEVICE_ADD_TYPE);
+            JSONObject obj = new JSONObject();
+            try {
+                obj.put("phone_number", "" + phoneNum);
+                obj.put("os", "android");
+            } catch (JSONException e) {
+                Log.d("netman", "JSONException: " + e);
+            }
+            String message = obj.toString();
+            AsyncTask sndmt = new sendNewDeviceMessageTask().execute(message, "" + MsgTypes.device_add);
             try {
                 sndmt.get(1000, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
@@ -148,7 +159,13 @@ public class HomeScreen extends ActionBarActivity {
         });
 
         if (id != null) {
-            new sendGetListsMessageTask().execute(id, "" + MsgTypes.GET_LISTS_TYPE);
+            JSONObject obj = new JSONObject();
+            try {
+                obj.put("device_id", "" + id);
+                new sendGetListsMessageTask().execute(obj.toString(), "" + MsgTypes.lists_get);
+            } catch (JSONException e) {
+                Log.d("netman", "JSON Exception: " + e);
+            }
         }
 
 
@@ -195,11 +212,15 @@ public class HomeScreen extends ActionBarActivity {
                 String list_entry = adapter1.getItem(position);
                 Log.d("main", "Tried to leave list: " + list_entry);
                 String list_entry_split[] = list_entry.split(":");
-                String list_name = list_entry_split[0];
-                String list_id = list_entry_split[1];
-                String device_id = id;
-                String message = device_id + "\0" + list_id;
-                new sendLeaveListMessageTask().execute(message, "" + MsgTypes.LEAVE_LIST_TYPE);
+                JSONObject obj = new JSONObject();
+                int num = Integer.parseInt(list_entry_split[1]);
+                try {
+                    obj.put("device_id", "" + id);
+                    obj.put("list_num", num);
+                } catch (JSONException e) {
+                    Log.d("netman", "JSON Exception: " + e);
+                }
+                new sendLeaveListMessageTask().execute(obj.toString(), "" + MsgTypes.list_leave);
                 return true;
             default:
                 return super.onContextItemSelected(item);
@@ -245,12 +266,21 @@ public class HomeScreen extends ActionBarActivity {
     public void addList(String name) {
         dbHelper.openOrCreateDB();
         String device_id = dbHelper.getDeviceID();
+        String message = "";
         dbHelper.closeDB();
-        String message = device_id + "\0" + name;
-        new sendNewListMessageTask().execute(message, "" + MsgTypes.ADD_LIST_TYPE);
-        // send pair to server
-        // get list id message
-        // create list item, add list item
+        try {
+            JSONObject list_obj = new JSONObject();
+            list_obj.put("num", 0);
+            list_obj.put("name", name);
+            list_obj.put("date", System.currentTimeMillis() / 1000L);
+            JSONObject main_obj = new JSONObject();
+            main_obj.put("device_id", device_id);
+            main_obj.put("list", list_obj);
+            message = main_obj.toString();
+        } catch (JSONException e) {
+            Log.d("netman", "JSONException: " + e);
+        }
+        new sendNewListMessageTask().execute(message, "" + MsgTypes.list_add);
     }
 
     public void addListDialog() {
@@ -329,14 +359,6 @@ public class HomeScreen extends ActionBarActivity {
         }
         @Override
         protected void onPostExecute(String result) {
-            /*result = result.substring(4);
-            String[] parts = result.split("\0");
-            Log.d("NetMan", "List id: " + parts[0]);
-            Log.d("NetMan", "Alive: " + parts[1]);
-            Log.d("NetMan", "Leave List End");
-            if (parts[1].equals("1")) {
-                list2.add(joinLeaveMessage);
-            }*/
             list1.remove(joinLeavePosition);
             adapter1.notifyDataSetChanged();
             adapter2.notifyDataSetChanged();
@@ -354,17 +376,20 @@ public class HomeScreen extends ActionBarActivity {
         }
         @Override
         protected void onPostExecute(String result) {
-            String lists[] = result.split("\n");
-            for (int i = 0; i < lists.length; ++i) {
-                Log.d("netman", "List: " + lists[i]);
-                String list_split[] = lists[i].split("\0");
-                if (list_split.length > 1) {
-                    String list_name = list_split[1];
-                    list1.add(list_name + ":" + list_split[0]);
+            try {
+                JSONObject main_obj = new JSONObject(result);
+                int num = main_obj.getInt("num_lists");
+                JSONArray lists_arr = main_obj.getJSONArray("lists");
+
+                for (int i = 0; i < num; ++i) {
+                    list1.add(lists_arr.getJSONObject(i).getString("name") + ":" + lists_arr.getJSONObject(i).getString("num"));
                 }
+
+                cListsTV.setText("Current Lists (" + list1.size() + ")");
+                adapter1.notifyDataSetChanged();
+            } catch (JSONException e) {
+                Log.d("netman", "JSON Exception: " + e);
             }
-            cListsTV.setText("Current Lists (" + list1.size() + ")");
-            adapter1.notifyDataSetChanged();
         }
     }
 
@@ -376,15 +401,20 @@ public class HomeScreen extends ActionBarActivity {
         }
         @Override
         protected void onPostExecute(String result) {
-            String results[] = result.split("\0");
-            String list_id = results[0];
-            String list_name = results[1];
-            dbHelper.openOrCreateDB();
-            dbHelper.addList(list_id, list_name);
-            dbHelper.closeDB();
-            list1.add(list_name + ":" + list_id);
-            cListsTV.setText("Current Lists (" + list1.size() + ")");
-            adapter1.notifyDataSetChanged();
+            try {
+                JSONObject main_obj = new JSONObject(result);
+                JSONObject list_obj = main_obj.getJSONObject("list");
+                String list_num = list_obj.getString("num");
+                String list_name = list_obj.getString("name");
+                dbHelper.openOrCreateDB();
+                dbHelper.addList(list_num, list_name);
+                dbHelper.closeDB();
+                list1.add(list_name + ":" + list_num);
+                cListsTV.setText("Current Lists (" + list1.size() + ")");
+                adapter1.notifyDataSetChanged();
+            } catch (JSONException e) {
+                Log.d("netman", "JSON Exception: " + e);
+            }
         }
     }
 }

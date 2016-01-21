@@ -2,7 +2,11 @@ package drsocto.shlist;
 
 import android.content.Context;
 import android.os.AsyncTask;
+import android.util.JsonReader;
 import android.util.Log;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -106,22 +110,31 @@ public class NetMan {
 
                 Log.d("netman", "Response: " + response_str);
 
+
                 if (!response_str.isEmpty()) {
-                    int first_null = response_str.indexOf("\0");
-                    String err_code = response_str.substring(0, first_null);
-                    String payload = response_str.substring(first_null + 1);
-                    if (err_code.compareTo("err") != 0) {
-                        Log.d("netman", "Payload: " + payload);
-                        switch (mType) {
-                            case MsgTypes.DEVICE_ADD_TYPE:
-                                return payload;
-                            case MsgTypes.ADD_LIST_TYPE:
-                                return payload;
-                            case MsgTypes.GET_LISTS_TYPE:
-                                return payload;
+                    JSONObject obj;
+                    String status;
+                    try {
+                        obj = new JSONObject(response_str);
+                        status = obj.getString("status");
+                        Log.d("netman", "Parsed JSON, status: " + status);
+                        if (status.equalsIgnoreCase("ok")) {
+                            switch (mType) {
+                                case MsgTypes.device_add:
+                                    closeSocket();
+                                    return obj.getString("device_id");
+                                case MsgTypes.list_add:
+                                    closeSocket();
+                                    return obj.toString();
+                                case MsgTypes.lists_get:
+                                    closeSocket();
+                                    return obj.toString();
+                            }
+                        } else {
+                            Log.d("netman", "Error:" + obj.toString());
                         }
-                    } else {
-                        Log.d("netman", "Error: " + payload);
+                    } catch (JSONException e) {
+                        Log.d("netman", "JSONException: " + e);
                     }
                 } else {
                     Log.d("netman", "Error: empty payload");

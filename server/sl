@@ -10,6 +10,7 @@ use Getopt::Std;
 use IO::Socket::SSL;
 use JSON::XS;
 use Scalar::Util qw(looks_like_number);
+use Try::Tiny;
 
 require "msgs.pl";
 our (%msg_num, @msg_str, @msg_func, $protocol_ver);
@@ -117,9 +118,19 @@ sub recv_msg {
 	}
 
 	my $payload = read_all($sock, $payload_size);
-	my $request = decode_json($payload);
 
-	return ($version, $msg_type, $request);
+	try {
+		my $request = decode_json($payload);
+
+		if (ref($request) ne "HASH") {
+			$log->print("error: json payload didn't have dictionary root\n");
+			exit 0;
+		}
+		return ($version, $msg_type, $request);
+	} catch {
+		$log->print("error: payload wasn't json\n");
+		exit 0;
+	}
 }
 
 sub read_all {

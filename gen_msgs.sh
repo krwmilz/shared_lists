@@ -31,7 +31,7 @@ print_table() {
 
 	i=0
 	for msg in $msg_types; do
-		eval "echo \"\t$3\"" >> ${1}
+		eval "echo \"	$3\"" >> ${1}
 		i=$((i + 1))
 	done
 
@@ -53,10 +53,14 @@ gen_java() {
 	cat << EOF > $java_path
 /* ${generated_at} */
 
-int protocol_version = $protocol_version;
+package drsocto.shlist;
+
+public final class MsgTypes {
+
+	public final static int protocol_version = $protocol_version;
 EOF
 
-	print_table $java_path "public enum MsgTypes {" "\$msg\t(\$i)," "};"
+	print_table $java_path "" "public final static int \$msg = \$i;" "}"
 }
 
 gen_perl() {

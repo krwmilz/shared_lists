@@ -1,7 +1,10 @@
 #import "ContactsTableViewController.h"
 #import "AddressBook.h"
+#import "Network.h"
 
-@interface ContactsTableViewController ()
+@interface ContactsTableViewController () {
+	Network *network_connection;
+}
 
 @property (strong, retain) AddressBook *address_book;
 @property (strong, retain) NSMutableArray *cells;
@@ -49,6 +52,8 @@
 
 	for (NSString *letter in _section_to_letter)
 		[_cells addObject:[letter_to_contact_map objectForKey:letter]];
+
+	network_connection = [Network shared_network_connection];
 }
 
 - (void)didReceiveMemoryWarning
@@ -120,13 +125,25 @@
 	UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
 	Contact *contact = [[_cells objectAtIndex:section] objectAtIndex:row];
 
-	if ([cell accessoryType] == UITableViewCellAccessoryNone)
+	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
+	if ([cell accessoryType] == UITableViewCellAccessoryNone) {
+		// Toggling the contact on, add friend
+
+		[request setObject:[contact.phone_numbers objectAtIndex:0] forKey:@"friend_phnum"];
+		[network_connection send_message:friend_add contents:request];
+
 		[cell setAccessoryType:UITableViewCellAccessoryCheckmark];
-	else
+	}
+	else {
+		// Toggling contact off, delete friend
+		[request setObject:[contact.phone_numbers objectAtIndex:0] forKey:@"friend_phnum"];
+		[network_connection send_message:friend_delete contents:request];
+
 		[cell setAccessoryType:UITableViewCellAccessoryNone];
+	}
 
 	NSLog(@"info: selected %@ %@ who has %i phone numbers",
-	      contact.first_name, contact.last_name, [contact.phone_numbers  count]);
+	      contact.first_name, contact.last_name, [contact.phone_numbers count]);
 }
 
 // programatically assign section headers, in this case they're letters

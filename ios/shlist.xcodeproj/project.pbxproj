@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		273EC9C01BB25B6300CBFCDC /* SettingsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 273EC9BF1BB25B6300CBFCDC /* SettingsTableViewController.m */; };
 		27AAC22C1B50ABAF00D99171 /* EditItemTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27AAC22B1B50ABAF00D99171 /* EditItemTableViewController.m */; };
 		27B03A021B43B8660054B6D2 /* AddressBook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27B03A001B43B8660054B6D2 /* AddressBook.framework */; };
 		27C70F051B32AF8000DADEB3 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F041B32AF8000DADEB3 /* main.m */; };
@@ -38,9 +39,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		273EC9BE1BB25B6300CBFCDC /* SettingsTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SettingsTableViewController.h; sourceTree = "<group>"; };
+		273EC9BF1BB25B6300CBFCDC /* SettingsTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SettingsTableViewController.m; sourceTree = "<group>"; };
 		27AAC22A1B50ABAF00D99171 /* EditItemTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EditItemTableViewController.h; path = ../EditItemTableViewController.h; sourceTree = "<group>"; };
 		27AAC22B1B50ABAF00D99171 /* EditItemTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = EditItemTableViewController.m; path = ../EditItemTableViewController.m; sourceTree = "<group>"; };
 		27B03A001B43B8660054B6D2 /* AddressBook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AddressBook.framework; path = System/Library/Frameworks/AddressBook.framework; sourceTree = SDKROOT; };
+		27B195B81C45FEE200D7B2E9 /* MsgTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MsgTypes.h; path = shlist/MsgTypes.h; sourceTree = "<group>"; };
 		27C70EFF1B32AF8000DADEB3 /* shlist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = shlist.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		27C70F031B32AF8000DADEB3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		27C70F041B32AF8000DADEB3 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; tabWidth = 8; usesTabs = 1; };
@@ -94,6 +98,7 @@
 		27C70EF61B32AF7F00DADEB3 = {
 			isa = PBXGroup;
 			children = (
+				27B195B81C45FEE200D7B2E9 /* MsgTypes.h */,
 				27B03A001B43B8660054B6D2 /* AddressBook.framework */,
 				27C70F011B32AF8000DADEB3 /* shlist */,
 				27C70F1B1B32AF8000DADEB3 /* shlistTests */,
@@ -138,6 +143,8 @@
 				27C70F0A1B32AF8000DADEB3 /* Network.m */,
 				27C70F2B1B33F3C300DADEB3 /* NewListTableViewController.h */,
 				27C70F2C1B33F3C300DADEB3 /* NewListTableViewController.m */,
+				273EC9BE1BB25B6300CBFCDC /* SettingsTableViewController.h */,
+				273EC9BF1BB25B6300CBFCDC /* SettingsTableViewController.m */,
 				27C70F021B32AF8000DADEB3 /* Supporting Files */,
 			);
 			path = shlist;
@@ -272,6 +279,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				273EC9C01BB25B6300CBFCDC /* SettingsTableViewController.m in Sources */,
 				BF7776B91B38928D00526CB0 /* ListTableViewController.m in Sources */,
 				27AAC22C1B50ABAF00D99171 /* EditItemTableViewController.m in Sources */,
 				27C70F0B1B32AF8000DADEB3 /* Network.m in Sources */,

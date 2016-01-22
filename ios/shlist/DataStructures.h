@@ -8,16 +8,15 @@
 // UILabel *names;
 
 @property NSString	*name;
-@property NSData	*id;
+@property NSNumber	*num;
 @property NSArray	*members_phone_nums;
 @property bool		 deadline;
 @property NSDate	*date;
-@property int		 items_ready;
-@property int		 items_total;
+@property NSNumber	*items_ready;
+@property NSNumber	*items_total;
 @property UITableViewCell *cell;
 
 @end
-
 
 // This object is an individual item in a list
 @interface ListItem : NSObject

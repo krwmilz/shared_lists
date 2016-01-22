@@ -119,7 +119,7 @@
 	[string_array addObject:[NSString stringWithFormat:@"%i", _item.completed]];
 
 	NSMutableData *buffer = [[NSMutableData alloc] init];
-	[buffer appendData:_list.id];
+	//[buffer appendData:_list.num];
 	[buffer appendData:[[string_array componentsJoinedByString:@":"] dataUsingEncoding:NSUTF8StringEncoding]];
 
 	// the list item that was just edited will be updated when a response comes

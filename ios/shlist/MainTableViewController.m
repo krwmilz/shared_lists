@@ -3,6 +3,7 @@
 #import "NewListTableViewController.h"
 #import "Network.h"
 #import "ListTableViewController.h"
+#import "MsgTypes.h"
 
 #import <AddressBook/AddressBook.h>
 #include "libkern/OSAtomic.h"
@@ -12,6 +13,9 @@
 	Network *network_connection;
 	NSString *phone_num_file;
 }
+
+// main data structure, [0] holds lists you're in, [1] is other lists
+@property NSMutableArray *lists;
 
 @property NSMutableDictionary *phnum_to_name_map;
 @property (strong, retain) AddressBook *address_book;
@@ -31,9 +35,9 @@
 	network_connection = [Network shared_network_connection];
 	network_connection->shlist_tvc = self;
 
-	// main lists
-	self.shared_lists = [[NSMutableArray alloc] init];
-	self.indirect_lists = [[NSMutableArray alloc] init];
+	_lists = [[NSMutableArray alloc] init];
+	[_lists addObject:[[NSMutableArray alloc] init]];
+	[_lists addObject:[[NSMutableArray alloc] init]];
 
 	// store the path to the phone number file
 	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
@@ -43,9 +47,10 @@
 	phone_number = nil;
 	if ([self load_phone_number]) {
 		// phone number loaded, try loading device id
-		if ([network_connection load_device_id:[phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
+		if ([network_connection load_device_id:phone_number]) {
 			// bulk update, doesn't take a payload
-			[network_connection send_message:3 contents:nil];
+			NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+			[network_connection send_message:lists_get contents:dict];
 		}
 		// else, device id request sent
 	}
@@ -68,7 +73,7 @@
 	}
 
 	UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Important"
-		message:@"In order for us to calculate your mutual contacts, your phone number is needed."
+		message:@"Your phone number is needed for us to calculate your mutual contacts. Severe amounts of functionality disabled."
 		delegate:self cancelButtonTitle:@"Nope" otherButtonTitles:@"Ok", nil];
 
 	alert.alertViewStyle = UIAlertViewStylePlainTextInput;
@@ -99,7 +104,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 	phone_number = entered_phone_num;
 
-	if ([network_connection load_device_id:[phone_number dataUsingEncoding:NSASCIIStringEncoding]]) {
+	if ([network_connection load_device_id:phone_number]) {
 		NSLog(@"info: network: connection ready");
 		// bulk update, doesn't take a payload
 		[network_connection send_message:3 contents:nil];
@@ -148,11 +153,11 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 - (NSInteger) tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-	if (section == 0)
-		return [self.shared_lists count];
-	else if (section == 1)
-		return [self.indirect_lists count];
-	return 0;
+	if (section > 1)
+		// should never happen
+		return 0;
+
+	return [[_lists objectAtIndex:section] count];
 }
 
 // new list dialogue has been saved
@@ -160,12 +165,37 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 {
 }
 
+- (void) lists_get_finished:(NSArray *)json_lists;
+{
+	NSMutableArray *lists = [_lists objectAtIndex:0];
+	[lists removeAllObjects];
+
+	for (NSDictionary *list in json_lists) {
+
+		SharedList *tmp = [[SharedList alloc] init];
+		tmp.num = [list objectForKey:@"num"];
+		tmp.name = [list objectForKey:@"name"];
+		// tmp.date = [list objectForKey:@"date"];
+		tmp.items_ready = [list objectForKey:@"items_complete"];
+		tmp.items_total = [list objectForKey:@"items_total"];
+		NSArray *members = [list objectForKey:@"members"];
+		tmp.members_phone_nums = members;
+		[lists addObject:tmp];
+
+		NSLog(@"adding list '%@'", [list objectForKey:@"name"]);
+	}
+
+	[self.tableView reloadData];
+}
+
 - (void) finished_new_list_request:(SharedList *) shlist
 {
-	[self.shared_lists addObject:shlist];
+	[[_lists objectAtIndex:0] addObject:shlist];
+	// [self.shared_lists addObject:shlist];
 
 	// response looks good, insert the new list
-	NSIndexPath *index_path = [NSIndexPath indexPathForRow:[self.shared_lists count] - 1 inSection:0];
+	int section_0_rows = [[_lists objectAtIndex:0] count];
+	NSIndexPath *index_path = [NSIndexPath indexPathForRow:section_0_rows - 1 inSection:0];
 	[self.tableView insertRowsAtIndexPaths:@[index_path] withRowAnimation:UITableViewRowAnimationFade];
 }
 
@@ -180,18 +210,19 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		return;
 
 	// we're in section 1 now, a tap down here means we're doing a join list request
-	SharedList *list = [self.indirect_lists objectAtIndex:[indexPath row]];
+	SharedList *list = [[_lists objectAtIndex:1] objectAtIndex:[indexPath row]];
 	NSLog(@"info: joining list '%@'", list.name);
 
 	// the response for this does all of the heavy row moving work
-	[network_connection send_message:4 contents:list.id];
+	int num = list.num;
+	[network_connection send_message:list_join contents:[NSData dataWithBytes:&num length:sizeof(num)]];
 }
 
 - (void) finished_join_list_request:(SharedList *) shlist
 {
 	SharedList *needle = nil;
-	for (SharedList *temp in _indirect_lists) {
-		if ([temp.id isEqualToData:shlist.id]) {
+	for (SharedList *temp in [_lists objectAtIndex:1]) {
+		if (temp.num == shlist.num) {
 			needle = temp;
 			break;
 		}
@@ -202,15 +233,19 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		return;
 
 	// this has to be done before row moving
-	[_shared_lists addObject:needle];
-	[_indirect_lists removeObject:needle];
+	[[_lists objectAtIndex:0] addObject:needle];
+	[[_lists objectAtIndex:1] removeObject:needle];
+
+	// [_shared_lists addObject:needle];
+	// [_indirect_lists removeObject:needle];
 
 	// get the original cells index path from the matched cell
 	NSIndexPath *orig_index_path = [self.tableView indexPathForCell:needle.cell];
 
 	// compute new position and start moving row as soon as possible
 	// XXX: sorting
-	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:[_shared_lists count] - 1 inSection:0];
+	int section_0_rows = [[_lists objectAtIndex:0] count];
+	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:section_0_rows - 1 inSection:0];
 
 	[self.tableView moveRowAtIndexPath:orig_index_path toIndexPath:new_index_path];
 
@@ -224,8 +259,8 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 - (void) finished_leave_list_request:(SharedList *) shlist
 {
 	SharedList *list = nil;
-	for (SharedList *temp in _shared_lists) {
-		if ([temp.id isEqualToData:shlist.id]) {
+	for (SharedList *temp in [_lists objectAtIndex:0]) {
+		if (temp.num == shlist.num) {
 			list = temp;
 			break;
 		}
@@ -235,8 +270,8 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		return;
 
 	// insert the new object at the beginning to match gui moving below
-	[_indirect_lists insertObject:list atIndex:0];
-	[_shared_lists removeObject:list];
+	[[_lists objectAtIndex:1] insertObject:list atIndex:0];
+	[[_lists objectAtIndex:0] removeObject:list];
 
 	// perform row move, the destination is the top of "other lists"
 	NSIndexPath *old_path = [self.tableView indexPathForCell:list.cell];
@@ -259,38 +294,33 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	UITableViewCell *cell;
 	cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell" forIndexPath:indexPath];
 
+	int section = [indexPath section];
 	int row = [indexPath row];
-	SharedList *shared_list;
+	SharedList *shared_list = [[_lists objectAtIndex:section] objectAtIndex:row];
 
 	UILabel *deadline_label = (UILabel *)[cell viewWithTag:3];
 	UILabel *fraction_label = (UILabel *)[cell viewWithTag:4];
 
 	if ([indexPath section] == 0) {
 		// "lists you're in" section
-		shared_list = [self.shared_lists objectAtIndex:row];
 
 		// XXX: needs to be stored on/sent from the server
 		deadline_label.text = @"in 3 days";
 
-		// set color based on how complete the list is
-		/*
-		float frac = (float) shared_list.items_ready / shared_list.items_total;
-		if (frac == 0.0f)
-			fraction_label.textColor = [UIColor blackColor];
-		else if (frac < 0.5f)
-			fraction_label.textColor = [UIColor redColor];
-		else if (frac < 0.75f)
-			fraction_label.textColor = [UIColor orangeColor];
-		else
+		// float frac = shared_list.items_ready  / shared_list.items_total;
+		float frac = 0.0f;
+		if (frac > 0.80f)
 			fraction_label.textColor = [UIColor greenColor];
-		 */
 
+		fraction_label.hidden = NO;
 		fraction_label.text = [self fraction:shared_list.items_ready
 					      denominator:shared_list.items_total];
+
+		cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+
 	}
 	else if ([indexPath section] == 1) {
 		// "other lists" section
-		shared_list = [self.indirect_lists objectAtIndex:row];
 
 		// no deadline
 		deadline_label.text = @"";
@@ -368,10 +398,15 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 - (NSString *)tableView:(UITableView *)tableView
 	titleForHeaderInSection:(NSInteger)section
 {
+	if (section > 1)
+		// should not happen
+		return @"";
+
+	int total = [[_lists objectAtIndex:section] count];
 	if (section == 0)
-		return [NSString stringWithFormat:@"Lists you're in (%i)", [_shared_lists count]];
+		return [NSString stringWithFormat:@"Lists you're in (%i)", total];
 	else if (section == 1)
-		return [NSString stringWithFormat:@"Other lists (%i)", [_indirect_lists count]];
+		return [NSString stringWithFormat:@"Other lists (%i)", total];
 	return @"";
 }
 
@@ -399,11 +434,13 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	forRowAtIndexPath:(NSIndexPath *)indexPath
 {
 	// we don't need to check for !section 0 because of canEditRowAtIndexPath
-	SharedList *list = [self.shared_lists objectAtIndex:[indexPath row]];
-	NSLog(@"info: leaving '%@' id '%@'", list.name, list.id);
+	SharedList *list = [[_lists objectAtIndex:0] objectAtIndex:[indexPath row]];
+	NSLog(@"info: leaving '%@' list num '%@'", list.name, list.num);
 
 	// send leave list message, response will do all heavy lifting
-	[network_connection send_message:5 contents:list.id];
+	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
+	[request setObject:list.num forKey:@"num"];
+	[network_connection send_message:list_leave contents:request];
 }
 
 // customize deletion label text
@@ -420,14 +457,14 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		// a shared list was selected, transfer into detailed view
 
 		NSIndexPath *path = [self.tableView indexPathForSelectedRow];
-		SharedList *list = [self.shared_lists objectAtIndex:[path row]];
+		SharedList *list = [[_lists objectAtIndex:0] objectAtIndex:[path row]];
 
 		// make sure incoming view controller knows about itself
 		[segue.destinationViewController setMetadata:list];
 
 		// send update list items message
 		network_connection->shlist_ldvc = segue.destinationViewController;
-		[network_connection send_message:6 contents:list.id];
+		//[network_connection send_message:6 contents:list.id];
 	}
 
 	// DetailObject *detail = [self detailForIndexPath:path];
@@ -445,21 +482,25 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 }
 
 // taken from http://stackoverflow.com/questions/30859359/display-fraction-number-in-uilabel
--(NSString *)fraction:(int)numerator denominator:(int)denominator
+-(NSString *)fraction:(NSNumber *)numerator denominator:(NSNumber *)denominator
 {
 
 	NSMutableString *result = [NSMutableString string];
 
-	NSString *one = [NSString stringWithFormat:@"%i", numerator];
+	NSString *one = [numerator stringValue];
 	for (int i = 0; i < one.length; i++) {
 		[result appendString:[self superscript:[[one substringWithRange:NSMakeRange(i, 1)] intValue]]];
 	}
-	[result appendString:@"/"];
 
-	NSString *two = [NSString stringWithFormat:@"%i", denominator];
+	[result appendString:@"/"];
+	return result;
+
+	NSString *two = [denominator stringValue];
+
 	for (int i = 0; i < two.length; i++) {
 		[result appendString:[self subscript:[[two substringWithRange:NSMakeRange(i, 1)] intValue]]];
 	}
+
 	return result;
 }
 

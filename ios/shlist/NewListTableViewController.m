@@ -78,10 +78,17 @@
 	shared_list.deadline = _deadline_switch.isOn;
 	// _shared_list.filters = ???
 
-	NSLog(@"debug: %@: saving", shared_list.name);
+	NSLog(@"new_list: sending list_add request...");
 
-	NSData *payload = [shared_list.name dataUsingEncoding:NSUTF8StringEncoding];
-	[network_connection send_message:1 contents:payload];
+	NSMutableDictionary *list = [[NSMutableDictionary alloc] init];
+	[list setObject:[NSNumber numberWithInt:0] forKey:@"num"];
+	[list setObject:shared_list.name forKey:@"name"];
+	[list setObject:[NSNumber numberWithInt:0] forKey:@"date"];
+
+	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
+	[request setObject:list forKey:@"list"];
+
+	[network_connection send_message:list_add contents:request];
 }
 
 @end

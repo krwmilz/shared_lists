@@ -22,5 +22,7 @@ for my $list ($A->lists_get()) {
 	fail_msg_ne $A->phnum, $list->{members}->[0];
 	fail_msg_ne $list->{name}, $stored_list->{name};
 	fail_num_ne 'date not the same', $list->{date}, $stored_list->{date};
+	fail_num_ne 'items total not the same', $list->{items_total}, 0;
+	fail_num_ne 'items complete not the same', $list->{items_complete}, 0;
 }
 fail_num_ne 'wrong number of lists', $i, 3;

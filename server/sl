@@ -468,18 +468,11 @@ sub msg_lists_get {
 
 		$log->print("found list '$list_num':'$list_name'\n");
 
-		# Find all members of this list
-		my @members;
-		$db->{get_list_members}->execute($list_num);
-		while (my ($member_num) = $db->{get_list_members}->fetchrow_array()) {
+		$db->{list_members_phnums}->execute($list_num);
+		my $members_ref = $db->{list_members_phnums}->fetchall_arrayref();
 
-			# Don't re look-up our own number
-			if ($member_num eq $dev->{num}) {
-				push @members, $dev->{phnum};
-				next;
-			}
-			push @members, devnum_to_phnum($db, $member_num);
-		}
+		# $members_ref comes back as an array of arrays, flatten it
+		my @members = map {@$_} @$members_ref;
 
 		my $list = {
 			num => $list_num,
@@ -826,6 +819,10 @@ sub prepare_stmt_handles {
 	$sql = qq{select lists.num, lists.name from lists, list_members where
 		lists.num = list_members.list and list_members.device = ?};
 	$self->{get_lists} = $dbh->prepare($sql);
+
+	$sql = qq{select devices.phone_num from devices, list_members
+		where devices.num = list_members.device and list_members.list = ?};
+	$self->{list_members_phnums} = $dbh->prepare($sql);
 
 	# list_members table queries
 	$sql = 'select device from list_members where list = ?';

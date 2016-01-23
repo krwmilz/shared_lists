@@ -172,14 +172,17 @@ sub send_msg {
 sub send_all {
 	my ($socket, $bytes, $bytes_total) = @_;
 
-	my $bytes_written = $socket->syswrite($bytes);
+	my $bytes_written = 0;
+	while ($bytes_total) {
+		my $wrote = $socket->syswrite($bytes, $bytes_total, $bytes_written);
 
-	if (!defined $bytes_written) {
-		$log->print("error: write failed: $!\n");
-		exit 0;
-	} elsif ($bytes_written != $bytes_total) {
-		$log->print("error: wrote $bytes_written instead of $bytes_total bytes\n");
-		exit 0;
+		unless (defined $bytes_written) {
+			$log->print("error: write failed: $!\n");
+			exit 0;
+		}
+
+		$bytes_total -= $wrote;
+		$bytes_written += $wrote;
 	}
 
 	return;

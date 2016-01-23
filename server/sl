@@ -507,10 +507,9 @@ sub msg_lists_get_other {
 	my %list_nums;
 	# Find all mutual friends of this device
 	$db->{mutual_friend_select}->execute($dev->{num});
-	while (my ($friend_num) = $db->{mutual_friend_select}->fetchrow_array()) {
+	while (my @row = $db->{mutual_friend_select}->fetchrow_array()) {
 
-		# We can't send device id's back to the client
-		my $friend_phnum = devnum_to_phnum($db, $friend_num);
+		my ($friend_num, $friend_phnum) = @row;
 		$log->print("found mutual friend '$friend_phnum'\n");
 
 		# Find all of the lists my mutual friend is in (but not me)
@@ -579,15 +578,6 @@ sub msg_list_items_get {
 
 sub fingerprint {
 	return substr shift, 0, 8;
-}
-
-sub devnum_to_phnum {
-	my ($db, $dev_num) = @_;
-
-	$db->{select_device_num}->execute($dev_num);
-	my (undef, undef, $ph_num) = $db->{select_device_num}->fetchrow_array;
-
-	return $ph_num;
 }
 
 sub list_number_valid {
@@ -792,9 +782,6 @@ sub prepare_stmt_handles {
 	$sql = 'select * from devices where id = ?';
 	$self->{select_device_id} = $dbh->prepare($sql);
 
-	$sql = 'select * from devices where num = ?';
-	$self->{select_device_num} = $dbh->prepare($sql);
-
 	# friends table queries
 	$sql = 'insert or replace into friends (device, friend) values (?, ?)';
 	$self->{friends_insert} = $dbh->prepare($sql);
@@ -809,7 +796,9 @@ sub prepare_stmt_handles {
 	$sql = 'insert or replace into mutual_friends (device, mutual_friend) values (?, ?)';
 	$self->{mutual_friend_insert} = $dbh->prepare($sql);
 
-	$sql = 'select mutual_friend from mutual_friends where device = ?';
+	$sql = qq{select devices.num, devices.phone_num from devices, mutual_friends
+		where devices.num = mutual_friends.mutual_friend
+		and mutual_friends.device = ?};
 	$self->{mutual_friend_select} = $dbh->prepare($sql);
 
 	$sql = 'delete from mutual_friends where device = ? and mutual_friend = ?';

@@ -4,6 +4,7 @@ use warnings;
 
 use IO::Socket::SSL;
 use JSON::XS;
+use Try::Tiny;
 use test;
 
 require "msgs.pl";
@@ -201,19 +202,27 @@ sub recv_msg {
 	# Check some things
 	fail "unsupported protocol version $version" if ($version != 0);
 	fail "unknown message type $msg_type" if ($msg_type >= @msg_str);
-	fail "$payload_size byte message too large" if ($payload_size > 4096);
 	fail "0 byte payload" if ($payload_size == 0);
 	fail "unexpected message type $self->{msg_type}" if ($self->{msg_type} != $msg_type);
 
 	# Read again for payload, $payload_size > 0
 	my $payload = read_all($self, $payload_size);
-	my $response = decode_json($payload);
 
-	my $status = $response->{status};
-	fail "wrong message status '$status'" if ($status ne $exp_status);
-	$self->{err_msg} = $response->{reason} if ($status eq 'err');
+	try {
+		my $response = decode_json($payload);
 
-	return $response;
+		if (ref($response) ne "HASH") {
+			fail "server didn't send back object root element";
+		}
+
+		my $status = $response->{status};
+		fail "wrong message status '$status'" if ($status ne $exp_status);
+		$self->{err_msg} = $response->{reason} if ($status eq 'err');
+
+		return $response;
+	} catch {
+		fail "server sent invalid json";
+	}
 }
 
 sub read_all {

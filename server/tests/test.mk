@@ -13,13 +13,16 @@ process-server-log:
 ifeq ($(DIFF_MOD), none)
 diff:
 	rm -f server.log
+
 else ifeq ($(DIFF_MOD), sort)
 diff: process-server-log
 	LC_ALL=C sort -o server.log < server.log
 	diff -u server.log.good server.log
+
 else ifeq ($(DIFF_MOD), os)
 diff: process-server-log
 	diff -u server.log.good.`uname` server.log
+
 else
 diff: process-server-log
 	diff -u server.log.good server.log

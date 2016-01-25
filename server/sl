@@ -266,7 +266,7 @@ sub msg_list_update {
 	my ($err, $dev, $list) = unpack_request($db, $request, 'device_id', 'list');
 	return make_error($err) if ($err);
 
-	$err = list_number_valid($db, $list->{num});
+	($err) = list_number_valid($db, $list->{num});
 	return make_error($err) if ($err);
 
 	# Check that the device is in the list it wants to update
@@ -317,8 +317,8 @@ sub msg_list_join {
     my ($err, $dev, $list_num) = unpack_request($db, $request, 'device_id', 'list_num');
     return make_error($err) if ($err);
 
-    $err = list_number_valid($db, $list_num);
-    return make_error($err) if ($err);
+    my ($list_err, undef, $list_name, $list_date) = list_number_valid($db, $list_num);
+    return make_error($list_err) if ($list_err);
 
     $log->print("device '$dev->{fp}'\n");
     $log->print("list '$list_num'\n");
@@ -334,15 +334,19 @@ sub msg_list_join {
 	return make_error("the device is already part of this list");
     }
 
+    $db->{list_members_phnums}->execute($list_num);
+    my $members_ref = $db->{list_members_phnums}->fetchall_arrayref();
+    # $members_ref comes back as an array of arrays, flatten it
+    my @members = map {@$_} @$members_ref;
+
     my $list = {
         num => $list_num,
-        # XXX: we should return the following here too
-        # name => $list_name,
-        # date => $list_date,
-        # items_complete => 0,
-        # items_total => 0,
-        # members => [ $phnum ],
-        # num_members => 1
+        name => $list_name,
+        date => $list_date,
+        items_complete => 0,
+        items_total => 0,
+        members => \@members,
+        num_members => scalar(@members)
     };
     return make_ok( { list => $list } );
 }
@@ -353,7 +357,7 @@ sub msg_list_leave {
     my ($err, $dev, $list_num) = unpack_request($db, $request, 'device_id', 'list_num');
     return make_error($err) if ($err);
 
-    $err = list_number_valid($db, $list_num);
+    ($err) = list_number_valid($db, $list_num);
     return make_error($err) if ($err);
 
     $log->print("device '$dev->{fp}'\n");
@@ -592,21 +596,21 @@ sub list_number_valid {
 
 	unless (defined $list_num) {
 		$log->print("list number key not found\n");
-		return "the client did not send a list number";
+		return ("the client did not send a list number");
 	}
 
 	unless (looks_like_number($list_num)) {
 		$log->print("'$list_num' is not a number\n");
-		return "the client sent a list number that was not a number";
+		return ("the client sent a list number that was not a number");
 	}
 
 	$db->{list_select}->execute($list_num);
-	unless ($db->{list_select}->fetchrow_array()) {
-		$log->print("unknown list number '$list_num'\n");
-		return "the client sent an unknown list number";
+	if (my @row = $db->{list_select}->fetchrow_array()) {
+		return (undef, @row);
 	}
 
-	return;
+	$log->print("unknown list number '$list_num'\n");
+	return ("the client sent an unknown list number");
 }
 
 sub make_error {

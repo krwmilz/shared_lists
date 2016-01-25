@@ -134,22 +134,23 @@ sub recv_msg {
 }
 
 sub read_all {
-	my ($sock, $bytes_left) = @_;
+	my ($sock, $bytes_total) = @_;
 
 	my $data;
-	while ($bytes_left > 0) {
-		my $bytes_read = $sock->sysread(my $tmp, $bytes_left);
+	my $bytes_read = 0;
+	while ($bytes_total > 0) {
+		my $read = $sock->sysread($data, $bytes_total, $bytes_read);
 
-		if (!defined $bytes_read) {
+		if (!defined $read) {
 			$log->print("error: read failed: $!\n");
 			exit 0;
-		} elsif ($bytes_read == 0) {
+		} elsif ($read == 0) {
 			$log->print("disconnected!\n");
 			exit 0;
 		}
 
-		$data .= $tmp;
-		$bytes_left -= $bytes_read;
+		$bytes_total -= $read;
+		$bytes_read += $read;
 	}
 
 	return $data;
@@ -170,13 +171,13 @@ sub send_msg {
 }
 
 sub send_all {
-	my ($socket, $bytes, $bytes_total) = @_;
+	my ($socket, $data, $bytes_total) = @_;
 
 	my $bytes_written = 0;
 	while ($bytes_total) {
-		my $wrote = $socket->syswrite($bytes, $bytes_total, $bytes_written);
+		my $wrote = $socket->syswrite($data, $bytes_total, $bytes_written);
 
-		unless (defined $bytes_written) {
+		unless (defined $wrote) {
 			$log->print("error: write failed: $!\n");
 			exit 0;
 		}

@@ -22,6 +22,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -31,6 +32,7 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.w3c.dom.Text;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -51,8 +53,9 @@ public class HomeScreen extends ActionBarActivity {
     private final String SERVER_ADDRESS = "104.236.186.39";
     private final int SERVER_PORT = 5437;
     private final String dbName = "shlist.db";
-    private ArrayList<String> list1;
-    private ArrayAdapter<String> adapter1;
+    private ArrayList<Shlist> list1;
+    private ArrayList<String> list1_str;
+    private MyInListsAdapter adapter1;
     private ArrayAdapter<String> adapter2;
     private ArrayList<String> list2;
     private long phoneNum;
@@ -109,9 +112,10 @@ public class HomeScreen extends ActionBarActivity {
             }
         }
 
-        list1 = new ArrayList<String>();
+        list1 = new ArrayList<Shlist>();
+        list1_str = new ArrayList<String>();
 
-        adapter1 = new ArrayAdapter<String>(this, R.layout.list_row, R.id.list_name, list1);
+        adapter1 = new MyInListsAdapter(this, R.layout.list_row, list1, list1_str);
 
         ListView lv1 = (ListView) findViewById(R.id.currentLists);
         registerForContextMenu(lv1);
@@ -209,11 +213,10 @@ public class HomeScreen extends ActionBarActivity {
             case R.id.leave_list:
                 int position = (int) info.id;
                 joinLeavePosition = position;
-                String list_entry = adapter1.getItem(position);
+                Shlist list_entry = adapter1.getShlist(position);
+                int num = list_entry.getNum();
                 Log.d("main", "Tried to leave list: " + list_entry);
-                String list_entry_split[] = list_entry.split(":");
                 JSONObject obj = new JSONObject();
-                int num = Integer.parseInt(list_entry_split[1]);
                 try {
                     obj.put("device_id", "" + id);
                     obj.put("list_num", num);
@@ -270,8 +273,7 @@ public class HomeScreen extends ActionBarActivity {
         dbHelper.closeDB();
         try {
             JSONObject list_obj = new JSONObject();
-            list_obj.put("num", 0);
-            list_obj.put("name", name);
+            list_obj.put("name", name.trim());
             list_obj.put("date", System.currentTimeMillis() / 1000L);
             JSONObject main_obj = new JSONObject();
             main_obj.put("device_id", device_id);
@@ -341,7 +343,7 @@ public class HomeScreen extends ActionBarActivity {
         @Override
         protected void onPostExecute(String result) {
             Log.d("NetMan", "Join List End");
-            list1.add(joinLeaveMessage);
+            //list1.add(joinLeaveMessage);
             list2.remove(joinLeavePosition);
             adapter1.notifyDataSetChanged();
             adapter2.notifyDataSetChanged();
@@ -360,6 +362,7 @@ public class HomeScreen extends ActionBarActivity {
         @Override
         protected void onPostExecute(String result) {
             list1.remove(joinLeavePosition);
+            list1_str.remove(joinLeavePosition);
             adapter1.notifyDataSetChanged();
             adapter2.notifyDataSetChanged();
             cListsTV.setText("Current Lists (" + list1.size() + ")");
@@ -380,9 +383,17 @@ public class HomeScreen extends ActionBarActivity {
                 JSONObject main_obj = new JSONObject(result);
                 int num = main_obj.getInt("num_lists");
                 JSONArray lists_arr = main_obj.getJSONArray("lists");
+                Shlist temp_shlist;
+                JSONObject temp_json;
+                int temp_items[] = new int[2];
 
                 for (int i = 0; i < num; ++i) {
-                    list1.add(lists_arr.getJSONObject(i).getString("name") + ":" + lists_arr.getJSONObject(i).getString("num"));
+                    temp_json = lists_arr.getJSONObject(i);
+                    temp_items[0] = temp_json.getInt("items_complete");
+                    temp_items[1] = temp_json.getInt("items_total");
+                    temp_shlist = new Shlist(temp_json.getInt("num"), temp_json.getString("name"), temp_items, new String[1], 22);
+                    list1.add(temp_shlist);
+                    list1_str.add(temp_shlist.getName());
                 }
 
                 cListsTV.setText("Current Lists (" + list1.size() + ")");
@@ -390,6 +401,19 @@ public class HomeScreen extends ActionBarActivity {
             } catch (JSONException e) {
                 Log.d("netman", "JSON Exception: " + e);
             }
+        }
+    }
+
+    public class sendFriendAddMessage extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... urls) {
+            String result = nm.sendMessage(urls);
+            return result;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+
         }
     }
 
@@ -404,17 +428,80 @@ public class HomeScreen extends ActionBarActivity {
             try {
                 JSONObject main_obj = new JSONObject(result);
                 JSONObject list_obj = main_obj.getJSONObject("list");
-                String list_num = list_obj.getString("num");
+                int list_num = list_obj.getInt("num");
+                String list_num_str = list_obj.getString("num");
                 String list_name = list_obj.getString("name");
+                int date = list_obj.getInt("date");
+                int items[] = new int[2];
+                items[0] = list_obj.getInt("items_complete");
+                items[1] = list_obj.getInt("items_total");
+                int num_members = list_obj.getInt("num_members");
+                String[] members = new String[0];
+                Shlist shlist = new Shlist(list_num, list_name, date);
                 dbHelper.openOrCreateDB();
-                dbHelper.addList(list_num, list_name);
+                dbHelper.addList(list_num_str, list_name);
                 dbHelper.closeDB();
-                list1.add(list_name + ":" + list_num);
+                list1.add(shlist);
+                list1_str.add(shlist.getName());
                 cListsTV.setText("Current Lists (" + list1.size() + ")");
                 adapter1.notifyDataSetChanged();
             } catch (JSONException e) {
                 Log.d("netman", "JSON Exception: " + e);
             }
         }
+    }
+
+    private class MyInListsAdapter extends ArrayAdapter<String> {
+
+        private ArrayList<Shlist> ourLists;
+
+        public MyInListsAdapter(Context context, int textViewResourceId,
+                               ArrayList<Shlist> taskList, ArrayList<String> stringList) {
+            super(context, textViewResourceId, stringList);
+            ourLists = taskList;
+        }
+
+        private class ViewHolder {
+            Shlist shlist;
+            TextView name;
+            TextView completion;
+            TextView friends;
+        }
+
+        public Shlist getShlist(int position) {
+            return ourLists.get(position);
+        }
+
+        @Override
+        public View getView(final int position, View convertView, ViewGroup parent) {
+
+            ViewHolder viewHolder = null;
+            Log.v("ConvertView", String.valueOf(position));
+
+            if (convertView == null) {
+                LayoutInflater inflater = (LayoutInflater)getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+                convertView = inflater.inflate(R.layout.list_row, null);
+
+                viewHolder = new ViewHolder();
+                viewHolder.name = (TextView) convertView.findViewById(R.id.list_name);
+                viewHolder.completion = (TextView) convertView.findViewById(R.id.list_completion);
+                viewHolder.friends = (TextView) convertView.findViewById(R.id.friends_list);
+
+                convertView.setTag(viewHolder);
+
+            }
+            else {
+                viewHolder = (ViewHolder) convertView.getTag();
+            }
+
+            viewHolder.shlist = ourLists.get(position);
+            viewHolder.name.setText(viewHolder.shlist.getName());
+            viewHolder.completion.setText(viewHolder.shlist.getComplete() + "/" + viewHolder.shlist.getTotal());
+            viewHolder.friends.setText("Kyle Muthafuckin Milz");
+
+            return convertView;
+
+        }
+
     }
 }

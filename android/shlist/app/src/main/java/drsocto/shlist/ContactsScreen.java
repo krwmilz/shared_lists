@@ -19,6 +19,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class ContactsScreen extends ActionBarActivity {
@@ -29,18 +31,35 @@ public class ContactsScreen extends ActionBarActivity {
         setContentView(R.layout.layout_contacts_screen);
 
         ArrayList<String> list = new ArrayList<String>();
+        ArrayList<Boolean> list_bool = new ArrayList<Boolean>();
         ListView lv = (ListView) findViewById(R.id.contactList);
+
+        ArrayList<Contact> contacts_list = new ArrayList<Contact>();
 
         Cursor phones = getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null,null,null, null);
         while (phones.moveToNext())
         {
-            String name=phones.getString(phones.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME));
+            String name = phones.getString(phones.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME));
             String phoneNumber = phones.getString(phones.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
-            list.add(name + ": " + phoneNumber);
+            String pattern = "(\\d*)";
+            Pattern r = Pattern.compile(pattern);
+            Matcher m = r.matcher(phoneNumber);
+            String out = "";
+            while(m.find()) {
+                out += m.group(1);
+            }
+            if (out.length() == 11) {
+                out = out.substring(1);
+            }
+            Log.d("contacts", "Regex: " + out);
+            phoneNumber = out;
 
+            Contact contact = new Contact(name, phoneNumber);
+            contacts_list.add(contact);
+            list.add(name);
         }
         phones.close();
-        ArrayAdapter<String> adapter = new MyCustomAdapter(this, R.layout.contact_row, list);
+        MyContactsListsAdapter adapter = new MyContactsListsAdapter(this, R.id.contactCheckBox, contacts_list, list);
         lv.setAdapter(adapter);
     }
 
@@ -71,19 +90,23 @@ public class ContactsScreen extends ActionBarActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    private class MyCustomAdapter extends ArrayAdapter<String> {
+    private class MyContactsListsAdapter extends ArrayAdapter<String> {
 
-        private ArrayList<String> taskList;
+        private ArrayList<Contact> contacts;
 
-        public MyCustomAdapter(Context context, int textViewResourceId,
-                               ArrayList<String> taskList) {
-            super(context, textViewResourceId, taskList);
-            this.taskList = new ArrayList<String>();
-            this.taskList.addAll(taskList);
+        public MyContactsListsAdapter(Context context, int textViewResourceId,
+                                ArrayList<Contact> taskList, ArrayList<String> stringList) {
+            super(context, textViewResourceId, stringList);
+            contacts = taskList;
         }
 
         private class ViewHolder {
-            CheckBox cBox;
+            Contact shlist;
+            CheckBox name;
+        }
+
+        public Contact getContact(int position) {
+            return contacts.get(position);
         }
 
         @Override
@@ -97,25 +120,31 @@ public class ContactsScreen extends ActionBarActivity {
                 convertView = inflater.inflate(R.layout.contact_row, null);
 
                 viewHolder = new ViewHolder();
-                viewHolder.cBox = (CheckBox) convertView.findViewById(R.id.contactCheckBox);
+
+
                 convertView.setTag(viewHolder);
 
-                viewHolder.cBox.setOnClickListener( new View.OnClickListener() {
-                    public void onClick(View v) {
-                        CheckBox taskCB = (CheckBox) v;
-                        if (taskCB.isChecked())
-                            Log.d("User Input: ", "Checked " + taskCB.getText());
-                        else
-                            Log.d("User Input: ", "Un-Checked " + taskCB.getText());
-                    }
-                });
             }
             else {
                 viewHolder = (ViewHolder) convertView.getTag();
             }
 
-            String task = taskList.get(position);
-            viewHolder.cBox.setText(task);
+            viewHolder.shlist = contacts.get(position);
+            viewHolder.name = (CheckBox) convertView.findViewById(R.id.contactCheckBox);
+            viewHolder.name.setText(viewHolder.shlist.getName());
+            viewHolder.name.setChecked(viewHolder.shlist.getSelected());
+            final Contact contact = viewHolder.shlist;
+            viewHolder.name.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Log.d("contacts", "Clicked: " + contact.getName() + ":" + contact.getNumber());
+                    if (contact.getSelected()) {
+                        contact.setSelected(false);
+                    } else {
+                        contact.setSelected(true);
+                    }
+                }
+            });
 
             return convertView;
 

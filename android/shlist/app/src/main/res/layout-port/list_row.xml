@@ -22,7 +22,7 @@
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:text="(3/9)"
-        android:id="@+id/textView2"
+        android:id="@+id/list_completion"
         android:layout_alignParentRight="true"
         android:layout_alignBottom="@id/list_name"
         android:layout_alignParentBottom="false"
@@ -33,21 +33,11 @@
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceSmall"
         android:text="Friends: David, Greg, Kyle"
-        android:id="@+id/textView"
+        android:id="@+id/friends_list"
         android:layout_alignParentTop="false"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="false"
         android:layout_alignParentBottom="true"
         android:layout_below="@+id/list_name" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:text="In 12 months"
-        android:id="@+id/textView3"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentRight="true"
-        android:layout_below="@+id/textView2"
-        android:textColor="#ffffb11a" />
 </RelativeLayout>

@@ -218,17 +218,18 @@ sub recv_msg {
 }
 
 sub read_all {
-	my ($self, $bytes_left) = @_;
+	my ($self, $bytes_total) = @_;
 
 	my $data;
-	while ($bytes_left > 0) {
-		my $bytes_read = $self->{sock}->sysread(my $tmp, $bytes_left);
+	my $bytes_read = 0;
+	while ($bytes_total > 0) {
+		my $read = $self->{sock}->sysread($data, $bytes_total, $bytes_read);
 
-		fail "read failed: $!" unless (defined $bytes_read);
-		fail "read EOF on socket" if ($bytes_read == 0);
+		fail "read failed: $!" unless (defined $read);
+		fail "read EOF on socket" if ($read == 0);
 
-		$data .= $tmp;
-		$bytes_left -= $bytes_read;
+		$bytes_total -= $read;
+		$bytes_read += $read;
 	}
 
 	return $data;

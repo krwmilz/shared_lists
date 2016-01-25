@@ -6,6 +6,7 @@ msg_types="
 	friend_add
 	friend_delete
 	list_add
+	list_update
 	list_join
 	list_leave
 	lists_get

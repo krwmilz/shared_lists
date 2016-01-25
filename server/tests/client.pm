@@ -41,7 +41,6 @@ sub new {
 sub list_add {
 	my $self = shift;
 	my $list = {
-		num => 0,
 		name => shift,
 		date => 0
 	};
@@ -55,14 +54,10 @@ sub list_add {
 
 sub list_update {
 	my $self = shift;
-	my $list = {
-		num => shift,
-		name => shift,
-		date => shift
-	};
+	my $list_ref = shift;
 	my $status = shift || 'ok';
 
-	my $list_data = communicate($self, 'list_add', $status, { list => $list });
+	my $list_data = communicate($self, 'list_update', $status, { list => $list_ref });
 	return if ($status eq 'err');
 }
 

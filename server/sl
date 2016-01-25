@@ -231,51 +231,67 @@ sub msg_list_add {
 	my ($err, $dev, $list) = unpack_request($db, $request, 'device_id', 'list');
 	return make_error($err) if ($err);
 
-	if ($list->{num} == 0) {
-		# Sending a list number of 0 triggers new list mode
-		$log->print("device '$dev->{fp}'\n");
-		$log->print("new list name '$list->{name}'\n");
+	# XXX: check that $list contains the necessary keys!
 
-		my $now = time;
-		$db->{new_list}->execute($list->{name}, $list->{date}, $now, $now);
+	$log->print("device '$dev->{fp}'\n");
+	$log->print("new list name '$list->{name}'\n");
 
-		$list->{num} = $db->{dbh}->last_insert_id("", "", "", "");
-		$log->print("new list number is '$list->{num}'\n");
+	my $now = time;
+	$db->{new_list}->execute($list->{name}, $list->{date}, $now, $now);
+	my $list_num = $db->{dbh}->last_insert_id("", "", "", "");
 
-		$db->{new_list_member}->execute($list->{num}, $dev->{num}, $now);
+	$log->print("new list number is '$list_num'\n");
 
-		# XXX: send push notifications to all my mutual friends to
-		# update their 'other lists' section
-	}
-	else {
-		# Otherwise we're in list update mode
-		$err = list_number_valid($db, $list->{num});
-		return make_error($err) if ($err);
+	$db->{new_list_member}->execute($list_num, $dev->{num}, $now);
 
-		# Check that the device is in the list it wants to update
-		$db->{check_list_member}->execute($list->{num}, $dev->{num});
-		unless ($db->{check_list_member}->fetchrow_array()) {
-			$log->print("device '$dev->{fp}' not in list '$list->{num}'\n");
-			return make_error("client tried to update a list it was not in");
-		}
-
-		# Do the update
-		$db->{update_list}->execute($list->{name}, $list->{date}, time, $list->{num});
-		$log->print("updated list '$list->{num}'\n");
-
-		# XXX: send push notifications to all my mutual friends to update their
-		# 'other lists' section, also tell all list members to update their
-		# 'lists' section
-	}
+	# XXX: send push notifications to all my mutual friends to
+	# update their 'other lists' section
 
 	my $resp_list = {
-		num => $list->{num},
+		num => $list_num,
 		name => $list->{name},
 		date => $list->{date},
 		items_complete => 0,
 		items_total => 0,
 		members => [ $dev->{phnum} ],
 		num_members => 1
+	};
+	return make_ok( { list => $resp_list } );
+}
+
+sub msg_list_update {
+	my ($db, $request) = @_;
+
+	my ($err, $dev, $list) = unpack_request($db, $request, 'device_id', 'list');
+	return make_error($err) if ($err);
+
+	$err = list_number_valid($db, $list->{num});
+	return make_error($err) if ($err);
+
+	# Check that the device is in the list it wants to update
+	$db->{check_list_member}->execute($list->{num}, $dev->{num});
+	unless ($db->{check_list_member}->fetchrow_array()) {
+		$log->print("device '$dev->{fp}' not in list '$list->{num}'\n");
+		return make_error("client tried to update a list it was not in");
+	}
+
+	# Do the update
+	$db->{update_list}->execute($list->{name}, $list->{date}, time, $list->{num});
+	$log->print("num  = $list->{num}\n");
+	$log->print("name = '$list->{name}'\n") if (exists $list->{name});
+	$log->print("date = $list->{date}\n") if (exists $list->{date});
+
+	$db->{list_select}->execute($list->{num});
+	my ($num, $name, $date) = $db->{list_select}->fetchrow_array();
+
+	# XXX: send push notifications to all my mutual friends to update their
+	# 'other lists' section, also tell all list members to update their
+	# 'lists' section
+
+	my $resp_list = {
+		num => $list->{num},
+		name => $list->{name},
+		date => $list->{date},
 	};
 	return make_ok( { list => $resp_list } );
 }
@@ -467,7 +483,8 @@ sub msg_lists_get {
 
 	my @lists;
 	$db->{get_lists}->execute($dev->{num});
-	while (my ($list_num, $list_name) = $db->{get_lists}->fetchrow_array()) {
+	while (my @row = $db->{get_lists}->fetchrow_array()) {
+		my ($list_num, $list_name, $list_date) = @row;
 
 		$log->print("found list '$list_num':'$list_name'\n");
 
@@ -480,7 +497,7 @@ sub msg_lists_get {
 		my $list = {
 			num => $list_num,
 			name => $list_name,
-			date => 0,
+			date => $list_date,
 			items_complete => 0,
 			items_total => 0,
 			members => \@members,
@@ -585,6 +602,11 @@ sub fingerprint {
 
 sub list_number_valid {
 	my ($db, $list_num) = @_;
+
+	unless (defined $list_num) {
+		$log->print("list number key not found\n");
+		return "the client did not send a list number";
+	}
 
 	unless (looks_like_number($list_num)) {
 		$log->print("'$list_num' is not a number\n");
@@ -769,7 +791,8 @@ sub prepare_stmt_handles {
 	$sql = 'insert into lists (name, date, created, last_updated) values (?, ?, ?, ?)';
 	$self->{new_list} = $dbh->prepare($sql);
 
-	$sql = 'update lists set name = ?, date = ?, last_updated = ? where num = ?';
+	$sql = qq{update lists set name = coalesce(?, name),
+		date = coalesce(?, date), last_updated = ? where num = ?};
 	$self->{update_list} = $dbh->prepare($sql);
 
 	$sql = 'delete from lists where num = ?';
@@ -808,7 +831,7 @@ sub prepare_stmt_handles {
 	$self->{mutual_friends_delete} = $dbh->prepare($sql);
 
 	# lists/list_members compound queries
-	$sql = qq{select lists.num, lists.name from lists, list_members where
+	$sql = qq{select lists.num, lists.name, lists.date from lists, list_members where
 		lists.num = list_members.list and list_members.device = ?};
 	$self->{get_lists} = $dbh->prepare($sql);
 

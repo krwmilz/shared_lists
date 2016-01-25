@@ -32,7 +32,7 @@ sub new {
 
 	# Register this device immediately by default
 	if ($dont_register == 0) {
-		$self->device_add(rand_phnum());
+		$self->device_add({ phone_number => rand_phnum(), os => 'unix' });
 	}
 
 	return $self;
@@ -123,10 +123,7 @@ sub lists_get_other {
 
 sub device_add {
 	my $self = shift;
-	my $msg_args = {
-		phone_number => shift || '4038675309',
-		os => shift || 'unix'
-	};
+	my $msg_args = shift;
 	my $exp_status = shift || 'ok';
 
 	# Reset error messages to guard against stale state

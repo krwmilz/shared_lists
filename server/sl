@@ -51,13 +51,14 @@ while (my $client_socket = $server_socket->accept()) {
 		next;
 	}
 
-	# in child: on linux we must stir the random pool after fork()'s
 	close $server_socket;
+	# In child: stir the random pool after fork() just in case
 	arc4random_stir();
+
 	$log->set_peer_host_port($client_socket);
 	$log->print("new connection (pid = '$$')\n");
 
-	# unconditionally upgrade connection to SSL
+	# Upgrade connection to SSL
 	my $ret = IO::Socket::SSL->start_SSL($client_socket,
 		SSL_server => 1,
 		SSL_cert_file => 'ssl/cert_chain.pem',

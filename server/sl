@@ -475,21 +475,19 @@ sub msg_lists_get {
 
 	my @lists;
 	$db->{get_lists}->execute($dev->{num});
-	while (my @row = $db->{get_lists}->fetchrow_array()) {
-		my ($list_num, $list_name, $list_date) = @row;
+	while (my ($num, $name, $date) = $db->{get_lists}->fetchrow_array()) {
+		$log->print("found list '$num':'$name'\n");
 
-		$log->print("found list '$list_num':'$list_name'\n");
-
-		$db->{list_members_phnums}->execute($list_num);
+		$db->{list_members_phnums}->execute($num);
 		my $members_ref = $db->{list_members_phnums}->fetchall_arrayref();
 
 		# $members_ref comes back as an array of arrays, flatten it
 		my @members = map {@$_} @$members_ref;
 
 		my $list = {
-			num => $list_num,
-			name => $list_name,
-			date => $list_date,
+			num => $num,
+			name => $name,
+			date => $date,
 			items_complete => 0,
 			items_total => 0,
 			members => \@members,
@@ -501,11 +499,7 @@ sub msg_lists_get {
 		$log->print("list has $list->{items_total} items\n");
 	}
 
-	my $response = {
-		lists => \@lists,
-		num_lists => scalar(@lists)
-	};
-	return make_ok($response);
+	return make_ok({ lists => \@lists, num_lists => scalar(@lists) });
 }
 
 sub msg_lists_get_other {

@@ -23,6 +23,7 @@ count=0
 for t in `LC_ALL=C ls tests/*/Makefile`; do
 	count=`expr $count + 1`
 	test_dir=`dirname ${t}`
+	> server.log
 
 	# run test, complain if it failed
 	if ! make -s -C $test_dir test; then
@@ -34,7 +35,6 @@ for t in `LC_ALL=C ls tests/*/Makefile`; do
 
 	# copy server log aside for diff'ing
 	cp server.log $test_dir/server.log
-	> server.log
 
 	# diff the server's output log
 	if ! make -s -C $test_dir diff; then

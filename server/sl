@@ -275,25 +275,17 @@ sub msg_list_update {
 		return make_error("client tried to update a list it was not in");
 	}
 
-	# Do the update
+	# Update list row, note that some values here can be optional
 	$db->{update_list}->execute($list->{name}, $list->{date}, time, $list->{num});
 	$log->print("num  = $list->{num}\n");
 	$log->print("name = '$list->{name}'\n") if (exists $list->{name});
 	$log->print("date = $list->{date}\n") if (exists $list->{date});
 
-	$db->{list_select}->execute($list->{num});
-	my ($num, $name, $date) = $db->{list_select}->fetchrow_array();
-
 	# XXX: send push notifications to all my mutual friends to update their
 	# 'other lists' section, also tell all list members to update their
 	# 'lists' section
 
-	my $resp_list = {
-		num => $list->{num},
-		name => $list->{name},
-		date => $list->{date},
-	};
-	return make_ok( { list => $resp_list } );
+	return make_ok();
 }
 
 sub msg_list_item_add {

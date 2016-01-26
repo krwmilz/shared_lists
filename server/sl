@@ -242,8 +242,6 @@ sub msg_list_add {
 	$db->{new_list}->execute($list->{name}, $list->{date}, $now, $now);
 	my $list_num = $db->{dbh}->last_insert_id("", "", "", "");
 
-	$log->print("new list number is '$list_num'\n");
-
 	$db->{new_list_member}->execute($list_num, $dev->{num}, $now);
 
 	# XXX: send push notifications to all my mutual friends to
@@ -258,6 +256,9 @@ sub msg_list_add {
 		members => [ $dev->{phnum} ],
 		num_members => 1
 	};
+
+	$log->print("new list number is '$list_num'\n");
+
 	return make_ok( { list => $resp_list } );
 }
 
@@ -482,7 +483,6 @@ sub msg_lists_get {
 	my @lists;
 	$db->{get_lists}->execute($dev->{num});
 	while (my ($num, $name, $date) = $db->{get_lists}->fetchrow_array()) {
-		$log->print("found list '$num':'$name'\n");
 
 		$db->{list_members_phnums}->execute($num);
 		my $members_ref = $db->{list_members_phnums}->fetchall_arrayref();
@@ -490,6 +490,7 @@ sub msg_lists_get {
 		# $members_ref comes back as an array of arrays, flatten it
 		my @members = map {@$_} @$members_ref;
 
+		my $num_members = scalar(@members);
 		my $list = {
 			num => $num,
 			name => $name,
@@ -497,12 +498,13 @@ sub msg_lists_get {
 			items_complete => 0,
 			items_total => 0,
 			members => \@members,
-			num_members => scalar(@members)
+			num_members => $num_members
 		};
 		push @lists, $list;
 
-		$log->print("list has $list->{num_members} members\n");
-		$log->print("list has $list->{items_total} items\n");
+		$log->print("found list '$num':'$name'\n");
+		$log->print("list has $num_members members\n");
+		$log->print("list has 0 items\n");
 	}
 
 	return make_ok({ lists => \@lists, num_lists => scalar(@lists) });

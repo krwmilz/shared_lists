@@ -42,7 +42,7 @@ print_table() {
 
 gen_objc() {
 	cat << EOF > $objc_path
-/* ${generated_at} */"
+/* ${generated_at} */
 
 int protocol_version = $protocol_version;
 EOF

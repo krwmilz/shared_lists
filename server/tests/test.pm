@@ -9,7 +9,7 @@ our @EXPORT = qw(rand_phnum fail fail_msg_ne fail_num_ne);
 
 my $string_gen = String::Random->new;
 sub rand_phnum {
-	return '1403' . $string_gen->randpattern('nnnnnnn');
+	return '403' . $string_gen->randpattern('nnnnnnn');
 }
 
 sub fail {

@@ -286,7 +286,7 @@ sub msg_list_update {
 
 	# Update list row, note that some values here can be optional
 	$db->{update_list}->execute($list->{name}, $list->{date}, time, $list->{num});
-	$log->print("num  = $list->{num}\n");
+	$log->print("num  = '$list->{num}'\n");
 	$log->print("name = '$list->{name}'\n") if (exists $list->{name});
 	$log->print("date = $list->{date}\n") if (exists $list->{date});
 

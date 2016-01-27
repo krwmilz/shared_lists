@@ -165,6 +165,12 @@ sub send_msg {
 	my $header_len = 6;
 	my $payload_len = length($payload);
 
+	if ($payload_len > 65535) {
+		my $err = make_error("response too large");
+		send_msg($sock, $ver, $msg_type, $err);
+		return 0;
+	}
+
 	send_all($sock, pack("nnn", $ver, $msg_type, $payload_len), $header_len);
 	send_all($sock, $payload, $payload_len);
 

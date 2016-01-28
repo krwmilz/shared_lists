@@ -233,6 +233,19 @@ sub msg_device_add {
 	return make_ok( { device_id => $device_id } );
 }
 
+sub msg_device_update {
+	my ($db, $request) = @_;
+
+	my ($err, $dev) = unpack_request($db, $request, 'device_id');
+	return make_error($err) if ($err);
+
+	my $hex_token = $request->{pushtoken_hex};
+	$db->{update_device}->execute($hex_token, $dev->{num});
+	$log->print("push token = '$hex_token'\n");
+
+	return make_ok();
+}
+
 sub msg_list_add {
 	my ($db, $request) = @_;
 
@@ -807,6 +820,9 @@ sub prepare_stmt_handles {
 
 	$sql = 'select * from devices where id = ?';
 	$self->{select_device_id} = $dbh->prepare($sql);
+
+	$sql = 'update devices set push_token = coalesce(?, push_token) where num = ?';
+	$self->{update_device} = $dbh->prepare($sql);
 
 	# friends table queries
 	$sql = 'insert or replace into friends (device, friend) values (?, ?)';

@@ -38,6 +38,14 @@ sub new {
 	return $self;
 }
 
+sub device_update {
+	my $self = shift;
+	my $msg_args = shift;
+	my $status = shift || 'ok';
+
+	my $response = communicate($self, 'device_update', $status, $msg_args);
+}
+
 sub list_add {
 	my $self = shift;
 	my $list = {

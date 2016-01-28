@@ -1,24 +1,26 @@
 #!/usr/bin/perl
-# generated Sun Jan 24 15:51:04 MST 2016
+# generated Tue Jan 26 00:51:55 MST 2016
 use strict;
 use warnings;
 
 our $protocol_ver = 0;
 our %msg_num = (
 	device_add => 0,
-	friend_add => 1,
-	friend_delete => 2,
-	list_add => 3,
-	list_update => 4,
-	list_join => 5,
-	list_leave => 6,
-	lists_get => 7,
-	lists_get_other => 8,
-	list_items_get => 9,
-	list_item_add => 10,
+	device_update => 1,
+	friend_add => 2,
+	friend_delete => 3,
+	list_add => 4,
+	list_update => 5,
+	list_join => 6,
+	list_leave => 7,
+	lists_get => 8,
+	lists_get_other => 9,
+	list_items_get => 10,
+	list_item_add => 11,
 );
 our @msg_str = (
 	'device_add',
+	'device_update',
 	'friend_add',
 	'friend_delete',
 	'list_add',
@@ -32,6 +34,7 @@ our @msg_str = (
 );
 our @msg_func = (
 	\&msg_device_add,
+	\&msg_device_update,
 	\&msg_friend_add,
 	\&msg_friend_delete,
 	\&msg_list_add,

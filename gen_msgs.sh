@@ -3,6 +3,7 @@
 protocol_version=0
 msg_types="
 	device_add
+	device_update
 	friend_add
 	friend_delete
 	list_add

@@ -1,6 +1,7 @@
 new connection (pid = <digits>)
 ssl ok, ver = 'TLSv1_2' cipher = 'ECDHE-RSA-AES128-SHA256'
 device_add: bad request, missing key 'phone_number'
+device_update: bad request, missing key 'device_id'
 friend_add: bad request, missing key 'device_id'
 friend_delete: bad request, missing key 'device_id'
 list_add: bad request, missing key 'device_id'

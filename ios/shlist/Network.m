@@ -272,8 +272,8 @@
 		return;
 	}
 
-	const char *payload = malloc(payload_size);
-	buffer_len = [inputShlistStream read:(uint8_t *)payload maxLength:payload_size];
+	uint8_t *payload = malloc(payload_size);
+	buffer_len = [inputShlistStream read:payload maxLength:payload_size];
 	if (buffer_len != payload_size) {
 		[self error:@"read: expected %i byte payload but got %i", payload_size, buffer_len];
 		return;
@@ -284,10 +284,11 @@
 
 	NSError *error = nil;
 	NSDictionary *response = [NSJSONSerialization JSONObjectWithData:data
-			options:NSJSONReadingAllowFragments error:&error];
+		options:0 error:&error];
 	if (error) {
 		NSLog(@"%@", [error userInfo]);
-	};
+		return;
+	}
 
 	NSString *status = [response objectForKey:@"status"];
 	if (status == nil) {
@@ -295,7 +296,7 @@
 		return;
 	}
 	if ([status compare:@"err"] == 0) {
-		NSLog(@"read: response error, reason = '%@'", [response objectForKey:@"reason"]);
+		NSLog(@"read: response error, reason = '%@'", [response valueForKey:@"reason"]);
 		return;
 	}
 
@@ -307,6 +308,8 @@
 		[self lists_get:response];
 	} else if (msg_type == list_join) {
 		[self list_join:response];
+	} else if (msg_type == lists_get_other) {
+		[self lists_get_other:response];
 	}
 
 	// free((void *)payload);
@@ -354,6 +357,19 @@
 
 	if (shlist_tvc)
 		[shlist_tvc lists_get_finished:lists];
+}
+
+- (void) lists_get_other:(NSDictionary *)response
+{
+	NSArray *other_lists = [response objectForKey:@"other_lists"];
+	NSLog(@"lists_get_other: got %i other lists from server", [other_lists count]);
+
+	// Don't attempt to update a view controller that isn't there yet
+	if (![self check_tvc:shlist_tvc])
+		return;
+
+	if (shlist_tvc)
+		[shlist_tvc lists_get_other_finished:other_lists];
 }
 
 - (void) list_join:(NSDictionary *)response

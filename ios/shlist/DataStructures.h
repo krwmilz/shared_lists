@@ -9,11 +9,12 @@
 
 @property NSString	*name;
 @property NSNumber	*num;
+@property NSNumber	*items_total;
 @property NSArray	*members_phone_nums;
 @property bool		 deadline;
 @property NSDate	*date;
 @property NSNumber	*items_ready;
-@property NSNumber	*items_total;
+
 @property UITableViewCell *cell;
 
 @end

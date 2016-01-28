@@ -48,9 +48,14 @@
 	if ([self load_phone_number]) {
 		// phone number loaded, try loading device id
 		if ([network_connection load_device_id:phone_number]) {
-			// bulk update, doesn't take a payload
+
+			// Send lists_get request, no arguments required here
 			NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
 			[network_connection send_message:lists_get contents:dict];
+
+			// Send lists_get_other request, no arguments here either
+			[dict removeAllObjects];
+			[network_connection send_message:lists_get_other contents:dict];
 		}
 		// else, device id request sent
 	}
@@ -73,7 +78,7 @@
 	}
 
 	UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Important"
-		message:@"Your phone number is needed for us to calculate your mutual contacts. Severe amounts of functionality disabled."
+		message:@"Your phone number is needed for us to calculate your mutual contacts. Expect severe functionality loss."
 		delegate:self cancelButtonTitle:@"Nope" otherButtonTitles:@"Ok", nil];
 
 	alert.alertViewStyle = UIAlertViewStylePlainTextInput;
@@ -171,18 +176,41 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	[lists removeAllObjects];
 
 	for (NSDictionary *list in json_lists) {
-
 		SharedList *tmp = [[SharedList alloc] init];
-		tmp.num = [list objectForKey:@"num"];
-		tmp.name = [list objectForKey:@"name"];
-		// tmp.date = [list objectForKey:@"date"];
-		tmp.items_ready = [list objectForKey:@"items_complete"];
-		tmp.items_total = [list objectForKey:@"items_total"];
-		NSArray *members = [list objectForKey:@"members"];
-		tmp.members_phone_nums = members;
+		tmp.num = list[@"num"];
+
+		NSData *name_data = [list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
+		tmp.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
+
+		NSNumber *date = list[@"date"];
+		tmp.date = [NSDate dateWithTimeIntervalSince1970:[date floatValue]];
+		tmp.members_phone_nums = list[@"members"];
+		tmp.items_ready = list[@"items_complete"];
+		tmp.items_total = list[@"items_total"];
 		[lists addObject:tmp];
 
-		NSLog(@"adding list '%@'", [list objectForKey:@"name"]);
+		NSLog(@"adding list '%@', num '%@'", tmp.name, tmp.num);
+	}
+
+	[self.tableView reloadData];
+}
+
+- (void) lists_get_other_finished:(NSArray *)other_json_lists;
+{
+	NSMutableArray *other_lists = [_lists objectAtIndex:1];
+	[other_lists removeAllObjects];
+
+	for (NSDictionary *list in other_json_lists) {
+		SharedList *tmp = [[SharedList alloc] init];
+		tmp.num = list[@"num"];
+
+		NSData *name_data = [list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
+		tmp.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
+
+		tmp.members_phone_nums = list[@"members"];
+		[other_lists addObject:tmp];
+
+		NSLog(@"adding other list '%@', num '%@'", tmp.name, tmp.num);
 	}
 
 	[self.tableView reloadData];
@@ -214,8 +242,9 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	NSLog(@"info: joining list '%@'", list.name);
 
 	// the response for this does all of the heavy row moving work
-	int num = list.num;
-	[network_connection send_message:list_join contents:[NSData dataWithBytes:&num length:sizeof(num)]];
+	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
+	[request setObject:list.num forKey:@"num"];
+	[network_connection send_message:list_join contents:request];
 }
 
 - (void) finished_join_list_request:(SharedList *) shlist
@@ -402,11 +431,11 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		// should not happen
 		return @"";
 
-	int total = [[_lists objectAtIndex:section] count];
+	NSUInteger total = [[_lists objectAtIndex:section] count];
 	if (section == 0)
-		return [NSString stringWithFormat:@"Lists you're in (%i)", total];
+		return [NSString stringWithFormat:@"Lists you're in (%lu)", (unsigned long)total];
 	else if (section == 1)
-		return [NSString stringWithFormat:@"Other lists (%i)", total];
+		return [NSString stringWithFormat:@"Other lists (%lu)", (unsigned long)total];
 	return @"";
 }
 
@@ -493,10 +522,8 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	}
 
 	[result appendString:@"/"];
-	return result;
 
 	NSString *two = [denominator stringValue];
-
 	for (int i = 0; i < two.length; i++) {
 		[result appendString:[self subscript:[[two substringWithRange:NSMakeRange(i, 1)] intValue]]];
 	}

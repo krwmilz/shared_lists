@@ -15,8 +15,40 @@
 	// we need to issue connect/reconnects from here
 	network_connection = [Network shared_network_connection];
 
+	// Register the supported interaction types.
+	[[UIApplication sharedApplication] registerForRemoteNotificationTypes:UIRemoteNotificationTypeBadge];
+
 	// customization after application launch
 	return YES;
+}
+
+// Handle remote notification registration.
+- (void)application:(UIApplication *)app
+	didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)devToken
+{
+	const unsigned char *token_data = [devToken bytes];
+	NSUInteger token_length = [devToken length];
+
+	NSMutableString *hex_token = [NSMutableString stringWithCapacity:(token_length * 2)];
+	for (int i = 0; i < token_length; i++) {
+		[hex_token appendFormat:@"%02X", (NSUInteger)token_data[i]];
+	}
+
+	NSLog(@"apn: device token is 0x%@", hex_token);
+
+	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
+	[request setObject:hex_token forKey:@"pushtoken_hex"];
+	[network_connection send_message:device_update contents:request];
+}
+
+// Called when push notification received
+- (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo
+{
+	NSLog(@"notify: got remote notification");
+	for (id key in userInfo) {
+		NSLog(@"notify: '%@' => '%@'", key, userInfo[key]);
+	}
+	[[NSNotificationCenter defaultCenter] postNotificationName:@"PushNotificationMessageReceivedNotification" object:nil userInfo:userInfo];
 }
 
 - (void) applicationWillResignActive:(UIApplication *)application
@@ -52,7 +84,7 @@
 	// background.
 
 	NSLog(@"info: app: entering foreground, reconnecting...");
-	[network_connection send_message:3 contents:nil];
+	[network_connection send_message:lists_get contents:[[NSMutableDictionary alloc] init]];
 }
 
 - (void) applicationDidBecomeActive:(UIApplication *)application
@@ -69,6 +101,12 @@
 
 	NSLog(@"info: app: teminating, disconnecting network");
 	[network_connection disconnect];
+}
+
+- (void)application:(UIApplication *)app
+	didFailToRegisterForRemoteNotificationsWithError:(NSError *)err
+{
+	NSLog(@"Error in registration. Error: %@", err);
 }
 
 @end

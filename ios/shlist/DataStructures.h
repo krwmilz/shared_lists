@@ -11,6 +11,7 @@
 @property NSNumber	*num;
 @property NSNumber	*items_total;
 @property NSArray	*members_phone_nums;
+@property NSNumber	*num_members;
 @property bool		 deadline;
 @property NSDate	*date;
 @property NSNumber	*items_ready;

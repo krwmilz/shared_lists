@@ -243,77 +243,104 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 	// the response for this does all of the heavy row moving work
 	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
-	[request setObject:list.num forKey:@"num"];
+	[request setObject:list.num forKey:@"list_num"];
 	[network_connection send_message:list_join contents:request];
 }
 
-- (void) finished_join_list_request:(SharedList *) shlist
+- (void) finished_join_list_request:(NSDictionary *) shlist
 {
+	NSMutableArray *lists = [_lists objectAtIndex:0];
+	NSMutableArray *other_lists = [_lists objectAtIndex:1];
+
+	// Find the list number we received a response for
 	SharedList *needle = nil;
-	for (SharedList *temp in [_lists objectAtIndex:1]) {
-		if (temp.num == shlist.num) {
+	for (SharedList *temp in other_lists) {
+		if (temp.num == shlist[@"num"]) {
 			needle = temp;
 			break;
 		}
 	}
 
-	// if we received an update from a list id we don't know about, do nothing
+	// If we received an update from a list id we don't know about, do nothing
 	if (needle == nil)
 		return;
 
-	// this has to be done before row moving
-	[[_lists objectAtIndex:0] addObject:needle];
-	[[_lists objectAtIndex:1] removeObject:needle];
+	// Swap between data structures first before moving rows
+	[lists addObject:needle];
+	[other_lists removeObject:needle];
 
-	// [_shared_lists addObject:needle];
-	// [_indirect_lists removeObject:needle];
-
-	// get the original cells index path from the matched cell
+	// Get the cell index path from the matched list cell
 	NSIndexPath *orig_index_path = [self.tableView indexPathForCell:needle.cell];
 
-	// compute new position and start moving row as soon as possible
+	// Compute new position and start moving row as soon as possible
 	// XXX: sorting
-	int section_0_rows = [[_lists objectAtIndex:0] count];
-	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:section_0_rows - 1 inSection:0];
-
+	int new_row_pos = [lists count] - 1;
+	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:new_row_pos inSection:0];
 	[self.tableView moveRowAtIndexPath:orig_index_path toIndexPath:new_index_path];
 
-	// add > accessory indicator, fill in and show completion fraction
+	// Put any new values into data structs
+	NSData *name_data = [shlist[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
+	needle.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
+	// needle.date =
+	needle.items_ready = shlist[@"items_complete"];
+	needle.items_total = shlist[@"items_total"];
+	needle.num_members = shlist[@"num_members"];
+
+	needle.members_phone_nums = shlist[@"members"];
+	[self process_members_array:shlist[@"members"] cell:needle.cell];
+
+	// Add > accessory indicator
 	needle.cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+
+	// Find fraction UILAbel, populate it and then show it
 	UILabel *fraction = (UILabel *)[needle.cell viewWithTag:4];
-	fraction.text = [self fraction:shlist.items_ready denominator:shlist.items_total];
+	fraction.text = [self fraction:needle.items_ready denominator:needle.items_total];
 	fraction.hidden = NO;
 }
 
-- (void) finished_leave_list_request:(SharedList *) shlist
+- (void) finished_leave_list_request:(NSDictionary *) response
 {
+	NSMutableArray *lists = [_lists objectAtIndex:0];
+	NSMutableArray *other_lists = [_lists objectAtIndex:1];
+
 	SharedList *list = nil;
-	for (SharedList *temp in [_lists objectAtIndex:0]) {
-		if (temp.num == shlist.num) {
+	for (SharedList *temp in lists) {
+		if (temp.num == response[@"list_num"]) {
 			list = temp;
 			break;
 		}
 	}
-
 	if (list == nil)
 		return;
 
-	// insert the new object at the beginning to match gui moving below
-	[[_lists objectAtIndex:1] insertObject:list atIndex:0];
-	[[_lists objectAtIndex:0] removeObject:list];
+	NSNumber *list_empty = response[@"list_empty"];
+	if ([list_empty intValue] == 1) {
+		// List was empty, delete instead of moving it
+		[lists removeObject:list];
 
-	// perform row move, the destination is the top of "other lists"
+		NSIndexPath *old_path = [self.tableView indexPathForCell:list.cell];
+		[self.tableView deleteRowsAtIndexPaths:@[old_path] withRowAnimation:UITableViewRowAnimationAutomatic];
+
+		return;
+	}
+
+	// Insert the new object at the beginning to match gui moving below
+	[other_lists insertObject:list atIndex:0];
+	[lists removeObject:list];
+
+	// Perform row move, the destination is the top of "other lists"
 	NSIndexPath *old_path = [self.tableView indexPathForCell:list.cell];
 	NSIndexPath *new_path = [NSIndexPath indexPathForRow:0 inSection:1];
 	[self.tableView moveRowAtIndexPath:old_path toIndexPath:new_path];
 
-	// remove > accessory and hide the completion fraction
+	// Remove > accessory and hide the completion fraction
 	list.cell.accessoryType = UITableViewCellAccessoryNone;
 	UILabel *fraction = (UILabel *)[list.cell viewWithTag:4];
 	fraction.hidden = YES;
 
-	// reset editing state back to the default
-	[self.tableView setEditing:FALSE animated:TRUE];
+	// XXX: update members array to disclude yourself (maybe send it back in response?)
+	// XXX: Maybe clear out list data that's no longer needed
+	// XXX: give some visual feedback here what's happening
 }
 
 
@@ -360,19 +387,19 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	}
 
 	UILabel *main_label = (UILabel *)[cell viewWithTag:1];
-	UILabel *members_label = (UILabel *)[cell viewWithTag:2];
-
-	// show name and members
 	main_label.text = shared_list.name;
-	members_label.text = [self process_members_array:shared_list.members_phone_nums];
+
+	[self process_members_array:shared_list.members_phone_nums cell:cell];
 
 	// hang on to a reference, this is needed in the networking gui callbacks
 	shared_list.cell = cell;
 	return cell;
 }
 
-- (NSString *) process_members_array:(NSArray *)phnum_array
+- (void) process_members_array:(NSArray *)phnum_array cell:(UITableViewCell *)cell
 {
+	UILabel *members_label = (UILabel *)[cell viewWithTag:2];
+
 	if (!OSAtomicAnd32(0xffff, &_address_book->ready)) {
 		// not ready
 		NSMutableString *output = [[NSMutableString alloc] init];
@@ -384,7 +411,8 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 			[output appendFormat:@", %@", tmp_phone_number];
 		}
-		return output;
+		members_label.text = output;
+		return;
 	}
 
 	// we can do phone number to name mappings
@@ -420,7 +448,8 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 				 others, plural];
 		[members_str appendString:buf];
 	}
-	return members_str;
+
+	members_label.text = members_str;
 }
 
 // section header titles
@@ -457,7 +486,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	return UITableViewCellEditingStyleDelete;
 }
 
-// this functions called when delete has been prompted and ok'd
+// This functions called when delete has been prompted and ok'd
 - (void) tableView:(UITableView *)tableView
 	commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
 	forRowAtIndexPath:(NSIndexPath *)indexPath
@@ -466,10 +495,13 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	SharedList *list = [[_lists objectAtIndex:0] objectAtIndex:[indexPath row]];
 	NSLog(@"info: leaving '%@' list num '%@'", list.name, list.num);
 
-	// send leave list message, response will do all heavy lifting
+	// Send leave list message, response will do all heavy lifting
 	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
-	[request setObject:list.num forKey:@"num"];
+	[request setObject:list.num forKey:@"list_num"];
 	[network_connection send_message:list_leave contents:request];
+
+	// Reset editing state back to the default
+	[self.tableView setEditing:FALSE animated:TRUE];
 }
 
 // customize deletion label text

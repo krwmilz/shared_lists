@@ -46,7 +46,7 @@
 
 - (void) connect
 {
-	[self info:@"network: connect()"];
+	NSLog(@"network: connect()");
 	connected = 1;
 
 	CFReadStreamRef readStream;
@@ -74,7 +74,7 @@
 
 - (void) disconnect
 {
-	[self info:@"network: disconnect()"];
+	NSLog(@"network: disconnect()");
 	connected = 0;
 
 	[inputShlistStream close];
@@ -130,7 +130,7 @@
 	[msg appendData:json];
 
 	[outputShlistStream write:[msg bytes] maxLength:[msg length]];
-	[self info:@"register: sent request"];
+	NSLog(@"register: sent request");
 
 	// we don't have a device id so we can't do anything yet
 	return false;
@@ -140,8 +140,6 @@
 {
 	if (!connected)
 		[self connect];
-
-	NSMutableData *msg = [NSMutableData data];
 
 	[request setObject:device_id forKey:@"device_id"];
 
@@ -156,22 +154,23 @@
 	uint16_t msg_type_network = htons(send_msg_type);
 	uint16_t length = htons([json length]);
 
+	NSMutableData *msg = [NSMutableData data];
 	[msg appendBytes:&version length:2];
 	[msg appendBytes:&msg_type_network length:2];
 	[msg appendBytes:&length length:2];
 	[msg appendData:json];
 
-	[self info:@"network: send_message: type %i, %i bytes",
-		send_msg_type, [msg length]];
+	NSLog(@"network: send_message: type %i, %i bytes",
+		send_msg_type, [msg length]);
 
 	if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
-		[self warn:@"network: write error occurred, trying reconnect"];
+		NSLog(@"network: write error occurred, trying reconnect");
 		if (connected)
 			[self disconnect];
 		[self connect];
 
 		if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
-			[self warn:@"network: resend failed after reconnect, giving up"];
+			NSLog(@"network: resend failed after reconnect, giving up");
 			return false;
 		}
 	}
@@ -190,19 +189,19 @@
 
 	switch (eventCode) {
 	case NSStreamEventNone: {
-		[self debug:@"network: NSStreamEventNone occurred"];
+		NSLog(@"network: NSStreamEventNone occurred");
 		break;
 	}
 	case NSStreamEventOpenCompleted: {
-		[self debug:@"network: %@ opened", stream_name];
+		NSLog(@"network: %@ opened", stream_name);
 		break;
 	}
 	case NSStreamEventHasBytesAvailable: {
-		[self debug:@"network: %@ has bytes available", stream_name];
+		NSLog(@"network: %@ has bytes available", stream_name);
 
 		if (stream == inputShlistStream) {
 			if (![inputShlistStream hasBytesAvailable]) {
-				[self warn:@"read: input stream had no bytes available"];
+				NSLog(@"read: input stream had no bytes available");
 				break;
 			}
 
@@ -211,7 +210,7 @@
 		break;
 	}
 	case NSStreamEventHasSpaceAvailable: {
-		[self debug:@"network: %@ has space available", stream_name];
+		NSLog(@"network: %@ has space available", stream_name);
 		break;
 	}
 	case NSStreamEventErrorOccurred: {
@@ -226,15 +225,15 @@
 			break;
 
 		NSError *theError = [error_stream streamError];
-		[self info:@"network: %@", [NSString stringWithFormat:@"%@ error %i: %@",
-				stream_name, [theError code], [theError localizedDescription]]];
+		NSLog(@"network: %@", [NSString stringWithFormat:@"%@ error %i: %@",
+				stream_name, [theError code], [theError localizedDescription]]);
 
 		[self disconnect];
 
 		break;
 	}
 	case NSStreamEventEndEncountered: {
-		[self debug:@"network: %@ end encountered", stream_name];
+		NSLog(@"network: %@ end encountered", stream_name);
 		[self disconnect];
 
 		break;
@@ -251,7 +250,7 @@
 
 	buffer_len = [inputShlistStream read:(uint8_t *)header maxLength:6];
 	if (buffer_len != 6) {
-		[self error:@"read: didn't return 6 bytes"];
+		NSLog(@"read: didn't return 6 bytes");
 	}
 
 	uint16_t version = ntohs(header[0]);
@@ -259,28 +258,25 @@
 	uint16_t payload_size = ntohs(header[2]);
 
 	if (version != 0) {
-		[self error:@"read: invalid version %i", version];
+		NSLog(@"read: invalid version %i", version);
+		return;
 	}
-	if (msg_type > 10) {
-		[self error:@"read: invalid message type %i", msg_type];
-	}
-	if (payload_size > 4095) {
-		[self error:@"read: %i bytes payload too large", payload_size];
-	}
-	if (payload_size == 0) {
-		// Payload doesn't contain anything, that's ok
+	if (msg_type > 11) {
+		NSLog(@"read: invalid message type %i", msg_type);
 		return;
 	}
 
 	uint8_t *payload = malloc(payload_size);
+
+	// Accept up to 64KB of data, the maximum size of payload_size
 	buffer_len = [inputShlistStream read:payload maxLength:payload_size];
 	if (buffer_len != payload_size) {
-		[self error:@"read: expected %i byte payload but got %i", payload_size, buffer_len];
+		NSLog(@"read: expected %i byte payload but got %i", payload_size, buffer_len);
 		return;
 	}
-	[self info:@"read: payload is %i bytes", buffer_len];
+	NSLog(@"read: payload is %i bytes", buffer_len);
 
-	NSData *data = [NSData dataWithBytes:payload length:payload_size];
+	NSData *data = [NSData dataWithBytesNoCopy:payload length:payload_size];
 
 	NSError *error = nil;
 	NSDictionary *response = [NSJSONSerialization JSONObjectWithData:data
@@ -290,13 +286,13 @@
 		return;
 	}
 
-	NSString *status = [response objectForKey:@"status"];
+	NSString *status = response[@"status"];
 	if (status == nil) {
 		NSLog(@"read: response did not contain 'status' key");
 		return;
 	}
 	if ([status compare:@"err"] == 0) {
-		NSLog(@"read: response error, reason = '%@'", [response valueForKey:@"reason"]);
+		NSLog(@"read: response error, reason = '%@'", response[@"reason"]);
 		return;
 	}
 
@@ -308,18 +304,18 @@
 		[self lists_get:response];
 	} else if (msg_type == list_join) {
 		[self list_join:response];
+	} else if (msg_type == list_leave) {
+		[self list_leave:response];
 	} else if (msg_type == lists_get_other) {
 		[self lists_get_other:response];
 	}
-
-	// free((void *)payload);
 }
 
 - (void) device_add:(NSDictionary *)response
 {
 	device_id = [response objectForKey:@"device_id"];
 
-	[self info:@"device_add: writing new key '%@' to file", device_id];
+	NSLog(@"device_add: writing new key '%@' to file", device_id);
 	NSError *error = nil;
 	[device_id writeToFile:device_id_file atomically:YES encoding:NSUTF8StringEncoding error:&error];
 
@@ -343,7 +339,7 @@
 	if ([self check_tvc:shlist_tvc])
 		[shlist_tvc finished_new_list_request:shlist];
 
-	[self info:@"list_add: successfully added new list '%@'", shlist.name];
+	NSLog(@"list_add: successfully added new list '%@'", shlist.name);
 }
 
 - (void) lists_get:(NSDictionary *)response
@@ -374,95 +370,28 @@
 
 - (void) list_join:(NSDictionary *)response
 {
-	SharedList *shlist = [[SharedList alloc] init];
-	shlist.num = [response objectForKey:@"num"];
-
-	// XXX: these need to be sent from the server
-	// shlist.items_ready = 0;
-	// shlist.items_total = 99;
-	// shlist.list_name = <network>;
-	// shlist.members = <network>;
+	NSDictionary *list = response[@"list"];
+	NSLog(@"network: joined list %@", list[@"num"]);
 
 	if ([self check_tvc:shlist_tvc])
-		[shlist_tvc finished_join_list_request:shlist];
-	[self info:@"list_join: joined list %i", shlist.num];
+		[shlist_tvc finished_join_list_request:list];
 }
 
 - (void) list_leave:(NSDictionary *)response
 {
-	SharedList *shlist = [[SharedList alloc] init];
-	shlist.num = [response objectForKey:@"num"];
-
-	// XXX: these need to be sent from the server
-	// shlist.list_name = <network>;
-	// shlist.members = <network>;
+	NSNumber *list_num = response[@"list_num"];
+	NSLog(@"network: left list %@", list_num);
 
 	if ([self check_tvc:shlist_tvc])
-		[shlist_tvc finished_leave_list_request:shlist];
-	[self info:@"list_leave: left list", shlist.num];
+		[shlist_tvc finished_leave_list_request:response];
 }
 
 - (bool) check_tvc:(MainTableViewController *) tvc
 {
 	if (tvc)
 		return true;
-	[self warn:@"network: trying to update main_tvc before it's ready, ignoring!"];
+	NSLog(@"network: trying to update main_tvc before it's ready, ignoring!");
 	return false;
-}
-
-#define LOG_LEVEL_ERROR	0
-#define LOG_LEVEL_WARN	1
-#define LOG_LEVEL_INFO	2
-#define LOG_LEVEL_DEBUG	3
-
-#define LOG_LEVEL LOG_LEVEL_INFO
-
-- (void) debug:(NSString *)fmt, ...
-{
-	va_list va;
-	va_start(va, fmt);
-	NSString *string = [[NSString alloc] initWithFormat:fmt
-						  arguments:va];
-	va_end(va);
-	if (LOG_LEVEL < LOG_LEVEL_DEBUG)
-		return;
-	NSLog(@"debug: %@", string);
-}
-
-- (void) info:(NSString *)fmt, ...
-{
-	va_list va;
-	va_start(va, fmt);
-	NSString *string = [[NSString alloc] initWithFormat:fmt
-						  arguments:va];
-	va_end(va);
-	if (LOG_LEVEL < LOG_LEVEL_INFO)
-		return;
-	NSLog(@"info: %@", string);
-}
-
-- (void) warn:(NSString *)fmt, ...
-{
-	va_list va;
-	va_start(va, fmt);
-	NSString *string = [[NSString alloc] initWithFormat:fmt
-						  arguments:va];
-	va_end(va);
-	if (LOG_LEVEL < LOG_LEVEL_WARN)
-		return;
-	NSLog(@"warn: %@", string);
-}
-
-- (void) error:(NSString *)fmt, ...
-{
-	va_list va;
-	va_start(va, fmt);
-	NSString *string = [[NSString alloc] initWithFormat:fmt
-						  arguments:va];
-	va_end(va);
-	if (LOG_LEVEL < LOG_LEVEL_ERROR)
-		return;
-	NSLog(@"error: %@", string);
 }
 
 - (void) dealloc

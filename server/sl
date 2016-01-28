@@ -338,12 +338,9 @@ sub msg_list_join {
     my ($err, $dev, $list_num) = unpack_request($db, $request, 'device_id', 'list_num');
     return make_error($err) if ($err);
 
-    my ($list_err, undef, $list_name, $list_date) = list_number_valid($db, $list_num);
+    my ($list_err, $list_num_num, $list_name, $list_date) = list_number_valid($db, $list_num);
     return make_error($list_err) if ($list_err);
 
-    $log->print("device '$dev->{fp}'\n");
-    $log->print("list '$list_num'\n");
-    
     my $time = time;
     $db->{check_list_member}->execute($list_num, $dev->{num});
 
@@ -361,7 +358,7 @@ sub msg_list_join {
     my @members = map {@$_} @$members_ref;
 
     my $list = {
-        num => $list_num,
+        num => $list_num_num,
         name => $list_name,
         date => $list_date,
         items_complete => 0,
@@ -369,6 +366,10 @@ sub msg_list_join {
         members => \@members,
         num_members => scalar(@members)
     };
+
+    $log->print("device '$dev->{fp}'\n");
+    $log->print("list '$list_num'\n");
+
     return make_ok( { list => $list } );
 }
 
@@ -381,16 +382,14 @@ sub msg_list_leave {
     ($err) = list_number_valid($db, $list_num);
     return make_error($err) if ($err);
 
-    $log->print("device '$dev->{fp}'\n");
-    $log->print("list '$list_num'\n");
-
     $db->{check_list_member}->execute($list_num, $dev->{num});
 
+    my $tmp_list_num = $list_num;
     if ($db->{check_list_member}->fetchrow_array()) {
         $db->{remove_list_member}->execute($list_num, $dev->{num});
-        $log->print("device '$dev->{fp}' has been removed from list '$list_num'\n");
+        $log->print("device '$dev->{fp}' has been removed from list '$tmp_list_num'\n");
     } else {
-        $log->print("tried to leave a list the user was not in for device '$dev->{fp}' and list '$list_num'\n");
+        $log->print("tried to leave a list the user was not in for device '$dev->{fp}' and list '$tmp_list_num'\n");
         return make_error("the client was not a member of the list");
     }
     $db->{check_list_member}->finish();
@@ -400,7 +399,7 @@ sub msg_list_leave {
     my $list_empty = 0;
 
     if (!$db->{get_list_members}->fetchrow_array()) {
-        $log->print("list '$list_num' is empty... deleting\n");
+        $log->print("list '$tmp_list_num' is empty... deleting\n");
         $db->{delete_list}->execute($list_num);
         $db->{delete_list_data}->execute($list_num);
         $list_empty = 1;
@@ -410,6 +409,10 @@ sub msg_list_leave {
         list_num => $list_num,
         list_empty => $list_empty
     };
+
+    $log->print("device '$dev->{fp}'\n");
+    $log->print("list '$list_num'\n");
+
     return make_ok($response);
 }
 
@@ -549,10 +552,11 @@ sub msg_lists_get_other {
 		$db->{get_other_lists}->execute($friend_num, $dev->{num});
 		while (my ($list_num) = $db->{get_other_lists}->fetchrow_array()) {
 
-			if (exists $list_nums{$list_num}) {
+			my $lookup = $list_num;
+			if (exists $list_nums{$lookup}) {
 				# Append member and move on
-				push @{ $list_nums{$list_num}->{members} }, $friend_phnum;
-				$list_nums{$list_num}->{num_members} += 1;
+				push @{ $list_nums{$lookup}->{members} }, $friend_phnum;
+				$list_nums{$lookup}->{num_members} += 1;
 				next
 			}
 

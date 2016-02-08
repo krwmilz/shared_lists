@@ -16,6 +16,14 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// Fields here defined in specification
+type NotifyRequest struct {
+	// Order of inner array defined by SQL statement in main server
+	Devices [][]string `json:"devices"`
+	MsgType string `json:"msg_type"`
+	Payload interface{} `json:"payload"`
+}
+
 func process_client(c net.Conn, h http.Client) {
 
 	// Read data from connection
@@ -30,39 +38,51 @@ func process_client(c net.Conn, h http.Client) {
 	fmt.Printf("Received: %v", string(data))
 
 	// Parse JSON
-	var f interface{}
-	err = json.Unmarshal(data, &f)
+	var notify_request NotifyRequest
+	err = json.Unmarshal(data, &notify_request)
 	if err != nil {
 		log.Printf("error parsing json:", err)
 		return
 	}
 
-	m := f.(map[string]interface{})
+	log.Print("msg type:", notify_request.MsgType)
 
-	for k, v := range m {
-		switch vv := v.(type) {
-		case string:
-			fmt.Println(k, "is string", vv)
-		case int:
-			fmt.Println(k, "is int", vv)
-		case []interface{}:
-			fmt.Println(k, "is an array", vv)
-			for i, u := range vv {
-				fmt.Println(i, u)
-			}
-		default:
-			fmt.Println(k, "is of a type I don't know how to handle")
+	// Re-marshal the payload
+	// Can also add "aps":{"badge":33} to set badge icon too
+	request_body, err := json.Marshal(notify_request.Payload)
+
+	base_url := "https://api.development.push.apple.com/3/device/"
+
+	// Loop over all devices
+	for i, d := range notify_request.Devices {
+		if d[0] != "ios" {
+			// We don't send messages for non-iOS devices
+			log.Print(i, " skipping device with os ", d[0])
+			continue
 		}
+
+		// Construct entire post URL by adding hexadecimal device token
+		// to base URL
+		post_url := base_url + d[1]
+
+		// Make new POST request
+		req, err := http.NewRequest("POST", post_url, bytes.NewBuffer(request_body))
+		if err != nil {
+			log.Printf("error making new request", err)
+			continue
+		}
+
+		// This must be set otherwise nothing gets delivered
+		req.Header.Set("apns-topic", "com.octopus.shlist")
+
+		// Make request over existing transport
+		resp, err := h.Do(req)
+		if err != nil {
+			log.Printf("error making request:", err)
+			continue
+		}
+		fmt.Println("response was:", resp)
 	}
-
-	var jsonStr = []byte(`{"aps":{"badge":33},"other_key":"other_value"}`)
-
-	req, err := http.NewRequest("POST", "https://api.development.push.apple.com/3/device/DE2D368BB6C80E1D8BCB86D20CB6C2161BD5CEC5BA35A1E1AA0DB382849ED9B2", bytes.NewBuffer(jsonStr))
-	req.Header.Set("apns-topic", "com.octopus.shlist")
-
-	// Make request over existing transport
-	resp, err := h.Do(req)
-	fmt.Println("response was:", resp)
 }
 
 func main() {
@@ -103,6 +123,7 @@ func main() {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM)
 	go func(c chan os.Signal) {
+		// Wait for signal
 		sig := <-c
 		log.Printf("Caught signal %s: shutting down", sig)
 

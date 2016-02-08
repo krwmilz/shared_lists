@@ -50,7 +50,12 @@ func process_client(c net.Conn, h http.Client) {
 	// Re-marshal the payload
 	// Can also add "aps":{"badge":33} to set badge icon too
 	request_body, err := json.Marshal(notify_request.Payload)
+	if err != nil {
+		log.Printf("error marshaling payload:", err)
+		return
+	}
 
+	// APN documentation says this is where we request stuff from
 	base_url := "https://api.development.push.apple.com/3/device/"
 
 	// Loop over all devices
@@ -68,7 +73,7 @@ func process_client(c net.Conn, h http.Client) {
 		// Make new POST request
 		req, err := http.NewRequest("POST", post_url, bytes.NewBuffer(request_body))
 		if err != nil {
-			log.Printf("error making new request", err)
+			log.Printf("error making new request:", err)
 			continue
 		}
 
@@ -136,6 +141,7 @@ func main() {
 		fd, err := l.Accept()
 		if err != nil {
 			log.Fatal("accept error:", err)
+			continue
 		}
 
 		go process_client(fd, client)

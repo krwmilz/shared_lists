@@ -24,8 +24,17 @@ type NotifyRequest struct {
 	Payload interface{} `json:"payload"`
 }
 
-func process_client(c net.Conn, h http.Client) {
+// APN expects this dictionary structure for badge changes
+type Badge struct {
+	Count int `json:"badge"`
+}
 
+type APNRequest struct {
+	Aps interface{} `json:"aps"`
+	Payload interface{} `json:"payload"`
+}
+
+func process_client(c net.Conn, h http.Client) {
 	// Read data from connection
 	buf := make([]byte, 4096)
 	nr, err := c.Read(buf);
@@ -35,7 +44,6 @@ func process_client(c net.Conn, h http.Client) {
 	c.Close()
 
 	data := buf[0:nr]
-	fmt.Printf("Received: %v", string(data))
 
 	// Parse JSON
 	var notify_request NotifyRequest
@@ -45,13 +53,20 @@ func process_client(c net.Conn, h http.Client) {
 		return
 	}
 
-	log.Print("msg type:", notify_request.MsgType)
+	log.Print("msg type: ", notify_request.MsgType)
+
+	var badge Badge
+	badge.Count = 11
+
+	var apn_request APNRequest
+	apn_request.Aps = badge
+	apn_request.Payload = notify_request.Payload
 
 	// Re-marshal the payload
 	// Can also add "aps":{"badge":33} to set badge icon too
-	request_body, err := json.Marshal(notify_request.Payload)
+	request_body, err := json.Marshal(apn_request)
 	if err != nil {
-		log.Printf("error marshaling payload:", err)
+		log.Printf("error re-marshaling payload:", err)
 		return
 	}
 
@@ -91,27 +106,12 @@ func process_client(c net.Conn, h http.Client) {
 }
 
 func main() {
-	// Read client SSL key pair
+	// These keys are provided by Apple through their Developer program
 	cert, err := tls.LoadX509KeyPair("ssl/aps.pem", "ssl/aps.key")
 	if err != nil {
-		log.Fatalf("server: loadkeys: %s", err)
+		log.Fatalf("loadkeys: %s", err)
 	}
-
 	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
-	conn, err := tls.Dial("tcp", "api.development.push.apple.com:443", &config)
-	if err != nil {
-		log.Fatalf("client: dial: %s", err)
-	}
-	defer conn.Close()
-	log.Println("client: connected to: ", conn.RemoteAddr())
-
-	state := conn.ConnectionState()
-	for _, v := range state.PeerCertificates {
-		// fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
-		fmt.Println(v.Subject)
-	}
-	log.Println("client: handshake: ", state.HandshakeComplete)
-	log.Println("client: mutual: ", state.NegotiatedProtocolIsMutual)
 
 	// Create new http client with http2 TLS transport underneath
 	client := http.Client {

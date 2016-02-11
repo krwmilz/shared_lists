@@ -16,6 +16,9 @@ fi
 perl -T sl -p $PORT -t > server.log &
 server_pid=$!
 
+perl testd &
+testd_pid=$!
+
 ok=0
 test_failed=0
 diff_failed=0
@@ -48,8 +51,10 @@ for t in `LC_ALL=C ls tests/*/Makefile`; do
 	ok=$((ok + 1))
 done
 
+kill $testd_pid
 kill $server_pid
 wait 2>/dev/null
+rm testd.log
 rm server.log
 
 printf "\n%i ok, %i test + %i diff fail " $ok $test_failed $diff_failed

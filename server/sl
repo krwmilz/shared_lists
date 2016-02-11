@@ -129,7 +129,7 @@ while (my $client_socket = $server_socket->accept()) {
 		# Try to send to various messaging daemons
 		send_unix("../apnd.socket", $msg, $msg_len) unless ($args{t});
 		send_unix("../gcmd.socket", $msg, $msg_len) unless ($args{t});
-		send_unix("testd.socket", $msg, $msg_len) if ($args{t});
+		send_unix("../testd.socket", $msg, $msg_len) if ($args{t});
 	}
 }
 

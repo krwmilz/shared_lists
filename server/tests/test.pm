@@ -2,6 +2,7 @@ package test;
 use strict;
 use warnings;
 
+use Carp;
 use Exporter qw(import);
 use String::Random;
 
@@ -13,29 +14,21 @@ sub rand_phnum {
 }
 
 sub fail {
-	my $msg = shift;
-
-	my (undef, $file, $line) = caller;
-	print "$file:$line: $msg\n";
-	exit 1;
+	confess shift;
 }
 
 sub fail_msg_ne {
 	my ($arg1, $arg2) = @_;
 	return if ($arg1 eq $arg2);
 
-	my (undef, $file, $line) = caller;
-	print "$file:$line: expected string '$arg1' but got '$arg2'\n";
-	exit 1;
+	confess "expected string '$arg1' but got '$arg2'";
 }
 
 sub fail_num_ne {
 	my ($msg, $arg1, $arg2) = @_;
 	return if ($arg1 == $arg2);
 
-	my (undef, $file, $line) = caller;
-	print "$file:$line: $msg $arg1 != $arg2\n";
-	exit 1;
+	confess "$msg $arg1 != $arg2";
 }
 
 1;

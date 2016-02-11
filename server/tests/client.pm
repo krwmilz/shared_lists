@@ -2,6 +2,7 @@ package client;
 use strict;
 use warnings;
 
+use Carp;
 use IO::Socket::SSL;
 use JSON::XS;
 use Try::Tiny;
@@ -9,6 +10,7 @@ use test;
 
 require "msgs.pl";
 our (%msg_num, @msg_str);
+my $i = 0;
 
 sub new {
 	my $class = shift;
@@ -33,6 +35,8 @@ sub new {
 	# Register this device immediately by default
 	if ($dont_register == 0) {
 		$self->device_add({ phone_number => rand_phnum(), os => 'unix' });
+		$self->device_update({ pushtoken_hex => "BADBEEF_$i" });
+		$i++;
 	}
 
 	return $self;
@@ -168,7 +172,7 @@ sub send_msg {
 	my $payload = encode_json($request);
 
 	my $msg_type = $self->{msg_type};
-	fail "invalid message type $msg_type" if ($msg_type > @msg_str);
+	confess "invalid message type $msg_type" if ($msg_type > @msg_str);
 
 	my $version = 0;
 	my $payload_len = length($payload);
@@ -186,8 +190,8 @@ sub send_all {
 
 	my $bytes_written = $self->{sock}->syswrite($bytes);
 
-	fail "write failed: $!" if (!defined $bytes_written);
-	fail "wrote $bytes_written instead of $bytes_total bytes" if ($bytes_written != $bytes_total);
+	confess "write failed: $!" if (!defined $bytes_written);
+	confess "wrote $bytes_written instead of $bytes_total bytes" if ($bytes_written != $bytes_total);
 
 	return $bytes_total;
 }
@@ -200,29 +204,31 @@ sub recv_msg {
 	my ($version, $msg_type, $payload_size) = unpack("nnn", $header);
 
 	# Check some things
-	fail "unsupported protocol version $version" if ($version != 0);
-	fail "unknown message type $msg_type" if ($msg_type >= @msg_str);
-	fail "0 byte payload" if ($payload_size == 0);
-	fail "unexpected message type $self->{msg_type}" if ($self->{msg_type} != $msg_type);
+	confess "unsupported protocol version $version" if ($version != 0);
+	confess "unknown message type $msg_type" if ($msg_type >= @msg_str);
+	confess "0 byte payload" if ($payload_size == 0);
+	confess "unexpected message type $self->{msg_type}" if ($self->{msg_type} != $msg_type);
 
 	# Read again for payload, $payload_size > 0
 	my $payload = read_all($self, $payload_size);
 
+	my $response;
 	try {
-		my $response = decode_json($payload);
-
-		if (ref($response) ne "HASH") {
-			fail "server didn't send back object root element";
-		}
-
-		my $status = $response->{status};
-		fail "wrong message status '$status'" if ($status ne $exp_status);
-		$self->{err_msg} = $response->{reason} if ($status eq 'err');
-
-		return $response;
+		$response = decode_json($payload);
 	} catch {
-		fail "server sent invalid json";
+		confess "server sent invalid json";
+	};
+
+	# Don't accept messages with an array root
+	if (ref($response) ne "HASH") {
+		confess "server didn't send back object root element";
 	}
+
+	my $status = $response->{status};
+	confess "wrong message status '$status'" if ($status ne $exp_status);
+	$self->{err_msg} = $response->{reason} if ($status eq 'err');
+
+	return $response;
 }
 
 sub read_all {
@@ -233,8 +239,8 @@ sub read_all {
 	while ($bytes_total > 0) {
 		my $read = $self->{sock}->sysread($data, $bytes_total, $bytes_read);
 
-		fail "read failed: $!" unless (defined $read);
-		fail "read EOF on socket" if ($read == 0);
+		confess "read failed: $!" unless (defined $read);
+		confess "read EOF on socket" if ($read == 0);
 
 		$bytes_total -= $read;
 		$bytes_read += $read;

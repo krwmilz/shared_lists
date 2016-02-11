@@ -4,10 +4,10 @@ device_add: success, <digits>:<base64> os <base64>
 list_add: device <base64>
 list_add: new list name <string>
 list_add: new list number is <digits>
-list_leave: device <base64>
-list_leave: list <digits>
 list_leave: device <base64> has been removed from list <digits>
 list_leave: list <digits> is empty... deleting
+list_leave: device <base64>
+list_leave: list <digits>
 lists_get: gathering lists for <base64>
 lists_get_other: gathering lists for <base64>
 disconnected!

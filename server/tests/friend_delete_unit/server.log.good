@@ -4,4 +4,6 @@ device_add: success, <digits>:<base64> os <base64>
 friend_delete: tried deleting friend <digits> but they weren't a friend
 friend_delete: bad friends number <base64>
 friend_delete: bad friends number <digits>
+friend_add: <base64> adding <digits>
+friend_delete: removing <digits> from friends list
 disconnected!

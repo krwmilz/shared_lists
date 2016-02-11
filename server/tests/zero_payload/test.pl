@@ -14,7 +14,13 @@ my $A = client->new(1);
 for (@msg_str) {
 	$A->set_msg_type( $_ );
 
+	my $msg_good = 'a missing message argument was required';
+	if ($_ eq 'device_add') {
+		$msg_good = 'the sent phone number is not a number';
+	}
+
+	# Send empty dictionary
 	$A->send_msg( {} );
 	my $response = $A->recv_msg('err');
-	fail_msg_ne 'a missing message argument was required', $response->{reason};
+	fail_msg_ne $msg_good, $response->{reason};
 }

@@ -63,7 +63,6 @@ func process_client(c net.Conn, h http.Client) {
 	apn_request.Payload = notify_request.Payload
 
 	// Re-marshal the payload
-	// Can also add "aps":{"badge":33} to set badge icon too
 	request_body, err := json.Marshal(apn_request)
 	if err != nil {
 		log.Printf("error re-marshaling payload:", err)

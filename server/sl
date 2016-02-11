@@ -8,6 +8,7 @@ use DBI;
 use File::Temp;
 use Getopt::Std;
 use IO::Socket::SSL;
+use IO::Socket::UNIX;
 use JSON::XS;
 use Scalar::Util qw(looks_like_number);
 use Try::Tiny;
@@ -77,26 +78,74 @@ while (my $client_socket = $server_socket->accept()) {
 	$db->prepare_stmt_handles();
 
 	while (1) {
+		# Database errors and socket connect errors both modify this
+		# value, make sure it's reset
+		undef $@;
+
 		my ($ver, $msg_type, $request) = recv_msg($client_socket);
-		$log->set_msg($msg_str[$msg_type]);
 
 		$db->{dbh}->begin_work;
-		my $response = $msg_func[$msg_type]->($db, $request);
+
+		my $device = undef;
+		if ($msg_type != $msg_num{device_add}) {
+			(my $err, $device) = get_device($db, $request);
+
+			if ($err) {
+				send_msg($client_socket, $ver, $msg_type, make_error($err));
+				$db->{dbh}->commit;
+				next;
+			}
+		}
+
+		my ($response, $notify) = $msg_func[$msg_type]->($db, $request, $device);
 		$db->{dbh}->commit;
 
 		if ($@) {
+			$log->print("db transaction aborted: $@\n");
 			# now rollback to undo the incomplete changes
 			# but do it in an eval{} as it may also fail
 			eval { $db->{dbh}->rollback };
 
-			$log->print("db transaction aborted: $@\n");
 			$response->{status} = 'err';
-			$response->{reason} = "database transaction aborted";
+			$response->{reason} = 'database transaction aborted';
+
+			send_msg($client_socket, $ver, $msg_type, $response);
+			next;
 		}
 
-		$log->set_msg('');
+		# Reply to client
 		send_msg($client_socket, $ver, $msg_type, $response);
+
+		# Some messages don't send notifications
+		next if (! defined $notify);
+
+		# Don't send notifications when there was en error
+		next if ($response->{status} eq 'err');
+
+		# Encode the notification message to find its size
+		my $msg = encode_json($notify);
+		my $msg_len = length($msg);
+
+		# Try to send to various messaging daemons
+		send_unix("../apnd.socket", $msg, $msg_len) unless ($args{t});
+		send_unix("../gcmd.socket", $msg, $msg_len) unless ($args{t});
+		send_unix("testd.socket", $msg, $msg_len) if ($args{t});
 	}
+}
+
+sub send_unix {
+	my ($socket_path, $msg, $msg_len) = @_;
+
+	my $socket = IO::Socket::UNIX->new(
+		Type => SOCK_STREAM(),
+		Peer => $socket_path
+	);
+	unless ($socket) {
+		$log->print("$socket_path: connect failed: $!\n");
+		return;
+	}
+
+	send_all($socket, $msg, $msg_len);
 }
 
 sub recv_msg {
@@ -109,15 +158,17 @@ sub recv_msg {
 		$log->print("error: unsupported protocol version $version\n");
 		exit 0;
 	}
-	elsif ($msg_type >= @msg_str) {
+
+	if ($msg_type >= @msg_str) {
 		$log->print("error: unknown message type $msg_type\n");
 		exit 0;
 	}
-	elsif ($payload_size > 4096 || $payload_size == 0) {
+	$log->set_msg($msg_str[$msg_type]);
+
+	if ($payload_size > 4096 || $payload_size == 0) {
 		$log->print("error: $payload_size byte payload invalid\n");
 		exit 0;
 	}
-
 	my $payload = read_all($sock, $payload_size);
 
 	try {
@@ -174,6 +225,9 @@ sub send_msg {
 	send_all($sock, pack("nnn", $ver, $msg_type, $payload_len), $header_len);
 	send_all($sock, $payload, $payload_len);
 
+	# Clear logging prefix as late as possible so send errors above will
+	# include the message type in them
+	$log->set_msg('');
 	return $header_len + $payload_len;
 }
 
@@ -199,11 +253,11 @@ sub send_all {
 sub msg_device_add {
 	my ($db, $request) = @_;
 
-	my ($err, $ph_num, $os) = unpack_request($db, $request, 'phone_number', 'os');
-	return make_error($err) if ($err);
+	my $ph_num = $request->{'phone_number'};
+	my $os = $request->{'os'};
 
 	unless (looks_like_number($ph_num)) {
-		$log->print("phone number '$ph_num' invalid\n");
+		$log->print("phone number invalid\n");
 		return make_error("the sent phone number is not a number");
 	}
 
@@ -230,27 +284,23 @@ sub msg_device_add {
 	$db->{new_device}->execute($device_id, $ph_num, $os, undef, time, time);
 	$log->print("success, '$ph_num':'$fp' os '$os'\n");
 
-	return make_ok( { device_id => $device_id } );
+	return (make_ok( { device_id => $device_id } ), undef);
 }
 
 sub msg_device_update {
-	my ($db, $request) = @_;
-
-	my ($err, $dev) = unpack_request($db, $request, 'device_id');
-	return make_error($err) if ($err);
+	my ($db, $request, $dev) = @_;
 
 	my $hex_token = $request->{pushtoken_hex};
 	$db->{update_device}->execute($hex_token, $dev->{num});
-	$log->print("push token = '$hex_token'\n");
+	# $log->print("push token = '$hex_token'\n");
 
 	return make_ok();
 }
 
 sub msg_list_add {
-	my ($db, $request) = @_;
+	my ($db, $request, $dev) = @_;
 
-	my ($err, $dev, $list) = unpack_request($db, $request, 'device_id', 'list');
-	return make_error($err) if ($err);
+	my $list = $request->{list};
 
 	# XXX: check that $list contains the necessary keys!
 
@@ -263,9 +313,6 @@ sub msg_list_add {
 
 	$db->{new_list_member}->execute($list_num, $dev->{num}, $now);
 
-	# XXX: send push notifications to all my mutual friends to
-	# update their 'other lists' section
-
 	my $resp_list = {
 		num => $list_num,
 		name => $list->{name},
@@ -275,19 +322,33 @@ sub msg_list_add {
 		members => [ $dev->{phnum} ],
 		num_members => 1
 	};
+	my $response = make_ok( { list => $resp_list } );
 
 	$log->print("new list number is '$list_num'\n");
 
-	return make_ok( { list => $resp_list } );
+	# For push notifications a list add on your part means all your friends
+	# gain a list in their other lists section. Create the same response
+	# that lists_get_other gives back for the notify payload
+	$db->{mutual_friend_notify_select}->execute($dev->{num});
+	my $notify->{devices} = $db->{mutual_friend_notify_select}->fetchall_arrayref();
+
+	$notify->{msg_type} = 'friend_added_list';
+	$notify->{payload} = {
+		num => $resp_list->{num},
+		name => $list->{name},
+		members => [ $dev->{phnum} ],
+		num_members => 1
+	};
+
+	return ($response, $notify);
 }
 
 sub msg_list_update {
-	my ($db, $request) = @_;
+	my ($db, $request, $dev) = @_;
 
-	my ($err, $dev, $list) = unpack_request($db, $request, 'device_id', 'list');
-	return make_error($err) if ($err);
+	my $list = $request->{'list'};
 
-	($err) = list_number_valid($db, $list->{num});
+	my ($err) = list_number_valid($db, $list->{num});
 	return make_error($err) if ($err);
 
 	# Check that the device is in the list it wants to update
@@ -297,24 +358,36 @@ sub msg_list_update {
 		return make_error("client tried to update a list it was not in");
 	}
 
+	# Notify all of my mutual friends that my list changed
+	$db->{mutual_friend_notify_select}->execute($dev->{num});
+	my $mutual_friends = $db->{mutual_friend_notify_select}->fetchall_arrayref();
+
+	# Notify all of the other list members that this list changed
+	$db->{select_list_members}->execute($list->{num}, $dev->{num});
+	my $list_members = $db->{select_list_members}->fetchall_arrayref();
+
+	my $notify;
+	$notify->{devices} = [@{ $mutual_friends }, @{ $list_members }];
+
+	$notify->{msg_type} = 'updated_list';
+	$notify->{payload} = {
+		num => $list->{num},
+		name => $list->{name},
+		date => $list->{date}
+	};
+	# print Dumper($notify);
+
 	# Update list row, note that some values here can be optional
 	$db->{update_list}->execute($list->{name}, $list->{date}, time, $list->{num});
 	$log->print("num  = '$list->{num}'\n");
 	$log->print("name = '$list->{name}'\n") if (exists $list->{name});
 	$log->print("date = $list->{date}\n") if (exists $list->{date});
 
-	# XXX: send push notifications to all my mutual friends to update their
-	# 'other lists' section, also tell all list members to update their
-	# 'lists' section
-
-	return make_ok();
+	return (make_ok(), $notify);
 }
 
 sub msg_list_item_add {
-    my ($db, $request) = @_;
-
-    my ($err, $device) = unpack_request($db, $request, 'device_id');
-    return make_error($err) if ($err);
+    my ($db, $request, $device) = @_;
 
     return make_error("unimplemented");
 
@@ -333,10 +406,8 @@ sub msg_list_item_add {
 }
 
 sub msg_list_join {
-    my ($db, $request) = @_;
-
-    my ($err, $dev, $list_num) = unpack_request($db, $request, 'device_id', 'list_num');
-    return make_error($err) if ($err);
+    my ($db, $request, $dev) = @_;
+    my $list_num = $request->{list_num};
 
     my ($list_err, $list_num_num, $list_name, $list_date) = list_number_valid($db, $list_num);
     return make_error($list_err) if ($list_err);
@@ -374,12 +445,10 @@ sub msg_list_join {
 }
 
 sub msg_list_leave {
-    my ($db, $request) = @_;
+    my ($db, $request, $dev) = @_;
+    my $list_num = $request->{list_num};
 
-    my ($err, $dev, $list_num) = unpack_request($db, $request, 'device_id', 'list_num');
-    return make_error($err) if ($err);
-
-    ($err) = list_number_valid($db, $list_num);
+    my ($err) = list_number_valid($db, $list_num);
     return make_error($err) if ($err);
 
     $db->{check_list_member}->execute($list_num, $dev->{num});
@@ -417,10 +486,8 @@ sub msg_list_leave {
 }
 
 sub msg_friend_add {
-	my ($db, $request) = @_;
-
-	my ($err, $dev, $friend_phnum) = unpack_request($db, $request, 'device_id', 'friend_phnum');
-	return make_error($err) if ($err);
+	my ($db, $request, $dev) = @_;
+	my $friend_phnum = $request->{'friend_phnum'};
 
 	$log->print("'$dev->{fp}' adding '$friend_phnum'\n");
 
@@ -451,8 +518,7 @@ sub msg_friend_add {
 		if ($db->{friends_select}->fetchrow_array()) {
 			$log->print("found mutual friendship\n");
 
-			# Adding both is technically not necessary but makes
-			# lookups easier
+			# Adding both is not necessary but makes lookups easier
 			$db->{mutual_friend_insert}->execute($dev->{num}, $friend_num);
 			$db->{mutual_friend_insert}->execute($friend_num, $dev->{num});
 		}
@@ -462,10 +528,8 @@ sub msg_friend_add {
 }
 
 sub msg_friend_delete {
-	my ($db, $request) = @_;
-
-	my ($err, $dev, $friend_phnum) = unpack_request($db, $request, 'device_id', 'friend_phnum');
-	return make_error($err) if ($err);
+	my ($db, $request, $dev) = @_;
+	my $friend_phnum = $request->{'friend_phnum'};
 
 	unless (looks_like_number($friend_phnum)) {
 		$log->print("bad friends number '$friend_phnum'\n");
@@ -495,10 +559,7 @@ sub msg_friend_delete {
 }
 
 sub msg_lists_get {
-	my ($db, $request) = @_;
-
-	my ($err, $dev) = unpack_request($db, $request, 'device_id');
-	return make_error($err) if ($err);
+	my ($db, $request, $dev) = @_;
 
 	$log->print("gathering lists for '$dev->{fp}'\n");
 
@@ -533,10 +594,7 @@ sub msg_lists_get {
 }
 
 sub msg_lists_get_other {
-	my ($db, $request) = @_;
-
-	my ($err, $dev) = unpack_request($db, $request, 'device_id');
-	return make_error($err) if ($err);
+	my ($db, $request, $dev) = @_;
 
 	$log->print("gathering lists for '$dev->{fp}'\n");
 
@@ -583,10 +641,9 @@ sub msg_lists_get_other {
 }
 
 sub msg_list_items_get {
-	my ($db, $request) = @_;
+	my ($db, $request, $dev) = @_;
 
-	my ($err, $dev, $list_id) = unpack_request($db, $request, 'device_id', 'list_num');
-	return make_error($err) if ($err);
+	my $list_id = $request->{'list_num'};
 
 	if (!$list_id) {
 		$log->print("received null list id");
@@ -651,30 +708,20 @@ sub make_ok {
 	return $args;
 }
 
-sub unpack_request {
-	# Function that gets values from a hash in a specified key order
-	my ($db, $request, @expected_keys) = @_;
+# Takes a request and verifies device_id is present and valid
+sub get_device {
+	my ($db, $request) = @_;
 
-	my @values;
-	for (@expected_keys) {
-		# Check if the caller requested a key that was not provided
-		if (! exists $request->{$_}) {
-			$log->print("bad request, missing key '$_'\n");
-			return ("a missing message argument was required");
-		}
-
-		if ($_ ne 'device_id') {
-			push @values, $request->{$_};
-			next;
-		}
-
-		# When callers request 'device_id' we check the id is valid here
-		my ($err, $device) = device_id_valid($db, $request->{$_});
-		return ($err) if ($err);
-
-		push @values, $device;
+	unless (exists $request->{'device_id'}) {
+		$log->print("bad request, missing key 'device_id'\n");
+		return ("a missing message argument was required");
 	}
-	return (undef, @values);
+
+	my ($err, $device) = device_id_valid($db, $request->{'device_id'});
+	return ($err) if ($err);
+
+	# All good
+	return (undef, $device);
 }
 
 sub device_id_valid {
@@ -842,10 +889,16 @@ sub prepare_stmt_handles {
 	$sql = 'insert or replace into mutual_friends (device, mutual_friend) values (?, ?)';
 	$self->{mutual_friend_insert} = $dbh->prepare($sql);
 
-	$sql = qq{select devices.num, devices.phone_num from devices, mutual_friends
+	$sql = qq{select devices.num, devices.phone_num, devices.os, devices.push_token
+		from devices, mutual_friends
 		where devices.num = mutual_friends.mutual_friend
 		and mutual_friends.device = ?};
 	$self->{mutual_friend_select} = $dbh->prepare($sql);
+
+	$sql = qq{select devices.os, devices.push_token from devices, mutual_friends
+		where devices.num = mutual_friends.mutual_friend
+		and mutual_friends.device = ? and devices.push_token is not null};
+	$self->{mutual_friend_notify_select} = $dbh->prepare($sql);
 
 	$sql = 'delete from mutual_friends where device = ? and mutual_friend = ?';
 	$self->{mutual_friends_delete} = $dbh->prepare($sql);
@@ -858,6 +911,11 @@ sub prepare_stmt_handles {
 	$sql = qq{select devices.phone_num from devices, list_members
 		where devices.num = list_members.device and list_members.list = ?};
 	$self->{list_members_phnums} = $dbh->prepare($sql);
+
+	$sql = qq{select devices.os, devices.push_token from devices, list_members
+		where devices.num = list_members.device and list_members.list = ?
+		and list_members.device != ?};
+	$self->{select_list_members} = $dbh->prepare($sql);
 
 	# list_members table queries
 	$sql = 'select device from list_members where list = ?';

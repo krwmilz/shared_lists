@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	//"crypto/x509"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"net"
@@ -16,21 +15,22 @@ import (
 	"golang.org/x/net/http2"
 )
 
-// Fields here defined in specification
+// Object that comes from the main server
 type NotifyRequest struct {
-	// Order of inner array defined by SQL statement in main server
 	Devices [][]string `json:"devices"`
 	MsgType string `json:"msg_type"`
 	Payload interface{} `json:"payload"`
 }
 
-// APN expects this dictionary structure for badge changes
+// Object that matches the format for badge changes
 type Badge struct {
 	Count int `json:"badge"`
 }
 
+// Object that we serialize and send as the POST payload to APN servers
 type APNRequest struct {
 	Aps interface{} `json:"aps"`
+	MsgType string `json:"msg_type"`
 	Payload interface{} `json:"payload"`
 }
 
@@ -53,14 +53,22 @@ func process_client(c net.Conn, h http.Client) {
 		return
 	}
 
+	total_devices := len(notify_request.Devices)
+
+	if total_devices == 0 {
+		log.Print("request contained no devices to send to")
+		return
+	}
+
 	log.Print("msg type: ", notify_request.MsgType)
 
 	var badge Badge
-	badge.Count = 11
+	badge.Count = 17
 
 	var apn_request APNRequest
 	apn_request.Aps = badge
 	apn_request.Payload = notify_request.Payload
+	apn_request.MsgType = notify_request.MsgType
 
 	// Re-marshal the payload
 	request_body, err := json.Marshal(apn_request)
@@ -72,9 +80,14 @@ func process_client(c net.Conn, h http.Client) {
 	// APN documentation says this is where we request stuff from
 	base_url := "https://api.development.push.apple.com/3/device/"
 
-	// Loop over all devices
+	// Send the same message to all devices
 	for i, d := range notify_request.Devices {
-		if d[0] != "ios" {
+
+		// Order defined by SQL statement in main server
+		os := d[0]
+		hex_token := d[1]
+
+		if os != "ios" {
 			// We don't send messages for non-iOS devices
 			log.Print(i, " skipping device with os ", d[0])
 			continue
@@ -82,7 +95,7 @@ func process_client(c net.Conn, h http.Client) {
 
 		// Construct entire post URL by adding hexadecimal device token
 		// to base URL
-		post_url := base_url + d[1]
+		post_url := base_url + hex_token
 
 		// Make new POST request
 		req, err := http.NewRequest("POST", post_url, bytes.NewBuffer(request_body))
@@ -91,16 +104,16 @@ func process_client(c net.Conn, h http.Client) {
 			continue
 		}
 
-		// This must be set otherwise nothing gets delivered
+		// This delivers messages to our iOS application only
 		req.Header.Set("apns-topic", "com.octopus.shlist")
 
 		// Make request over existing transport
 		resp, err := h.Do(req)
 		if err != nil {
-			log.Printf("error making request:", err)
+			log.Printf("  %d/%d: %s", i + 1, total_devices, err)
 			continue
 		}
-		fmt.Println("response was:", resp)
+		log.Printf("  %d/%d: %s", i + 1, total_devices, resp.Status)
 	}
 }
 

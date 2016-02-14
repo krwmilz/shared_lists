@@ -12,6 +12,7 @@ use JSON::XS;
 use Scalar::Util qw(looks_like_number);
 use Try::Tiny;
 
+# Our own modules
 use logger;
 use database;
 
@@ -32,6 +33,13 @@ $log->print_bare("using database '$db_file'\n");
 my $db = database->new($db_file);
 $db->create_tables();
 
+# Create master listening socket, by default on port 5437. All connection
+# requests are served from this socket. Don't make this an SSL listening socket
+# as the IO::Socket::SSL man page warns about potential blocks that can happen
+# during an SSL handshake (which would be bad).
+#
+# So create the socket as plain TCP, accept plain TCP and then start SSL on the
+# client socket.
 my $server_socket = new IO::Socket::INET (
 	LocalPort => $args{p} || '5437',
 	Proto => 'tcp',
@@ -43,7 +51,10 @@ die "Could not create socket: $!\n" unless($server_socket);
 my ($addr, $port) = ($server_socket->sockhost(), $server_socket->sockport());
 $log->print_bare("accepting connections on $addr:$port (pid = '$$')\n");
 
+# Children who have died will do not have to be waited on with this
 $SIG{CHLD} = 'IGNORE';
+
+# Accept new plain TCP connections and handle them in separate processes
 while (my $client_socket = $server_socket->accept()) {
 
 	# Create a child process to handle this client
@@ -57,13 +68,13 @@ while (my $client_socket = $server_socket->accept()) {
 	}
 
 	close $server_socket;
-	# In child: stir the random pool after fork() just in case
+	# Stir the random pool after fork() just in case
 	arc4random_stir();
 
 	$log->set_peer_host_port($client_socket);
 	$log->print("new connection (pid = '$$')\n");
 
-	# Upgrade connection to SSL
+	# Upgrade plain TCP connection to SSL
 	my $ret = IO::Socket::SSL->start_SSL($client_socket,
 		SSL_server => 1,
 		SSL_cert_file => 'ssl/cert_chain.pem',
@@ -83,13 +94,16 @@ while (my $client_socket = $server_socket->accept()) {
 
 	while (1) {
 		# Database errors and socket connect errors both modify this
-		# value, make sure it's reset
+		# value. Make sure it's reset
 		undef $@;
 
+		# Wait for an entire message to be received
 		my ($ver, $msg_type, $request) = recv_msg($client_socket);
 
 		$db->{dbh}->begin_work;
 
+		# Every message type except 'device_add' needs to include
+		# 'device_id' in the request. Check that here.
 		my $device = undef;
 		if ($msg_type != $msg_num{device_add}) {
 			(my $err, $device) = get_device($db, $request);
@@ -101,6 +115,9 @@ while (my $client_socket = $server_socket->accept()) {
 			}
 		}
 
+		# Call appropriate message handler. Each handler returns both
+		# data that should be sent back over the main socket and
+		# notification data that gets sent over vendor specific API.
 		my ($response, $notify) = $msg_func[$msg_type]->($db, $request, $device);
 		$db->{dbh}->commit;
 
@@ -117,7 +134,7 @@ while (my $client_socket = $server_socket->accept()) {
 			next;
 		}
 
-		# Reply to client
+		# Respond to client over the main socket
 		send_msg($client_socket, $ver, $msg_type, $response);
 
 		# Some messages don't send notifications
@@ -126,11 +143,11 @@ while (my $client_socket = $server_socket->accept()) {
 		# Don't send notifications when there was en error
 		next if ($response->{status} eq 'err');
 
-		# Encode the notification message to find its size
+		# Encode the notification message and find its size
 		my $msg = encode_json($notify);
 		my $msg_len = length($msg);
 
-		# Try to send to various messaging daemons
+		# Send to notification daemons
 		send_unix("../apnd.socket", $msg, $msg_len) unless ($args{t});
 		send_unix("../gcmd.socket", $msg, $msg_len) unless ($args{t});
 		send_unix("../testd.socket", $msg, $msg_len) if ($args{t});
@@ -140,6 +157,8 @@ while (my $client_socket = $server_socket->accept()) {
 sub send_unix {
 	my ($socket_path, $msg, $msg_len) = @_;
 
+	# Every time this function is called we create a new connection to the
+	# socket, send our data and then disconnect
 	my $socket = IO::Socket::UNIX->new(
 		Type => SOCK_STREAM(),
 		Peer => $socket_path
@@ -149,12 +168,16 @@ sub send_unix {
 		return;
 	}
 
+	# This is the same function we use for TCP data sending
 	send_all($socket, $msg, $msg_len);
+
+	close($socket);
 }
 
 sub recv_msg {
 	my ($sock) = @_;
 
+	# First read the fixed size 6 byte header
 	my $header = read_all($sock, 6);
 	my ($version, $msg_type, $payload_size) = unpack("nnn", $header);
 
@@ -169,10 +192,15 @@ sub recv_msg {
 	}
 	$log->set_msg($msg_str[$msg_type]);
 
+	# Server requests are limited to 4KB size, a 0 byte payload will not be
+	# valid JSON so reject that here
 	if ($payload_size > 4096 || $payload_size == 0) {
 		$log->print("error: $payload_size byte payload invalid\n");
 		exit 0;
 	}
+
+	# Now that we know the size of the message we can try and read the
+	# entire thing exactly
 	my $payload = read_all($sock, $payload_size);
 
 	try {

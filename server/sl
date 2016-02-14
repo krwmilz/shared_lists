@@ -51,7 +51,7 @@ die "Could not create socket: $!\n" unless($server_socket);
 my ($addr, $port) = ($server_socket->sockhost(), $server_socket->sockport());
 $log->print_bare("accepting connections on $addr:$port (pid = '$$')\n");
 
-# Children who have died will do not have to be waited on with this
+# Children who have exited will do not have to be waited on with this
 $SIG{CHLD} = 'IGNORE';
 
 # Accept new plain TCP connections and handle them in separate processes
@@ -119,10 +119,11 @@ while (my $client_socket = $server_socket->accept()) {
 		# data that should be sent back over the main socket and
 		# notification data that gets sent over vendor specific API.
 		my ($response, $notify) = $msg_func[$msg_type]->($db, $request, $device);
-		$db->{dbh}->commit;
 
+		$db->{dbh}->commit;
 		if ($@) {
 			$log->print("db transaction aborted: $@\n");
+
 			# now rollback to undo the incomplete changes
 			# but do it in an eval{} as it may also fail
 			eval { $db->{dbh}->rollback };
@@ -154,6 +155,8 @@ while (my $client_socket = $server_socket->accept()) {
 	}
 }
 
+# Connect to a UNIX file system socket and send a JSON encoded message
+# Returns nothing.
 sub send_unix {
 	my ($socket_path, $msg, $msg_len) = @_;
 
@@ -174,6 +177,10 @@ sub send_unix {
 	close($socket);
 }
 
+# Receive an entire message, header + payload. Validate version, message type,
+# and payload size from header. Then read the payload and make sure it's valid
+# JSON, and that the JSON root was a dictionary.
+# Returns a ($version, $msg_type, $payload) list. Exits on error.
 sub recv_msg {
 	my ($sock) = @_;
 
@@ -217,6 +224,8 @@ sub recv_msg {
 	}
 }
 
+# Read an exact amount of bytes from a socket.
+# Returns the data read from the socket, exits on error.
 sub read_all {
 	my ($sock, $bytes_total) = @_;
 
@@ -240,18 +249,28 @@ sub read_all {
 	return $data;
 }
 
+# Send an entire message (header + payload). Creates binary header by appending
+# version, message type, and payload size. Then it appends the payload which is
+# an encoded JSON string. Note we can't send native UTF-8 strings, they must be
+# encoded and then decoded on the other (client) side.
+# Returns number of bytes sent.
 sub send_msg {
 	my ($sock, $ver, $msg_type, $response) = @_;
 
+	# $payload is now a single JSON string that has no characters whose
+	# value is > 255
 	my $payload = encode_json($response);
 
 	my $header_len = 6;
 	my $payload_len = length($payload);
 
 	if ($payload_len > 65535) {
+		# Don't send the response that was too large, but do send back a
+		# quick message saying the response was too large
 		my $err = make_error("response too large");
-		send_msg($sock, $ver, $msg_type, $err);
-		return 0;
+		# If the new error we pass here is greater than the maximum
+		# payload length this will infinitely recurse.
+		return send_msg($sock, $ver, $msg_type, $err);
 	}
 
 	send_all($sock, pack("nnn", $ver, $msg_type, $payload_len), $header_len);
@@ -263,6 +282,9 @@ sub send_msg {
 	return $header_len + $payload_len;
 }
 
+# Send an exact amount of data over $socket. SSL can only send max 16KB per
+# frame so we need to loop to make sure everything gets sent.
+# Returns the number of bytes written, exits on write failure.
 sub send_all {
 	my ($socket, $data, $bytes_total) = @_;
 
@@ -279,9 +301,12 @@ sub send_all {
 		$bytes_written += $wrote;
 	}
 
-	return;
+	return $bytes_written;
 }
 
+# 'device_add' message handler. Validates incoming phone number, makes sure this
+# phone number has not registered already, creates new device_id's.
+# Does not return any push notifications because this device has no friends yet.
 sub msg_device_add {
 	my ($db, $request) = @_;
 
@@ -298,11 +323,14 @@ sub msg_device_add {
 		$log->print("phone number '$ph_num' already exists\n");
 		return make_error("the sent phone number already exists");
 	}
+	# Only accept a white list of operating systems
 	if ($os ne 'unix' && $os ne 'android' && $os ne 'ios') {
 		$log->print("unknown operating system '$os'\n");
 		return make_error("operating system not supported");
 	}
 
+	# Create new 256 bit random hashed string that we use as the unique
+	# device id
 	my $device_id = sha256_base64(arc4random_bytes(32));
 	my $fp = fingerprint($device_id);
 
@@ -319,6 +347,10 @@ sub msg_device_add {
 	return (make_ok( { device_id => $device_id } ), undef);
 }
 
+# 'device_update' message handler. Takes a device_id and a token and updates the
+# devices table with the new token. Used so that the notification infrastructure
+# knows about the latest token a device has.
+# Returns with an ok message.
 sub msg_device_update {
 	my ($db, $request, $dev) = @_;
 

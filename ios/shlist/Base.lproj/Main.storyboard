@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="7706" systemVersion="14D136" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" initialViewController="KKJ-Fr-5sX">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="7706" systemVersion="14F1605" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" initialViewController="KKJ-Fr-5sX">
     <dependencies>
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="7703"/>
@@ -259,7 +259,7 @@
             </objects>
             <point key="canvasLocation" x="3828" y="-638"/>
         </scene>
-        <!--Shlist-->
+        <!--Shared Lists-->
         <scene sceneID="hc1-Lv-WtP">
             <objects>
                 <tableViewController id="x0J-ua-E8Q" customClass="MainTableViewController" sceneMemberID="viewController">
@@ -321,7 +321,7 @@
                         </connections>
                     </tableView>
                     <toolbarItems/>
-                    <navigationItem key="navigationItem" title="Shlist" id="uhM-V6-aB7">
+                    <navigationItem key="navigationItem" title="Shared Lists" id="uhM-V6-aB7">
                         <barButtonItem key="leftBarButtonItem" systemItem="edit" id="XHh-J3-UVD"/>
                         <barButtonItem key="rightBarButtonItem" systemItem="add" id="hNc-gt-QbU">
                             <connections>
@@ -335,7 +335,7 @@
             </objects>
             <point key="canvasLocation" x="432" y="202"/>
         </scene>
-        <!--Add Shared List-->
+        <!--New List-->
         <scene sceneID="tne-QT-ifu">
             <objects>
                 <tableViewController id="BYZ-38-t0r" customClass="NewListTableViewController" sceneMemberID="viewController">
@@ -442,7 +442,7 @@
                             </tableViewSection>
                         </sections>
                     </tableView>
-                    <navigationItem key="navigationItem" title="Add Shared List" id="5ys-ck-wLj">
+                    <navigationItem key="navigationItem" title="New List" id="5ys-ck-wLj">
                         <barButtonItem key="leftBarButtonItem" systemItem="cancel" id="WaR-Ud-Hmo">
                             <connections>
                                 <segue destination="C3w-Ab-gX6" kind="unwind" unwindAction="unwindToList:" id="7wZ-HT-2Br"/>
@@ -485,6 +485,9 @@
                                                     <rect key="frame" x="16" y="13" width="576" height="17"/>
                                                     <fontDescription key="fontDescription" type="system" pointSize="14"/>
                                                     <textInputTraits key="textInputTraits"/>
+                                                    <connections>
+                                                        <action selector="name_editing_ended:" destination="uyw-yd-pcJ" eventType="editingDidEnd" id="7XN-3a-wjb"/>
+                                                    </connections>
                                                 </textField>
                                             </subviews>
                                             <constraints>
@@ -505,11 +508,9 @@
                     <navigationItem key="navigationItem" title="Edit Name" id="fd1-sm-vtP"/>
                     <connections>
                         <outlet property="list_name" destination="zf2-sM-1jM" id="w6j-kT-Mxt"/>
-                        <segue destination="w7g-ds-BFe" kind="unwind" unwindAction="unwindToAddList:" id="Gsp-mJ-yJ9"/>
                     </connections>
                 </tableViewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="K6g-mo-23k" userLabel="First Responder" sceneMemberID="firstResponder"/>
-                <exit id="w7g-ds-BFe" userLabel="Exit" sceneMemberID="exit"/>
             </objects>
             <point key="canvasLocation" x="3024" y="202"/>
         </scene>
@@ -649,8 +650,8 @@
                                                     <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
                                                     <nil key="highlightedColor"/>
                                                 </label>
-                                                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Good" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="15d-vN-62f">
-                                                    <rect key="frame" x="541" y="11" width="43" height="21"/>
+                                                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="15d-vN-62f">
+                                                    <rect key="frame" x="584" y="22" width="0.0" height="0.0"/>
                                                     <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                                     <color key="textColor" white="0.33333333333333331" alpha="1" colorSpace="calibratedWhite"/>
                                                     <nil key="highlightedColor"/>
@@ -669,7 +670,7 @@
                                         <tableViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" tableViewCell="pLe-rJ-ITY" id="RsW-FA-jWb">
                                             <autoresizingMask key="autoresizingMask"/>
                                             <subviews>
-                                                <label opaque="NO" multipleTouchEnabled="YES" contentMode="left" text="Device Id" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" id="0kV-we-bvq">
+                                                <label opaque="NO" multipleTouchEnabled="YES" contentMode="left" text="Fingerprint" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" id="0kV-we-bvq">
                                                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                                     <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                                     <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>

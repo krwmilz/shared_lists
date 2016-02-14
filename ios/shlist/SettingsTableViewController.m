@@ -19,27 +19,25 @@
 	[super viewDidLoad];
 
 	netconn = [Network shared_network_connection];
-	NSString *device_id = [[NSString alloc] initWithData:[netconn get_device_id] encoding:NSASCIIStringEncoding];
+	NSString *device_id = [netconn get_device_id];
 	_device_id_label.text = [device_id substringToIndex:8];
+
+	if ([netconn connected])
+		_network_label.text = @"Connected";
+	else
+		_network_label.text = @"Disconnected";
+	netconn->settings_tvc = self;
 }
 
-- (void) viewWillAppear:(BOOL)animated
+- (void) update_network_text:(NSString *)new_text
 {
-	// check every time this view is selected
-	_network_label.text = @"Checking...";
-	netconn->settings_tvc = self;
-	[netconn send_message:8 contents:nil];
+	_network_label.text = new_text;
 }
 
 - (void)didReceiveMemoryWarning
 {
 	[super didReceiveMemoryWarning];
 	// Dispose of any resources that can be recreated.
-}
-
-- (void) finish_ok_request
-{
-	_network_label.text = @"All good";
 }
 
 /*

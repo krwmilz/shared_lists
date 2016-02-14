@@ -13,16 +13,29 @@
 }
 
 
-- (void)didReceiveMemoryWarning {
+- (void)didReceiveMemoryWarning
+{
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
 }
 
 #pragma mark - Table view data source
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+{
     // Return the number of sections.
     return 1;
+}
+
+- (IBAction)name_editing_ended:(id)sender
+{
+
+	NSIndexPath *name_path = [NSIndexPath indexPathForRow:0 inSection:0];
+	UITableViewCell *name_cell = [self.tableView cellForRowAtIndexPath:name_path];
+
+	UITextField *name = (UITextField *)[name_cell viewWithTag:1];
+
+	NSLog(@"name was '%@'", name.text);
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -30,15 +43,13 @@
     return 1;
 }
 
-/*
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:<#@"reuseIdentifier"#> forIndexPath:indexPath];
-    
-    // Configure the cell...
-    
-    return cell;
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+	// Configure the cell...
+	UITableViewCell *cell = [super tableView:tableView cellForRowAtIndexPath:indexPath];
+
+	return cell;
 }
-*/
 
 /*
 // Override to support conditional editing of the table view.

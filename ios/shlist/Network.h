@@ -11,7 +11,6 @@
 	int *bytesRead;
 
 	@public
-	MainTableViewController *shlist_tvc;
 	ListTableViewController *shlist_ldvc;
 	SettingsTableViewController *settings_tvc;
 }
@@ -21,9 +20,9 @@
 
 // only networking really cares about the device id
 - (bool) load_device_id:(NSString *)phone_number;
-- (NSData *) get_device_id;
+- (NSString *) get_device_id;
+- (bool) connected;
 - (bool) send_message:(uint16_t)msg_type contents:(NSMutableDictionary *)data;
-
 
 
 // returns singleton instance

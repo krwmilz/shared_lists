@@ -2,6 +2,6 @@
 
 @interface SettingsTableViewController : UITableViewController
 
-- (void) finish_ok_request;
+- (void) update_network_text:(NSString *)new_text;
 
 @end

@@ -39,6 +39,11 @@
 	return self;
 }
 
+- (bool) connected
+{
+	return connected;
+}
+
 - (NSString *) get_device_id
 {
 	return device_id;
@@ -48,6 +53,7 @@
 {
 	NSLog(@"network: connect()");
 	connected = 1;
+	[settings_tvc update_network_text:@"Connected"];
 
 	CFReadStreamRef readStream;
 	CFWriteStreamRef writeStream;
@@ -76,6 +82,7 @@
 {
 	NSLog(@"network: disconnect()");
 	connected = 0;
+	[settings_tvc update_network_text:@"Disconnected"];
 
 	[inputShlistStream close];
 	[outputShlistStream close];
@@ -296,102 +303,22 @@
 		return;
 	}
 
+	// device_add responses don't trigger any gui updates
 	if (msg_type == device_add) {
-		[self device_add:response];
-	} else if (msg_type == list_add) {
-		[self list_add:response];
-	} else if (msg_type == lists_get) {
-		[self lists_get:response];
-	} else if (msg_type == list_join) {
-		[self list_join:response];
-	} else if (msg_type == list_leave) {
-		[self list_leave:response];
-	} else if (msg_type == lists_get_other) {
-		[self lists_get_other:response];
+		device_id = [response objectForKey:@"device_id"];
+
+		NSLog(@"device_add: writing new key '%@' to file", device_id);
+		NSError *error = nil;
+		[device_id writeToFile:device_id_file atomically:YES encoding:NSUTF8StringEncoding error:&error];
+
+		if (error != nil)
+			NSLog(@"%@", [error userInfo]);
+		return;
 	}
-}
 
-- (void) device_add:(NSDictionary *)response
-{
-	device_id = [response objectForKey:@"device_id"];
-
-	NSLog(@"device_add: writing new key '%@' to file", device_id);
-	NSError *error = nil;
-	[device_id writeToFile:device_id_file atomically:YES encoding:NSUTF8StringEncoding error:&error];
-
-	if (error != nil)
-		NSLog(@"%@", [error userInfo]);
-}
-
-- (void) list_add:(NSDictionary *)response
-{
-	NSDictionary *list = [response objectForKey:@"list"];
-
-	SharedList *shlist = [[SharedList alloc] init];
-	shlist.num = [list objectForKey:@"num"];
-	shlist.name = [list objectForKey:@"name"];
-
-	NSArray *members = [list objectForKey:@"members"];
-	shlist.members_phone_nums = members;
-	shlist.items_ready = [list objectForKey:@"items_complete"];
-	shlist.items_total = [list objectForKey:@"items_total"];
-
-	if ([self check_tvc:shlist_tvc])
-		[shlist_tvc finished_new_list_request:shlist];
-
-	NSLog(@"list_add: successfully added new list '%@'", shlist.name);
-}
-
-- (void) lists_get:(NSDictionary *)response
-{
-	NSArray *lists = [response objectForKey:@"lists"];
-	NSLog(@"lists_get: got %i lists from server", [lists count]);
-
-	// Don't attempt to update a view controller that isn't there yet
-	if (![self check_tvc:shlist_tvc])
-		return;
-
-	if (shlist_tvc)
-		[shlist_tvc lists_get_finished:lists];
-}
-
-- (void) lists_get_other:(NSDictionary *)response
-{
-	NSArray *other_lists = [response objectForKey:@"other_lists"];
-	NSLog(@"lists_get_other: got %i other lists from server", [other_lists count]);
-
-	// Don't attempt to update a view controller that isn't there yet
-	if (![self check_tvc:shlist_tvc])
-		return;
-
-	if (shlist_tvc)
-		[shlist_tvc lists_get_other_finished:other_lists];
-}
-
-- (void) list_join:(NSDictionary *)response
-{
-	NSDictionary *list = response[@"list"];
-	NSLog(@"network: joined list %@", list[@"num"]);
-
-	if ([self check_tvc:shlist_tvc])
-		[shlist_tvc finished_join_list_request:list];
-}
-
-- (void) list_leave:(NSDictionary *)response
-{
-	NSNumber *list_num = response[@"list_num"];
-	NSLog(@"network: left list %@", list_num);
-
-	if ([self check_tvc:shlist_tvc])
-		[shlist_tvc finished_leave_list_request:response];
-}
-
-- (bool) check_tvc:(MainTableViewController *) tvc
-{
-	if (tvc)
-		return true;
-	NSLog(@"network: trying to update main_tvc before it's ready, ignoring!");
-	return false;
+	// Send a generic notification, these have to be hooked up to work
+	NSString *notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", msg_type];
+	[[NSNotificationCenter defaultCenter] postNotificationName:notification_name object:nil userInfo:response];
 }
 
 - (void) dealloc

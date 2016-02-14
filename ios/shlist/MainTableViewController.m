@@ -24,16 +24,55 @@
 
 @implementation MainTableViewController
 
+- (void) dealloc
+{
+	// If you don't remove yourself as an observer, the Notification Center
+	// will continue to try and send notification objects to the deallocated
+	// object.
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
 - (void) viewDidLoad
 {
 	[super viewDidLoad];
+
+	// Listen for push notifications
+	[[NSNotificationCenter defaultCenter] addObserver:self
+						 selector:@selector(receiveNotification:)
+						     name:@"MessageReceivedNotification"
+						   object:nil];
+
+	// Hook up generic message handlers
+	[[NSNotificationCenter defaultCenter] addObserver:self
+						 selector:@selector(lists_get_finished:)
+						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", lists_get]
+						   object:nil];
+
+	[[NSNotificationCenter defaultCenter] addObserver:self
+						 selector:@selector(lists_get_other_finished:)
+						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", lists_get_other]
+						   object:nil];
+
+	[[NSNotificationCenter defaultCenter] addObserver:self
+						 selector:@selector(finished_new_list_request:)
+						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_add]
+						   object:nil];
+
+	[[NSNotificationCenter defaultCenter] addObserver:self
+						 selector:@selector(finished_join_list_request:)
+						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_join]
+						   object:nil];
+
+	[[NSNotificationCenter defaultCenter] addObserver:self
+						 selector:@selector(finished_leave_list_request:)
+						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_leave]
+						   object:nil];
 
 	// display an Edit button in the navigation bar for this view controller
 	self.navigationItem.leftBarButtonItem = self.editButtonItem;
 
 	// there's a race here when assigning self
 	network_connection = [Network shared_network_connection];
-	network_connection->shlist_tvc = self;
 
 	_lists = [[NSMutableArray alloc] init];
 	[_lists addObject:[[NSMutableArray alloc] init]];
@@ -68,17 +107,50 @@
 	_address_book.main_tvc = self;
 }
 
+- (void) receiveNotification:(NSNotification *) notification
+{
+	NSDictionary *userinfo = notification.userInfo;
+
+	// [notification name] should always be @"TestNotification"
+	// unless you use this method for observation of other notifications
+	// as well.
+
+	if ([[notification name] isEqualToString:@"MessageReceivedNotification"])
+		NSLog (@"Successfully received the test notification!");
+
+	NSMutableArray *other_lists = [_lists objectAtIndex:1];
+
+	SharedList *tmp = [[SharedList alloc] init];
+	// tmp.num = list[@"num"];
+	tmp.num = [NSNumber numberWithInt:99];
+
+	// NSData *name_data = [list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
+	// tmp.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
+	tmp.name = @"Some new list from the outthere";
+
+	// tmp.members_phone_nums = list[@"members"];
+	[other_lists addObject:tmp];
+
+	NSLog(@"notify: adding other list '%@', num '%@'", tmp.name, tmp.num);
+
+	NSIndexPath *new_path = [NSIndexPath indexPathForRow:[other_lists count] - 1 inSection:1];
+	[self.tableView insertRowsAtIndexPaths:@[new_path] withRowAnimation:UITableViewRowAnimationAutomatic];
+
+	[self update_section_headers];
+}
+
 - (bool) load_phone_number
 {
 	if ([[NSFileManager defaultManager] fileExistsAtPath:phone_num_file]) {
 		// file exists, read what it has
 		// XXX: validate length of file too
-		phone_number = [NSString stringWithContentsOfFile:phone_num_file];
+		NSError *error = nil;
+		phone_number = [NSString stringWithContentsOfFile:phone_num_file encoding:NSASCIIStringEncoding error:&error];
 		return true;
 	}
 
 	UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Important"
-		message:@"Your phone number is needed for us to calculate your mutual contacts. Expect severe functionality loss."
+		message:@"We need this phone's number to find your mutual friends."
 		delegate:self cancelButtonTitle:@"Nope" otherButtonTitles:@"Ok", nil];
 
 	alert.alertViewStyle = UIAlertViewStylePlainTextInput;
@@ -170,8 +242,13 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 {
 }
 
-- (void) lists_get_finished:(NSArray *)json_lists;
+- (void) lists_get_finished:(NSNotification *)notification;
 {
+	NSDictionary *response = notification.userInfo;
+
+	NSArray *json_lists = [response objectForKey:@"lists"];
+	NSLog(@"lists_get: got %lu lists from server", (unsigned long)[json_lists count]);
+
 	NSMutableArray *lists = [_lists objectAtIndex:0];
 	[lists removeAllObjects];
 
@@ -179,11 +256,16 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		SharedList *tmp = [[SharedList alloc] init];
 		tmp.num = list[@"num"];
 
+		// Convert incoming encoded UTF-8 into real UTF-8
 		NSData *name_data = [list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
 		tmp.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
 
 		NSNumber *date = list[@"date"];
-		tmp.date = [NSDate dateWithTimeIntervalSince1970:[date floatValue]];
+		if ([date intValue] != 0)
+			tmp.date = [NSDate dateWithTimeIntervalSince1970:[date floatValue]];
+		else
+			tmp.date = nil;
+
 		tmp.members_phone_nums = list[@"members"];
 		tmp.items_ready = list[@"items_complete"];
 		tmp.items_total = list[@"items_total"];
@@ -192,11 +274,16 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		NSLog(@"adding list '%@', num '%@'", tmp.name, tmp.num);
 	}
 
-	[self.tableView reloadData];
+	NSIndexSet *section = [NSIndexSet indexSetWithIndex:0];
+	[self.tableView reloadSections:section withRowAnimation:UITableViewRowAnimationNone];
 }
 
-- (void) lists_get_other_finished:(NSArray *)other_json_lists;
+- (void) lists_get_other_finished:(NSNotification *)notification;
 {
+	NSDictionary *response = notification.userInfo;
+	NSArray *other_json_lists = [response objectForKey:@"other_lists"];
+	NSLog(@"lists_get_other: got %i other lists from server", [other_json_lists count]);
+
 	NSMutableArray *other_lists = [_lists objectAtIndex:1];
 	[other_lists removeAllObjects];
 
@@ -213,18 +300,33 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		NSLog(@"adding other list '%@', num '%@'", tmp.name, tmp.num);
 	}
 
-	[self.tableView reloadData];
+	NSIndexSet *section = [NSIndexSet indexSetWithIndex:1];
+	[self.tableView reloadSections:section withRowAnimation:UITableViewRowAnimationNone];
 }
 
-- (void) finished_new_list_request:(SharedList *) shlist
+- (void) finished_new_list_request:(NSNotification *) notification
 {
-	[[_lists objectAtIndex:0] addObject:shlist];
-	// [self.shared_lists addObject:shlist];
+	NSDictionary *response = notification.userInfo;
+	NSDictionary *list = [response objectForKey:@"list"];
+
+	SharedList *shlist = [[SharedList alloc] init];
+	shlist.num = [list objectForKey:@"num"];
+	shlist.name = [list objectForKey:@"name"];
+
+	NSMutableArray *members = [list objectForKey:@"members"];
+	shlist.members_phone_nums = members;
+	shlist.items_ready = [list objectForKey:@"items_complete"];
+	shlist.items_total = [list objectForKey:@"items_total"];
+
+	NSMutableArray *lists = [_lists objectAtIndex:0];
+	[lists addObject:shlist];
 
 	// response looks good, insert the new list
-	int section_0_rows = [[_lists objectAtIndex:0] count];
-	NSIndexPath *index_path = [NSIndexPath indexPathForRow:section_0_rows - 1 inSection:0];
+	NSUInteger new_row_pos = [lists count] - 1;
+	NSIndexPath *index_path = [NSIndexPath indexPathForRow:new_row_pos inSection:0];
 	[self.tableView insertRowsAtIndexPaths:@[index_path] withRowAnimation:UITableViewRowAnimationFade];
+
+	[self update_section_headers];
 }
 
 // major thing here is join list requests
@@ -247,8 +349,12 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	[network_connection send_message:list_join contents:request];
 }
 
-- (void) finished_join_list_request:(NSDictionary *) shlist
+- (void) finished_join_list_request:(NSNotification *) notification
 {
+	NSDictionary *response = notification.userInfo;
+	NSDictionary *shlist = response[@"list"];
+	NSLog(@"network: joined list %@", shlist[@"num"]);
+
 	NSMutableArray *lists = [_lists objectAtIndex:0];
 	NSMutableArray *other_lists = [_lists objectAtIndex:1];
 
@@ -274,14 +380,24 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 	// Compute new position and start moving row as soon as possible
 	// XXX: sorting
-	int new_row_pos = [lists count] - 1;
+	NSUInteger new_row_pos = [lists count] - 1;
 	NSIndexPath *new_index_path = [NSIndexPath indexPathForRow:new_row_pos inSection:0];
 	[self.tableView moveRowAtIndexPath:orig_index_path toIndexPath:new_index_path];
+
+	[self update_section_headers];
 
 	// Put any new values into data structs
 	NSData *name_data = [shlist[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
 	needle.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
-	// needle.date =
+
+	NSNumber *date = shlist[@"date"];
+	if ([date intValue] != 0) {
+		needle.date = [NSDate dateWithTimeIntervalSince1970:[date floatValue]];
+	}
+	else {
+		needle.date = nil;
+	}
+
 	needle.items_ready = shlist[@"items_complete"];
 	needle.items_total = shlist[@"items_total"];
 	needle.num_members = shlist[@"num_members"];
@@ -296,10 +412,53 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	UILabel *fraction = (UILabel *)[needle.cell viewWithTag:4];
 	fraction.text = [self fraction:needle.items_ready denominator:needle.items_total];
 	fraction.hidden = NO;
+
+	// Show date label if date has been set to something
+	if (needle.date != nil) {
+		UILabel *deadline_label = (UILabel *)[needle.cell viewWithTag:3];
+		deadline_label.hidden = NO;
+	}
 }
 
-- (void) finished_leave_list_request:(NSDictionary *) response
+
+// section header titles
+- (NSString *)tableView:(UITableView *)tableView
+titleForHeaderInSection:(NSInteger)section
 {
+	if (section > 1)
+		// should not happen
+		return @"";
+
+	unsigned long total = [[_lists objectAtIndex:section] count];
+	if (section == 0)
+		return [NSString stringWithFormat:@"Your Lists (%lu)", total];
+	else if (section == 1)
+		return [NSString stringWithFormat:@"Other Lists (%lu)", total];
+	return @"";
+}
+
+- (void) update_section_headers
+{
+	NSMutableArray *lists = [_lists objectAtIndex:0];
+	NSMutableArray *other_lists = [_lists objectAtIndex:1];
+
+	UITableViewHeaderFooterView *sectionZeroHeader = [self.tableView headerViewForSection:0];
+	UITableViewHeaderFooterView *sectionOneHeader = [self.tableView headerViewForSection:1];
+	NSString *sectionZeroLabel = [NSString stringWithFormat:@"Your Lists (%lu)", (unsigned long)[lists count]];
+	NSString *sectionOneLabel = [NSString stringWithFormat:@"Other Lists (%lu)", (unsigned long)[other_lists count]];
+
+	[sectionZeroHeader.textLabel setText:sectionZeroLabel];
+	[sectionZeroHeader setNeedsLayout];
+	[sectionOneHeader.textLabel setText:sectionOneLabel];
+	[sectionOneHeader setNeedsLayout];
+}
+
+- (void) finished_leave_list_request:(NSNotification *) notification
+{
+	NSDictionary *response = notification.userInfo;
+	NSNumber *list_num = response[@"list_num"];
+	NSLog(@"network: left list %@", list_num);
+
 	NSMutableArray *lists = [_lists objectAtIndex:0];
 	NSMutableArray *other_lists = [_lists objectAtIndex:1];
 
@@ -321,6 +480,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 		NSIndexPath *old_path = [self.tableView indexPathForCell:list.cell];
 		[self.tableView deleteRowsAtIndexPaths:@[old_path] withRowAnimation:UITableViewRowAnimationAutomatic];
 
+		[self update_section_headers];
 		return;
 	}
 
@@ -333,10 +493,27 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	NSIndexPath *new_path = [NSIndexPath indexPathForRow:0 inSection:1];
 	[self.tableView moveRowAtIndexPath:old_path toIndexPath:new_path];
 
-	// Remove > accessory and hide the completion fraction
+	// Make sure section headers are accurate
+	[self update_section_headers];
+
+	// Remove yourself from the members array
+	NSMutableArray *members = [list.members_phone_nums mutableCopy];
+	NSUInteger index = [members indexOfObject:@"4037082094"];
+	if (index != NSNotFound) {
+		[members removeObjectAtIndex:index];
+	}
+	[self process_members_array:members cell:list.cell];
+
+	// Remove > accessory
 	list.cell.accessoryType = UITableViewCellAccessoryNone;
+
+	// Hide completion fraction
 	UILabel *fraction = (UILabel *)[list.cell viewWithTag:4];
 	fraction.hidden = YES;
+
+	// Hide date
+	UILabel *deadline_label = (UILabel *)[list.cell viewWithTag:3];
+	deadline_label.hidden = YES;
 
 	// XXX: update members array to disclude yourself (maybe send it back in response?)
 	// XXX: Maybe clear out list data that's no longer needed
@@ -358,20 +535,24 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	UILabel *fraction_label = (UILabel *)[cell viewWithTag:4];
 
 	if ([indexPath section] == 0) {
-		// "lists you're in" section
+		// your lists section
 
-		// XXX: needs to be stored on/sent from the server
-		deadline_label.text = @"in 3 days";
+		if (shared_list.date == nil) {
+			deadline_label.hidden = YES;
+		} else {
+			// XXX: calculate how long until deadline
+			// NSDate *date = shared_list.date;
+			deadline_label.text = @"date";
+		}
 
-		// float frac = shared_list.items_ready  / shared_list.items_total;
-		float frac = 0.0f;
+		float frac = [shared_list.items_ready floatValue]  / [shared_list.items_total floatValue];
 		if (frac > 0.80f)
 			fraction_label.textColor = [UIColor greenColor];
-
 		fraction_label.hidden = NO;
 		fraction_label.text = [self fraction:shared_list.items_ready
 					      denominator:shared_list.items_total];
 
+		// Add ">" accessory to indicate you can "enter" this list
 		cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 
 	}
@@ -452,21 +633,6 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	members_label.text = members_str;
 }
 
-// section header titles
-- (NSString *)tableView:(UITableView *)tableView
-	titleForHeaderInSection:(NSInteger)section
-{
-	if (section > 1)
-		// should not happen
-		return @"";
-
-	NSUInteger total = [[_lists objectAtIndex:section] count];
-	if (section == 0)
-		return [NSString stringWithFormat:@"Lists you're in (%lu)", (unsigned long)total];
-	else if (section == 1)
-		return [NSString stringWithFormat:@"Other lists (%lu)", (unsigned long)total];
-	return @"";
-}
 
 // only section 0 lists can be edited
 - (BOOL) tableView:(UITableView *)tableView

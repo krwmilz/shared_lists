@@ -10,7 +10,6 @@
 @property (weak, nonatomic) IBOutlet UISwitch		*deadline_switch;
 @property (weak, nonatomic) IBOutlet UILabel		*list_name;
 
-// @property (weak, nonatomic) IBOutlet UITextField	*textField;
 @property (weak, nonatomic) IBOutlet UIDatePicker	*datePicker;
 
 @end
@@ -37,7 +36,10 @@
 	[super viewDidLoad];
 	// Do any additional setup after loading the view.
 
-	_list_name.text = @"New List";
+	//_edit_text_field = [[UITextField alloc] init];
+	//_edit_text_field.text = @"New Shlist";
+
+	_list_name.text = @"New Shlist";
 	network_connection = [Network shared_network_connection];
 }
 
@@ -58,16 +60,17 @@
 // preparation before navigation
 - (void) prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
 {
-	if ([[segue identifier] isEqualToString:@"edit name segue"]) {
+	if ([[segue identifier] isEqualToString:@"add shared list name edit"]) {
 		// segue forwards to name editor
 		NSLog(@"debug: %@: editing name", _list_name.text);
 
-		// EditTableViewController *edit = [segue destinationViewController];
-		// edit.list_name.text = @"New List";
+		EditTableViewController *edit = [segue destinationViewController];
+		edit.list_name = (UITextField *)_list_name;
+
 		return;
 	}
 
-	// jump backwards to previous view controller
+	// User hit cancel, throw away any changes
 	if (sender != self.saveButton)
 		return;
 
@@ -76,7 +79,6 @@
 	// saving, copy form fields into shared list object
 	shared_list.name = _list_name.text;
 	shared_list.deadline = _deadline_switch.isOn;
-	// _shared_list.filters = ???
 
 	NSLog(@"new_list: sending list_add request...");
 

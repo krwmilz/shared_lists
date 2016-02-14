@@ -31,7 +31,7 @@
 
 	NSMutableString *hex_token = [NSMutableString stringWithCapacity:(token_length * 2)];
 	for (int i = 0; i < token_length; i++) {
-		[hex_token appendFormat:@"%02X", (NSUInteger)token_data[i]];
+		[hex_token appendFormat:@"%02lX", (unsigned long)token_data[i]];
 	}
 
 	NSLog(@"apn: device token is 0x%@", hex_token);
@@ -48,7 +48,7 @@
 	for (id key in userInfo) {
 		NSLog(@"notify: '%@' => '%@'", key, userInfo[key]);
 	}
-	[[NSNotificationCenter defaultCenter] postNotificationName:@"PushNotificationMessageReceivedNotification" object:nil userInfo:userInfo];
+	[[NSNotificationCenter defaultCenter] postNotificationName:@"MessageReceivedNotification" object:nil userInfo:userInfo];
 }
 
 - (void) applicationWillResignActive:(UIApplication *)application

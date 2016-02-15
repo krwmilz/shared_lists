@@ -45,10 +45,22 @@
 - (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo
 {
 	NSLog(@"notify: got remote notification");
-	for (id key in userInfo) {
-		NSLog(@"notify: '%@' => '%@'", key, userInfo[key]);
+
+	NSString *msg_type = userInfo[@"msg_type"];
+	if (msg_type == nil) {
+		NSLog(@"didReceiveRemoteNotification: did not have 'msg_type' key");
+		return;
 	}
-	[[NSNotificationCenter defaultCenter] postNotificationName:@"MessageReceivedNotification" object:nil userInfo:userInfo];
+
+	// Create unique notification name based on the incoming message type
+	NSString *notification_name = [NSString stringWithFormat:@"PushNotification_%@", userInfo[@"msg_type"]];
+
+	if (![userInfo[@"payload"] isKindOfClass:[NSDictionary class]]) {
+		NSLog(@"didReceiveRemoteNotification: payload wasn't a dictionary");
+		return;
+	}
+
+	[[NSNotificationCenter defaultCenter] postNotificationName:notification_name object:nil userInfo:userInfo[@"payload"]];
 }
 
 - (void) applicationWillResignActive:(UIApplication *)application

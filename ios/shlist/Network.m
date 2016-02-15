@@ -51,10 +51,6 @@
 
 - (void) connect
 {
-	NSLog(@"network: connect()");
-	connected = 1;
-	[settings_tvc update_network_text:@"Connected"];
-
 	CFReadStreamRef readStream;
 	CFWriteStreamRef writeStream;
 
@@ -76,13 +72,17 @@
 
 	[inputShlistStream open];
 	[outputShlistStream open];
+
+	NSLog(@"network: connect()");
+	connected = 1;
+	[[NSNotificationCenter defaultCenter] postNotificationName:@"NetworkConnectedNotification" object:nil userInfo:nil];
 }
 
 - (void) disconnect
 {
 	NSLog(@"network: disconnect()");
 	connected = 0;
-	[settings_tvc update_network_text:@"Disconnected"];
+	[[NSNotificationCenter defaultCenter] postNotificationName:@"NetworkDisconnectedNotification" object:nil userInfo:nil];
 
 	[inputShlistStream close];
 	[outputShlistStream close];
@@ -103,11 +103,12 @@
 		// read device id from filesystem into memory
 		NSError *error = nil;
 		device_id = [NSString stringWithContentsOfFile:device_id_file encoding:NSUTF8StringEncoding error:&error];
-		if (error != nil)
+		if (error != nil) {
 			NSLog(@"%@", [error userInfo]);
+			return false;
+		}
 
 		NSLog(@"network: device id loaded");
-
 		return true;
 	}
 
@@ -120,7 +121,7 @@
 				 nil];
 
 	NSError *error = nil;
-	NSData *json = [NSJSONSerialization dataWithJSONObject:request options:NSJSONWritingPrettyPrinted error:&error];
+	NSData *json = [NSJSONSerialization dataWithJSONObject:request options:0 error:&error];
 	if (error != nil) {
 		NSLog(@"%@", [error userInfo]);
 		return false;
@@ -148,19 +149,23 @@
 	if (!connected)
 		[self connect];
 
+	// Append 'device_id' to all message requests sent through this function
 	[request setObject:device_id forKey:@"device_id"];
 
 	NSError *error = nil;
-	NSData *json = [NSJSONSerialization dataWithJSONObject:request options:NSJSONWritingPrettyPrinted error:&error];
+	// Try to serialize request, bail if errors
+	NSData *json = [NSJSONSerialization dataWithJSONObject:request options:0 error:&error];
 	if (error != nil) {
 		NSLog(@"%@", [error userInfo]);
 		return false;
 	}
 
+	// Convert header values into network byte order
 	uint16_t version = htons(0);
 	uint16_t msg_type_network = htons(send_msg_type);
 	uint16_t length = htons([json length]);
 
+	// Construct message header by concatenating network byte order fields
 	NSMutableData *msg = [NSMutableData data];
 	[msg appendBytes:&version length:2];
 	[msg appendBytes:&msg_type_network length:2];
@@ -286,6 +291,7 @@
 	NSData *data = [NSData dataWithBytesNoCopy:payload length:payload_size];
 
 	NSError *error = nil;
+	// Try to parse payload and check for errors
 	NSDictionary *response = [NSJSONSerialization JSONObjectWithData:data
 		options:0 error:&error];
 	if (error) {
@@ -293,18 +299,20 @@
 		return;
 	}
 
+	// Make sure server sent 'status' key in response
 	NSString *status = response[@"status"];
 	if (status == nil) {
 		NSLog(@"read: response did not contain 'status' key");
 		return;
 	}
+	// Make sure 'status' key is not 'err'
 	if ([status compare:@"err"] == 0) {
 		NSLog(@"read: response error, reason = '%@'", response[@"reason"]);
 		return;
 	}
 
-	// device_add responses don't trigger any gui updates
 	if (msg_type == device_add) {
+		// device_add responses don't trigger any gui updates
 		device_id = [response objectForKey:@"device_id"];
 
 		NSLog(@"device_add: writing new key '%@' to file", device_id);

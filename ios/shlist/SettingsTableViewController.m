@@ -18,20 +18,34 @@
 {
 	[super viewDidLoad];
 
+	NSNotificationCenter *default_center = [NSNotificationCenter defaultCenter];
+	// Listen for network connect/disconnect events and set the text field accordingly
+	[default_center addObserver:self selector:@selector(set_network_text_connected)
+			       name:@"NetworkConnectedNotification" object:nil];
+
+	[default_center addObserver:self selector:@selector(set_network_text_disconnected)
+			       name:@"NetworkDisconnectedNotification" object:nil];
+
 	netconn = [Network shared_network_connection];
 	NSString *device_id = [netconn get_device_id];
+
+	// Just show the first 8 characters of the device id (aka device fingerprint)
 	_device_id_label.text = [device_id substringToIndex:8];
 
 	if ([netconn connected])
-		_network_label.text = @"Connected";
+		[self set_network_text_connected];
 	else
-		_network_label.text = @"Disconnected";
-	netconn->settings_tvc = self;
+		[self set_network_text_disconnected];
 }
 
-- (void) update_network_text:(NSString *)new_text
+- (void) set_network_text_connected
 {
-	_network_label.text = new_text;
+	_network_label.text = @"Connected";
+}
+
+- (void) set_network_text_disconnected
+{
+	_network_label.text = @"Disconnected";
 }
 
 - (void)didReceiveMemoryWarning

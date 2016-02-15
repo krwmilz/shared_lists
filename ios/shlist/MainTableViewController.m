@@ -26,9 +26,6 @@
 
 - (void) dealloc
 {
-	// If you don't remove yourself as an observer, the Notification Center
-	// will continue to try and send notification objects to the deallocated
-	// object.
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -36,37 +33,37 @@
 {
 	[super viewDidLoad];
 
+	NSNotificationCenter *default_center = [NSNotificationCenter defaultCenter];
+	NSString *notification_name;
+
 	// Listen for push notifications
-	[[NSNotificationCenter defaultCenter] addObserver:self
-						 selector:@selector(receiveNotification:)
-						     name:@"MessageReceivedNotification"
-						   object:nil];
+	[default_center addObserver:self selector:@selector(push_friend_added_list:)
+			       name:@"PushNotification_friend_added_list" object:nil];
+
+	[default_center addObserver:self selector:@selector(push_updated_list:)
+			       name:@"PushNotification_updated_list" object:nil];
 
 	// Hook up generic message handlers
-	[[NSNotificationCenter defaultCenter] addObserver:self
-						 selector:@selector(lists_get_finished:)
-						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", lists_get]
-						   object:nil];
+	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", lists_get];
+	[default_center addObserver:self selector:@selector(lists_get_finished:)
+		name:notification_name object:nil];
 
-	[[NSNotificationCenter defaultCenter] addObserver:self
-						 selector:@selector(lists_get_other_finished:)
-						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", lists_get_other]
-						   object:nil];
+	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", lists_get_other];
+	[default_center addObserver:self selector:@selector(lists_get_other_finished:)
+		name:notification_name object:nil];
 
-	[[NSNotificationCenter defaultCenter] addObserver:self
-						 selector:@selector(finished_new_list_request:)
-						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_add]
-						   object:nil];
+	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_add];
+	[default_center addObserver:self selector:@selector(finished_new_list_request:)
+		name:notification_name object:nil];
 
-	[[NSNotificationCenter defaultCenter] addObserver:self
-						 selector:@selector(finished_join_list_request:)
-						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_join]
-						   object:nil];
+	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_join];
+	[default_center addObserver:self selector:@selector(finished_join_list_request:)
+		name:notification_name object:nil];
 
-	[[NSNotificationCenter defaultCenter] addObserver:self
-						 selector:@selector(finished_leave_list_request:)
-						     name:[NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_leave]
-						   object:nil];
+	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_leave];
+	[default_center addObserver:self selector:@selector(finished_leave_list_request:)
+		name:notification_name object:nil];
+
 
 	// display an Edit button in the navigation bar for this view controller
 	self.navigationItem.leftBarButtonItem = self.editButtonItem;
@@ -107,31 +104,19 @@
 	_address_book.main_tvc = self;
 }
 
-- (void) receiveNotification:(NSNotification *) notification
+// Handle 'friend_added_list' message from notification service
+- (void) push_friend_added_list:(NSNotification *) notification
 {
-	NSDictionary *userinfo = notification.userInfo;
+	NSDictionary *json_list = notification.userInfo;
 
-	// [notification name] should always be @"TestNotification"
-	// unless you use this method for observation of other notifications
-	// as well.
-
-	if ([[notification name] isEqualToString:@"MessageReceivedNotification"])
-		NSLog (@"Successfully received the test notification!");
+	// Server will only send back partial list information because this will
+	// always be put in the other lists section
+	SharedList *tmp = [self deserialize_light_list:json_list];
 
 	NSMutableArray *other_lists = [_lists objectAtIndex:1];
-
-	SharedList *tmp = [[SharedList alloc] init];
-	// tmp.num = list[@"num"];
-	tmp.num = [NSNumber numberWithInt:99];
-
-	// NSData *name_data = [list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
-	// tmp.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
-	tmp.name = @"Some new list from the outthere";
-
-	// tmp.members_phone_nums = list[@"members"];
 	[other_lists addObject:tmp];
 
-	NSLog(@"notify: adding other list '%@', num '%@'", tmp.name, tmp.num);
+	NSLog(@"notify: new other list '%@', num '%@'", tmp.name, tmp.num);
 
 	NSIndexPath *new_path = [NSIndexPath indexPathForRow:[other_lists count] - 1 inSection:1];
 	[self.tableView insertRowsAtIndexPaths:@[new_path] withRowAnimation:UITableViewRowAnimationAutomatic];
@@ -253,22 +238,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	[lists removeAllObjects];
 
 	for (NSDictionary *list in json_lists) {
-		SharedList *tmp = [[SharedList alloc] init];
-		tmp.num = list[@"num"];
-
-		// Convert incoming encoded UTF-8 into real UTF-8
-		NSData *name_data = [list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
-		tmp.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
-
-		NSNumber *date = list[@"date"];
-		if ([date intValue] != 0)
-			tmp.date = [NSDate dateWithTimeIntervalSince1970:[date floatValue]];
-		else
-			tmp.date = nil;
-
-		tmp.members_phone_nums = list[@"members"];
-		tmp.items_ready = list[@"items_complete"];
-		tmp.items_total = list[@"items_total"];
+		SharedList *tmp = [self deserialize_full_list:list];
 		[lists addObject:tmp];
 
 		NSLog(@"adding list '%@', num '%@'", tmp.name, tmp.num);
@@ -288,13 +258,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	[other_lists removeAllObjects];
 
 	for (NSDictionary *list in other_json_lists) {
-		SharedList *tmp = [[SharedList alloc] init];
-		tmp.num = list[@"num"];
-
-		NSData *name_data = [list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
-		tmp.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
-
-		tmp.members_phone_nums = list[@"members"];
+		SharedList *tmp = [self deserialize_light_list:list];
 		[other_lists addObject:tmp];
 
 		NSLog(@"adding other list '%@', num '%@'", tmp.name, tmp.num);
@@ -309,14 +273,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	NSDictionary *response = notification.userInfo;
 	NSDictionary *list = [response objectForKey:@"list"];
 
-	SharedList *shlist = [[SharedList alloc] init];
-	shlist.num = [list objectForKey:@"num"];
-	shlist.name = [list objectForKey:@"name"];
-
-	NSMutableArray *members = [list objectForKey:@"members"];
-	shlist.members_phone_nums = members;
-	shlist.items_ready = [list objectForKey:@"items_complete"];
-	shlist.items_total = [list objectForKey:@"items_total"];
+	SharedList *shlist = [self deserialize_full_list:list];
 
 	NSMutableArray *lists = [_lists objectAtIndex:0];
 	[lists addObject:shlist];
@@ -327,6 +284,44 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	[self.tableView insertRowsAtIndexPaths:@[index_path] withRowAnimation:UITableViewRowAnimationFade];
 
 	[self update_section_headers];
+}
+
+- (SharedList *) deserialize_full_list:(NSDictionary *)json_list
+{
+	SharedList *shlist = [[SharedList alloc] init];
+	shlist.num = [json_list objectForKey:@"num"];
+
+	// We need some careful decoding to get a usable Unicode string
+	NSData *name_data = [json_list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
+	shlist.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
+
+	NSNumber *date = json_list[@"date"];
+	if ([date intValue] != 0) {
+		shlist.date = [NSDate dateWithTimeIntervalSince1970:[date floatValue]];
+	}
+	else {
+		shlist.date = nil;
+	}
+
+	shlist.members_phone_nums = [json_list objectForKey:@"members"];
+	shlist.items_ready = [json_list objectForKey:@"items_complete"];
+	shlist.items_total = [json_list objectForKey:@"items_total"];
+
+	return shlist;
+}
+
+- (SharedList *) deserialize_light_list:(NSDictionary *)json_list
+{
+	SharedList *shlist = [[SharedList alloc] init];
+	shlist.num = [json_list objectForKey:@"num"];
+
+	// We need some careful decoding to get a usable Unicode string
+	NSData *name_data = [json_list[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
+	shlist.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
+
+	shlist.members_phone_nums = [json_list objectForKey:@"members"];
+
+	return shlist;
 }
 
 // major thing here is join list requests
@@ -352,8 +347,8 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 - (void) finished_join_list_request:(NSNotification *) notification
 {
 	NSDictionary *response = notification.userInfo;
-	NSDictionary *shlist = response[@"list"];
-	NSLog(@"network: joined list %@", shlist[@"num"]);
+	NSDictionary *json_list = response[@"list"];
+	NSLog(@"network: joined list %@", json_list[@"num"]);
 
 	NSMutableArray *lists = [_lists objectAtIndex:0];
 	NSMutableArray *other_lists = [_lists objectAtIndex:1];
@@ -361,7 +356,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	// Find the list number we received a response for
 	SharedList *needle = nil;
 	for (SharedList *temp in other_lists) {
-		if (temp.num == shlist[@"num"]) {
+		if (temp.num == json_list[@"num"]) {
 			needle = temp;
 			break;
 		}
@@ -371,12 +366,16 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 	if (needle == nil)
 		return;
 
-	// Swap between data structures first before moving rows
-	[lists addObject:needle];
+	// The server sent us a full list object, make sure to copy cell reference
+	SharedList *joined_list = [self deserialize_full_list:json_list];
+	joined_list.cell = needle.cell;
+
+	// Add completely new object to lists section and remove the old list
+	[lists addObject:joined_list];
 	[other_lists removeObject:needle];
 
 	// Get the cell index path from the matched list cell
-	NSIndexPath *orig_index_path = [self.tableView indexPathForCell:needle.cell];
+	NSIndexPath *orig_index_path = [self.tableView indexPathForCell:joined_list.cell];
 
 	// Compute new position and start moving row as soon as possible
 	// XXX: sorting
@@ -386,36 +385,20 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 	[self update_section_headers];
 
-	// Put any new values into data structs
-	NSData *name_data = [shlist[@"name"] dataUsingEncoding:NSISOLatin1StringEncoding];
-	needle.name = [[NSString alloc] initWithData:name_data encoding:NSUTF8StringEncoding];
-
-	NSNumber *date = shlist[@"date"];
-	if ([date intValue] != 0) {
-		needle.date = [NSDate dateWithTimeIntervalSince1970:[date floatValue]];
-	}
-	else {
-		needle.date = nil;
-	}
-
-	needle.items_ready = shlist[@"items_complete"];
-	needle.items_total = shlist[@"items_total"];
-	needle.num_members = shlist[@"num_members"];
-
-	needle.members_phone_nums = shlist[@"members"];
-	[self process_members_array:shlist[@"members"] cell:needle.cell];
+	// Update members in list row
+	[self process_members_array:joined_list.members_phone_nums cell:joined_list.cell];
 
 	// Add > accessory indicator
-	needle.cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+	joined_list.cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 
 	// Find fraction UILAbel, populate it and then show it
-	UILabel *fraction = (UILabel *)[needle.cell viewWithTag:4];
-	fraction.text = [self fraction:needle.items_ready denominator:needle.items_total];
+	UILabel *fraction = (UILabel *)[joined_list.cell viewWithTag:4];
+	fraction.text = [self fraction:joined_list.items_ready denominator:joined_list.items_total];
 	fraction.hidden = NO;
 
 	// Show date label if date has been set to something
-	if (needle.date != nil) {
-		UILabel *deadline_label = (UILabel *)[needle.cell viewWithTag:3];
+	if (joined_list.date != nil) {
+		UILabel *deadline_label = (UILabel *)[joined_list.cell viewWithTag:3];
 		deadline_label.hidden = NO;
 	}
 }
@@ -690,7 +673,7 @@ titleForHeaderInSection:(NSInteger)section
 		[segue.destinationViewController setMetadata:list];
 
 		// send update list items message
-		network_connection->shlist_ldvc = segue.destinationViewController;
+		// network_connection->shlist_ldvc = segue.destinationViewController;
 		//[network_connection send_message:6 contents:list.id];
 	}
 

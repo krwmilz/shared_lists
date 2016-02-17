@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	//"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net"
@@ -54,13 +55,11 @@ func process_client(c net.Conn, h http.Client) {
 	}
 
 	total_devices := len(notify_request.Devices)
+	log.Printf("sending message type '%s' to %d device(s)", notify_request.MsgType, total_devices)
 
 	if total_devices == 0 {
-		log.Print("request contained no devices to send to")
 		return
 	}
-
-	log.Print("msg type: ", notify_request.MsgType)
 
 	var badge Badge
 	badge.Count = 17
@@ -70,7 +69,8 @@ func process_client(c net.Conn, h http.Client) {
 	apn_request.Payload = notify_request.Payload
 	apn_request.MsgType = notify_request.MsgType
 
-	// Re-marshal the payload
+	// Create the POST request body, only needs to be done once because we
+	// send the same message to all devices
 	request_body, err := json.Marshal(apn_request)
 	if err != nil {
 		log.Printf("error re-marshaling payload:", err)
@@ -80,16 +80,16 @@ func process_client(c net.Conn, h http.Client) {
 	// APN documentation says this is where we request stuff from
 	base_url := "https://api.development.push.apple.com/3/device/"
 
-	// Send the same message to all devices
+	// Loop over all devices, check if they are ios and send a message
 	for i, d := range notify_request.Devices {
 
 		// Order defined by SQL statement in main server
-		os := d[0]
-		hex_token := d[1]
+		os, hex_token := d[0], d[1]
+		log_header := fmt.Sprintf("%3d %s", i + 1, hex_token)
 
+		// Filter out any non iOS devices
 		if os != "ios" {
-			// We don't send messages for non-iOS devices
-			log.Print(i, " skipping device with os ", d[0])
+			log.Printf("%s: not an ios device", log_header)
 			continue
 		}
 
@@ -100,7 +100,7 @@ func process_client(c net.Conn, h http.Client) {
 		// Make new POST request
 		req, err := http.NewRequest("POST", post_url, bytes.NewBuffer(request_body))
 		if err != nil {
-			log.Printf("error making new request:", err)
+			log.Printf("%s: new request error: %s", log_header, err)
 			continue
 		}
 
@@ -110,10 +110,10 @@ func process_client(c net.Conn, h http.Client) {
 		// Make request over existing transport
 		resp, err := h.Do(req)
 		if err != nil {
-			log.Printf("  %d/%d: %s", i + 1, total_devices, err)
+			log.Printf("%s: %s", log_header, err)
 			continue
 		}
-		log.Printf("  %d/%d: %s", i + 1, total_devices, resp.Status)
+		log.Printf("%s: %s", log_header, resp.Status)
 	}
 }
 
@@ -142,7 +142,7 @@ func main() {
 	go func(c chan os.Signal) {
 		// Wait for signal
 		sig := <-c
-		log.Printf("Caught signal %s: shutting down", sig)
+		log.Printf("caught signal %s: shutting down", sig)
 
 		l.Close()
 		os.Exit(0)

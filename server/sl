@@ -310,6 +310,7 @@ sub send_all {
 sub msg_device_add {
 	my ($db, $request) = @_;
 
+	# XXX: check that these exists first
 	my $ph_num = $request->{'phone_number'};
 	my $os = $request->{'os'};
 
@@ -361,22 +362,29 @@ sub msg_device_update {
 	return make_ok();
 }
 
+# Takes a device_id and a list structure and records this list in the database.
+# Also prepares an friend_added_list notification that should be sent to all my
+# mutual friends.
 sub msg_list_add {
 	my ($db, $request, $dev) = @_;
 
-	my $list = $request->{list};
-
 	# XXX: check that $list contains the necessary keys!
+	my $list = $request->{list};
 
 	$log->print("device '$dev->{fp}'\n");
 	$log->print("new list name '$list->{name}'\n");
 
 	my $now = time;
+	# Create new list, use null for primary key so the new row automatically
+	# gets the lowest numbered integer that isn't used
 	$db->{new_list}->execute($list->{name}, $list->{date}, $now, $now);
 	my $list_num = $db->{dbh}->last_insert_id("", "", "", "");
 
+	# Assign first reference count to the new list: the lists creator
 	$db->{new_list_member}->execute($list_num, $dev->{num}, $now);
 
+	# Send back a full list structure. Be extra careful about types here as
+	# this is serialized by encode_json and types in Perl can be... tricky.
 	my $resp_list = {
 		num => $list_num,
 		name => $list->{name},
@@ -396,6 +404,9 @@ sub msg_list_add {
 	$db->{mutual_friend_notify_select}->execute($dev->{num});
 	my $notify->{devices} = $db->{mutual_friend_notify_select}->fetchall_arrayref();
 
+	# Prepare a smaller list structure that will be sent to every device
+	# selected above. Their client shows your new lists in their other lists
+	# section, which doesn't need a lot of information.
 	$notify->{msg_type} = 'friend_added_list';
 	$notify->{payload} = {
 		num => $resp_list->{num},
@@ -622,15 +633,20 @@ sub msg_friend_delete {
 	return make_ok( { friend_phnum => $friend_phnum } );
 }
 
+# Takes no arguments and finds all of the lists that the given device_id is in.
+# Fills out complete list structures to send back.
+# This message doesn't send any notifications.
 sub msg_lists_get {
 	my ($db, $request, $dev) = @_;
 
 	$log->print("gathering lists for '$dev->{fp}'\n");
 
 	my @lists;
+	# Find all lists that this device number is a member of
 	$db->{get_lists}->execute($dev->{num});
 	while (my ($num, $name, $date) = $db->{get_lists}->fetchrow_array()) {
 
+		# Get the phone numbers of all the list members
 		$db->{list_members_phnums}->execute($num);
 		my $members_ref = $db->{list_members_phnums}->fetchall_arrayref();
 
@@ -781,16 +797,7 @@ sub get_device {
 		return ("a missing message argument was required");
 	}
 
-	my ($err, $device) = device_id_valid($db, $request->{'device_id'});
-	return ($err) if ($err);
-
-	# All good
-	return (undef, $device);
-}
-
-sub device_id_valid {
-	my ($db, $device_id) = @_;
-
+	my $device_id = $request->{'device_id'};
 	unless ($device_id && $device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
 		$log->print("bad device id\n");
 		return ('the client sent a device id that was not base64');

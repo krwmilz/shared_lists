@@ -11,6 +11,9 @@ fi
 perl -MDevel::Cover sl -p $PORT -t &
 server_pid=$!
 
+perl testd &
+testd_pid=$!
+
 passed=0
 failed=0
 count=0
@@ -29,6 +32,7 @@ for t in `ls tests/*/Makefile`; do
 done
 
 # Kill the server to flush all coverage data
+kill $testd_pid
 kill $server_pid
 wait
 

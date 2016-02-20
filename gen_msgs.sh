@@ -49,6 +49,7 @@ int protocol_version = $protocol_version;
 EOF
 
 	print_table $objc_path "enum msg_types {" "\$msg = \$i," "};"
+	print_table $objc_path "static const char *msg_strings[] = {" "\\\"\$msg\\\"," "};"
 }
 
 gen_java() {

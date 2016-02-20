@@ -1,4 +1,4 @@
-/* generated Tue Jan 26 00:51:55 MST 2016 */
+/* generated Sat Feb 20 15:18:31 MST 2016 */
 
 int protocol_version = 0;
 enum msg_types {
@@ -14,4 +14,18 @@ enum msg_types {
 	lists_get_other = 9,
 	list_items_get = 10,
 	list_item_add = 11,
+};
+static const char *msg_strings[] = {
+	"device_add",
+	"device_update",
+	"friend_add",
+	"friend_delete",
+	"list_add",
+	"list_update",
+	"list_join",
+	"list_leave",
+	"lists_get",
+	"lists_get_other",
+	"list_items_get",
+	"list_item_add",
 };

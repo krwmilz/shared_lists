@@ -55,27 +55,23 @@
 	CFWriteStreamRef writeStream;
 
 	CFStringRef host_name = CFSTR("absentmindedproductions.ca");
-
 	CFStreamCreatePairWithSocketToHost(NULL, host_name, 9999, &readStream, &writeStream);
-	inputShlistStream = (__bridge NSInputStream *)readStream;
-	outputShlistStream = (__bridge NSOutputStream *)writeStream;
 
-	[inputShlistStream setDelegate:self];
-	[outputShlistStream setDelegate:self];
+	input_stream = (__bridge NSInputStream *)readStream;
+	output_stream = (__bridge NSOutputStream *)writeStream;
 
-	[inputShlistStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-	[outputShlistStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+	[input_stream setDelegate:self];
+	[output_stream setDelegate:self];
+
+	[input_stream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+	[output_stream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
 
 	// Enable SSL on both streams
-	[inputShlistStream setProperty:NSStreamSocketSecurityLevelTLSv1 forKey:NSStreamSocketSecurityLevelKey];
-	[outputShlistStream setProperty:NSStreamSocketSecurityLevelTLSv1 forKey:NSStreamSocketSecurityLevelKey];
+	[input_stream setProperty:NSStreamSocketSecurityLevelTLSv1 forKey:NSStreamSocketSecurityLevelKey];
+	[output_stream setProperty:NSStreamSocketSecurityLevelTLSv1 forKey:NSStreamSocketSecurityLevelKey];
 
-	[inputShlistStream open];
-	[outputShlistStream open];
-
-	NSLog(@"network: connect()");
-	connected = 1;
-	[[NSNotificationCenter defaultCenter] postNotificationName:@"NetworkConnectedNotification" object:nil userInfo:nil];
+	[input_stream open];
+	[output_stream open];
 }
 
 - (void) disconnect
@@ -84,16 +80,16 @@
 	connected = 0;
 	[[NSNotificationCenter defaultCenter] postNotificationName:@"NetworkDisconnectedNotification" object:nil userInfo:nil];
 
-	[inputShlistStream close];
-	[outputShlistStream close];
+	[input_stream close];
+	[output_stream close];
 
-	[inputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
+	[input_stream removeFromRunLoop:[NSRunLoop currentRunLoop]
 				     forMode:NSDefaultRunLoopMode];
-	[outputShlistStream removeFromRunLoop:[NSRunLoop currentRunLoop]
+	[output_stream removeFromRunLoop:[NSRunLoop currentRunLoop]
 				      forMode:NSDefaultRunLoopMode];
 
-	inputShlistStream = nil; // stream is ivar, so reinit it
-	outputShlistStream = nil; // stream is ivar, so reinit it
+	input_stream = nil; // stream is ivar, so reinit it
+	output_stream = nil; // stream is ivar, so reinit it
 }
 
 - (bool) load_device_id:(NSString *)phone_number;
@@ -113,44 +109,21 @@
 	}
 
 	// no device id file found, send a registration message
-	NSMutableData *msg = [NSMutableData data];
-
-	NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+	NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
 				 phone_number, @"phone_number",
 				 @"ios", @"os",
 				 nil];
+	[self send_message:device_add contents:request];
 
-	NSError *error = nil;
-	NSData *json = [NSJSONSerialization dataWithJSONObject:request options:0 error:&error];
-	if (error != nil) {
-		NSLog(@"%@", [error userInfo]);
-		return false;
-	}
-
-	uint16_t version = htons(0);
-	uint16_t msg_type = htons(device_add);
-	uint16_t length = htons([json length]);
-	[msg appendBytes:&version length:2];
-	[msg appendBytes:&msg_type length:2];
-	[msg appendBytes:&length length:2];
-
-	// Append JSON payload
-	[msg appendData:json];
-
-	[outputShlistStream write:[msg bytes] maxLength:[msg length]];
-	NSLog(@"register: sent request");
-
-	// we don't have a device id so we can't do anything yet
 	return false;
 }
 
 - (bool) send_message:(uint16_t)send_msg_type contents:(NSMutableDictionary *)request
 {
-	if (!connected)
-		[self connect];
-
-	// Append 'device_id' to all message requests sent through this function
-	[request setObject:device_id forKey:@"device_id"];
+	if (send_msg_type != device_add) {
+		// Append 'device_id' to all message types except device_add
+		[request setObject:device_id forKey:@"device_id"];
+	}
 
 	NSError *error = nil;
 	// Try to serialize request, bail if errors
@@ -172,20 +145,10 @@
 	[msg appendBytes:&length length:2];
 	[msg appendData:json];
 
-	NSLog(@"network: send_message: type %i, %i bytes",
-		send_msg_type, [msg length]);
+	NSLog(@"network: send_message: type %i, %lu bytes",
+		send_msg_type, (unsigned long)[msg length]);
 
-	if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
-		NSLog(@"network: write error occurred, trying reconnect");
-		if (connected)
-			[self disconnect];
-		[self connect];
-
-		if ([outputShlistStream write:[msg bytes] maxLength:[msg length]] == -1) {
-			NSLog(@"network: resend failed after reconnect, giving up");
-			return false;
-		}
-	}
+	[output_stream write:[msg bytes] maxLength:[msg length]];
 
 	// sent successfully
 	return true;
@@ -194,10 +157,10 @@
 - (void)stream:(NSStream *)stream handleEvent:(NSStreamEvent)eventCode
 {
 	NSString *stream_name;
-	if (stream == inputShlistStream)
-		stream_name = @"input";
-	else if (stream == outputShlistStream)
-		stream_name = @"output";
+	if (stream == input_stream)
+		stream_name = @"input stream";
+	else if (stream == output_stream)
+		stream_name = @"output stream";
 
 	switch (eventCode) {
 	case NSStreamEventNone: {
@@ -206,39 +169,41 @@
 	}
 	case NSStreamEventOpenCompleted: {
 		NSLog(@"network: %@ opened", stream_name);
+
+		connected = 1;
+		[[NSNotificationCenter defaultCenter] postNotificationName:@"NetworkConnectedNotification" object:nil userInfo:nil];
 		break;
 	}
 	case NSStreamEventHasBytesAvailable: {
-		NSLog(@"network: %@ has bytes available", stream_name);
+		// NSLog(@"network: %@ has bytes available", stream_name);
 
-		if (stream == inputShlistStream) {
-			if (![inputShlistStream hasBytesAvailable]) {
-				NSLog(@"read: input stream had no bytes available");
-				break;
-			}
-
-			[self read_ready];
+		if (stream != input_stream) {
+			break;
 		}
+
+		// Read an entire message, header + payload
+		[self read_ready];
+
 		break;
 	}
 	case NSStreamEventHasSpaceAvailable: {
-		NSLog(@"network: %@ has space available", stream_name);
+		// NSLog(@"network: %@ has space available", stream_name);
 		break;
 	}
 	case NSStreamEventErrorOccurred: {
 		// happens when trying to connect to a down server
 		NSStream *error_stream;
-		if (stream == inputShlistStream)
-			error_stream = inputShlistStream;
-		else if (stream == outputShlistStream)
-			error_stream = outputShlistStream;
+		if (stream == input_stream)
+			error_stream = input_stream;
+		else if (stream == output_stream)
+			error_stream = output_stream;
 		else
 			// don't try to do operations on null stream
 			break;
 
 		NSError *theError = [error_stream streamError];
-		NSLog(@"network: %@", [NSString stringWithFormat:@"%@ error %i: %@",
-				stream_name, [theError code], [theError localizedDescription]]);
+		NSLog(@"network: %@", [NSString stringWithFormat:@"%@ error %li: %@",
+				stream_name, (long)[theError code], [theError localizedDescription]]);
 
 		[self disconnect];
 
@@ -255,20 +220,20 @@
 	}
 }
 
+// Try to read and parse an entire message. If the messsage type isn't device_add,
+// then send a notification to the classes responsible
 - (void) read_ready
 {
-	NSInteger buffer_len;
+	// Read header
 	uint16_t header[3];
+	[self read_all:(uint8_t *)header size:6];
 
-	buffer_len = [inputShlistStream read:(uint8_t *)header maxLength:6];
-	if (buffer_len != 6) {
-		NSLog(@"read: didn't return 6 bytes");
-	}
-
+	// Unpack header
 	uint16_t version = ntohs(header[0]);
 	uint16_t msg_type = ntohs(header[1]);
 	uint16_t payload_size = ntohs(header[2]);
 
+	// Verify header
 	if (version != 0) {
 		NSLog(@"read: invalid version %i", version);
 		return;
@@ -278,20 +243,16 @@
 		return;
 	}
 
+	// Read payload, accept up to 64KB of data
 	uint8_t *payload = malloc(payload_size);
+	[self read_all:payload size:payload_size];
+	NSLog(@"read: payload is %i bytes", payload_size);
 
-	// Accept up to 64KB of data, the maximum size of payload_size
-	buffer_len = [inputShlistStream read:payload maxLength:payload_size];
-	if (buffer_len != payload_size) {
-		NSLog(@"read: expected %i byte payload but got %i", payload_size, buffer_len);
-		return;
-	}
-	NSLog(@"read: payload is %i bytes", buffer_len);
-
+	// Create new NSData wrapper around the payload bytes
 	NSData *data = [NSData dataWithBytesNoCopy:payload length:payload_size];
 
 	NSError *error = nil;
-	// Try to parse payload and check for errors
+	// Try to parse the payload as JSON, check for errors
 	NSDictionary *response = [NSJSONSerialization JSONObjectWithData:data
 		options:0 error:&error];
 	if (error) {
@@ -324,9 +285,22 @@
 		return;
 	}
 
-	// Send a generic notification, these have to be hooked up to work
-	NSString *notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", msg_type];
+	// Send out a notification that a response was received. The responsible
+	// parties should already be listening for these by the time they come in.
+	NSString *notification_name = [NSString stringWithFormat:@"NetworkResponseFor_%s", msg_strings[msg_type]];
 	[[NSNotificationCenter defaultCenter] postNotificationName:notification_name object:nil userInfo:response];
+}
+
+// Read a fixed amount of bytes
+- (NSInteger) read_all:(uint8_t *)data size:(unsigned int)size
+{
+	NSInteger buffer_len = [input_stream read:data maxLength:size];
+	if (buffer_len != size) {
+		NSLog(@"read_all: read %ld instead of %d bytes", (long)buffer_len, size);
+		return buffer_len;
+	}
+
+	return buffer_len;
 }
 
 - (void) dealloc

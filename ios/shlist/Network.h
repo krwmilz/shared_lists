@@ -3,8 +3,8 @@
 #import "MsgTypes.h"
 
 @interface Network : NSObject <NSStreamDelegate> {
-	NSInputStream *inputShlistStream;
-	NSOutputStream *outputShlistStream;
+	NSInputStream *input_stream;
+	NSOutputStream *output_stream;
 }
 
 - (void) connect;

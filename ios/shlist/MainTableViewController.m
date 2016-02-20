@@ -43,32 +43,25 @@
 	[default_center addObserver:self selector:@selector(push_updated_list:)
 			       name:@"PushNotification_updated_list" object:nil];
 
-	// Hook up generic message handlers
-	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", lists_get];
-	[default_center addObserver:self selector:@selector(lists_get_finished:)
-		name:notification_name object:nil];
+	const SEL selectors[] = {
+		@selector(lists_get_finished:),
+		@selector(lists_get_other_finished:),
+		@selector(finished_new_list_request:),
+		@selector(finished_join_list_request:),
+		@selector(finished_leave_list_request:)
+	};
+	NSUInteger count = 0;
 
-	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", lists_get_other];
-	[default_center addObserver:self selector:@selector(lists_get_other_finished:)
-		name:notification_name object:nil];
-
-	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_add];
-	[default_center addObserver:self selector:@selector(finished_new_list_request:)
-		name:notification_name object:nil];
-
-	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_join];
-	[default_center addObserver:self selector:@selector(finished_join_list_request:)
-		name:notification_name object:nil];
-
-	notification_name = [NSString stringWithFormat:@"NetworkResponseForMsgType%i", list_leave];
-	[default_center addObserver:self selector:@selector(finished_leave_list_request:)
-		name:notification_name object:nil];
-
+	// This object handles responses for these types of messages
+	for (id str in @[@"lists_get", @"lists_get_other", @"list_add", @"list_join", @"list_leave"]) {
+		notification_name = [NSString stringWithFormat:@"NetworkResponseFor_%@", str];
+		[default_center addObserver:self selector:selectors[count] name:notification_name object:nil];
+		count++;
+	}
 
 	// display an Edit button in the navigation bar for this view controller
 	self.navigationItem.leftBarButtonItem = self.editButtonItem;
 
-	// there's a race here when assigning self
 	network_connection = [Network shared_network_connection];
 
 	_lists = [[NSMutableArray alloc] init];
@@ -227,7 +220,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 {
 }
 
-- (void) lists_get_finished:(NSNotification *)notification;
+- (void) lists_get_finished:(NSNotification *)notification
 {
 	NSDictionary *response = notification.userInfo;
 
@@ -252,7 +245,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 {
 	NSDictionary *response = notification.userInfo;
 	NSArray *other_json_lists = [response objectForKey:@"other_lists"];
-	NSLog(@"lists_get_other: got %i other lists from server", [other_json_lists count]);
+	NSLog(@"lists_get_other: got %lu other lists from server", (unsigned long)[other_json_lists count]);
 
 	NSMutableArray *other_lists = [_lists objectAtIndex:1];
 	[other_lists removeAllObjects];
@@ -510,14 +503,14 @@ titleForHeaderInSection:(NSInteger)section
 	UITableViewCell *cell;
 	cell = [tableView dequeueReusableCellWithIdentifier:@"SharedListPrototypeCell" forIndexPath:indexPath];
 
-	int section = [indexPath section];
-	int row = [indexPath row];
+	NSInteger section = [indexPath section];
+	NSInteger row = [indexPath row];
 	SharedList *shared_list = [[_lists objectAtIndex:section] objectAtIndex:row];
 
 	UILabel *deadline_label = (UILabel *)[cell viewWithTag:3];
 	UILabel *fraction_label = (UILabel *)[cell viewWithTag:4];
 
-	if ([indexPath section] == 0) {
+	if (section == 0) {
 		// your lists section
 
 		if (shared_list.date == nil) {
@@ -539,7 +532,7 @@ titleForHeaderInSection:(NSInteger)section
 		cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 
 	}
-	else if ([indexPath section] == 1) {
+	else if (section == 1) {
 		// "other lists" section
 
 		// no deadline

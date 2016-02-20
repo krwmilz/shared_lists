@@ -76,8 +76,8 @@
 - (UITableViewCell *)tableView:(UITableView *)tableView
 	 cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	int section = [indexPath section];
-	int row = [indexPath row];
+	NSInteger section = [indexPath section];
+	NSInteger row = [indexPath row];
 	Contact *contact = [[_cells objectAtIndex:section] objectAtIndex:row];
 
 	UITableViewCell *cell;
@@ -117,8 +117,8 @@
 - (void)tableView:(UITableView *)tableView
 	didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
-	int section = [indexPath section];
-	int row = [indexPath row];
+	NSInteger section = [indexPath section];
+	NSInteger row = [indexPath row];
 
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
 
@@ -142,8 +142,8 @@
 		[cell setAccessoryType:UITableViewCellAccessoryNone];
 	}
 
-	NSLog(@"info: selected %@ %@ who has %i phone numbers",
-	      contact.first_name, contact.last_name, [contact.phone_numbers count]);
+	NSLog(@"info: selected %@ %@ who has %lu phone numbers",
+	      contact.first_name, contact.last_name, (unsigned long)[contact.phone_numbers count]);
 }
 
 // programatically assign section headers, in this case they're letters

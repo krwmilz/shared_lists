@@ -22,8 +22,6 @@
 		27C70F301B33F4FA00DADEB3 /* MainTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27C70F2F1B33F4FA00DADEB3 /* MainTableViewController.m */; };
 		27D805731BA2649D00867494 /* ContactsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27D805721BA2649D00867494 /* ContactsTableViewController.m */; };
 		27D83D2A1BAFC99D0029F54B /* EditTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27D83D291BAFC99D0029F54B /* EditTableViewController.m */; };
-		27DCC9DE1B8A98D400207340 /* dollar103-2.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9DD1B8A98D400207340 /* dollar103-2.png */; };
-		27DCC9E81B9EB4E800207340 /* information15-3.png in Resources */ = {isa = PBXBuildFile; fileRef = 27DCC9E71B9EB4E800207340 /* information15-3.png */; };
 		27DCC9EB1B9FF89E00207340 /* AddressBook.m in Sources */ = {isa = PBXBuildFile; fileRef = 27DCC9EA1B9FF89E00207340 /* AddressBook.m */; };
 		BF7776B91B38928D00526CB0 /* ListTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = BF7776B81B38928D00526CB0 /* ListTableViewController.m */; };
 /* End PBXBuildFile section */
@@ -68,8 +66,6 @@
 		27D805721BA2649D00867494 /* ContactsTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ContactsTableViewController.m; sourceTree = SOURCE_ROOT; };
 		27D83D281BAFC99D0029F54B /* EditTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EditTableViewController.h; sourceTree = "<group>"; };
 		27D83D291BAFC99D0029F54B /* EditTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = EditTableViewController.m; sourceTree = "<group>"; };
-		27DCC9DD1B8A98D400207340 /* dollar103-2.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "dollar103-2.png"; path = "../../../Downloads/dollar103-2.png"; sourceTree = "<group>"; };
-		27DCC9E71B9EB4E800207340 /* information15-3.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "information15-3.png"; path = "../../../Downloads/information15-3.png"; sourceTree = "<group>"; };
 		27DCC9E91B9FF89E00207340 /* AddressBook.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AddressBook.h; sourceTree = "<group>"; };
 		27DCC9EA1B9FF89E00207340 /* AddressBook.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AddressBook.m; sourceTree = "<group>"; };
 		BF7776B71B38928D00526CB0 /* ListTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListTableViewController.h; sourceTree = "<group>"; };
@@ -126,13 +122,11 @@
 				27D805721BA2649D00867494 /* ContactsTableViewController.m */,
 				27C70F281B33CE2500DADEB3 /* DataStructures.h */,
 				27C70F291B33D1C900DADEB3 /* DataStructures.m */,
-				27DCC9DD1B8A98D400207340 /* dollar103-2.png */,
 				27AAC22A1B50ABAF00D99171 /* EditItemTableViewController.h */,
 				27AAC22B1B50ABAF00D99171 /* EditItemTableViewController.m */,
 				27D83D281BAFC99D0029F54B /* EditTableViewController.h */,
 				27D83D291BAFC99D0029F54B /* EditTableViewController.m */,
 				27C70F0F1B32AF8000DADEB3 /* Images.xcassets */,
-				27DCC9E71B9EB4E800207340 /* information15-3.png */,
 				27C70F111B32AF8000DADEB3 /* LaunchScreen.xib */,
 				BF7776B71B38928D00526CB0 /* ListTableViewController.h */,
 				BF7776B81B38928D00526CB0 /* ListTableViewController.m */,
@@ -259,9 +253,7 @@
 			files = (
 				27C70F0E1B32AF8000DADEB3 /* Main.storyboard in Resources */,
 				27C70F131B32AF8000DADEB3 /* LaunchScreen.xib in Resources */,
-				27DCC9E81B9EB4E800207340 /* information15-3.png in Resources */,
 				27C70F101B32AF8000DADEB3 /* Images.xcassets in Resources */,
-				27DCC9DE1B8A98D400207340 /* dollar103-2.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

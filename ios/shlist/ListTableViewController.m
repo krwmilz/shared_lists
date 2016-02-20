@@ -170,9 +170,9 @@
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
 {
 	if (section == 0)
-		return [NSString stringWithFormat:@"Shared Items (%i)", [_list_items count]];
+		return [NSString stringWithFormat:@"Shared Items (%lu)", (unsigned long)[_list_items count]];
 	else if (section == 1)
-		return [NSString stringWithFormat:@"Private Items (%i)", [_private_items count]];
+		return [NSString stringWithFormat:@"Private Items (%lu)", (unsigned long)[_private_items count]];
 	return @"";
 }
 

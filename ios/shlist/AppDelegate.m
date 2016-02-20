@@ -38,7 +38,9 @@
 
 	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
 	[request setObject:hex_token forKey:@"pushtoken_hex"];
-	[network_connection send_message:device_update contents:request];
+	if ([network_connection get_device_id] != nil) {
+		[network_connection send_message:device_update contents:request];
+	}
 }
 
 // Called when push notification received
@@ -96,7 +98,9 @@
 	// background.
 
 	NSLog(@"info: app: entering foreground, reconnecting...");
-	[network_connection send_message:lists_get contents:[[NSMutableDictionary alloc] init]];
+	[network_connection connect];
+	//[network_connection send_message:lists_get contents:[[NSMutableDictionary alloc] init]];
+	//[network_connection send_message:lists_get_other contents:[[NSMutableDictionary alloc] init]];
 }
 
 - (void) applicationDidBecomeActive:(UIApplication *)application

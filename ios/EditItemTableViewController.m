@@ -123,7 +123,7 @@
 	[buffer appendData:[[string_array componentsJoinedByString:@":"] dataUsingEncoding:NSUTF8StringEncoding]];
 
 	// the list item that was just edited will be updated when a response comes
-	[network_connection send_message:7 contents:buffer];
+	//[network_connection send_message:7 contents:buffer];
 
 	NSLog(@"debug: %@: %@: saving", _list.name, _item.name);
 }

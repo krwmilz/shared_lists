@@ -119,7 +119,7 @@ func process_client(c net.Conn, h http.Client) {
 
 func main() {
 	// These keys are provided by Apple through their Developer program
-	cert, err := tls.LoadX509KeyPair("ssl/aps.pem", "ssl/aps.key")
+	cert, err := tls.LoadX509KeyPair("certs/aps.pem", "certs/aps.key")
 	if err != nil {
 		log.Fatalf("loadkeys: %s", err)
 	}

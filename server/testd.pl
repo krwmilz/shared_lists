@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 use warnings;
 use strict;
+$| = 1;
 
 use Data::Dumper;
 use IO::Socket::UNIX;

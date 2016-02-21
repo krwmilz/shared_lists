@@ -16,7 +16,7 @@ fi
 perl -T sl -p $PORT -t > server.log &
 server_pid=$!
 
-perl testd &
+perl testd.pl > testd.log &
 testd_pid=$!
 
 ok=0
@@ -27,17 +27,20 @@ for t in `LC_ALL=C ls tests/*/Makefile`; do
 	count=`expr $count + 1`
 	test_dir=`dirname ${t}`
 	> server.log
+	> testd.log
 
 	# run test, complain if it failed
 	if ! make -s -C $test_dir test; then
 		printf "%3s %s: $red%s$reset\n" $count $test_dir "test failed"
 		test_failed=$((test_failed + 1))
 		> server.log
+		> testd.log
 		continue
 	fi
 
 	# copy server log aside for diff'ing
 	cp server.log $test_dir/server.log
+	cp testd.log $test_dir/testd.log
 
 	# diff the server's output log
 	if ! make -s -C $test_dir diff; then

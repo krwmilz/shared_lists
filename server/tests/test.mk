@@ -29,4 +29,4 @@ diff: process-server-log
 endif
 
 clean:
-	rm -f server.log
+	rm -f server.log testd.log

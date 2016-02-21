@@ -11,7 +11,7 @@ fi
 perl -MDevel::Cover sl -p $PORT -t &
 server_pid=$!
 
-perl testd &
+perl testd.pl &
 testd_pid=$!
 
 passed=0

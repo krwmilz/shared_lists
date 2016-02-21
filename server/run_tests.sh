@@ -23,7 +23,7 @@ ok=0
 test_failed=0
 diff_failed=0
 count=0
-for t in `LC_ALL=C ls tests/*/Makefile`; do
+for t in `LC_ALL=C ls t/*/Makefile`; do
 	count=`expr $count + 1`
 	test_dir=`dirname ${t}`
 	> server.log

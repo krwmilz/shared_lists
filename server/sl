@@ -106,7 +106,7 @@ while (my $client_socket = $server_socket->accept()) {
 		# 'device_id' in the request. Check that here.
 		my $device = undef;
 		if ($msg_type != $msg_num{device_add}) {
-			(my $err, $device) = get_device($db, $request);
+			(my $err, $device) = get_device($db, $request->{device_id});
 
 			if ($err) {
 				send_msg($client_socket, $ver, $msg_type, make_error($err));
@@ -118,7 +118,7 @@ while (my $client_socket = $server_socket->accept()) {
 		# Call appropriate message handler. Each handler returns both
 		# data that should be sent back over the main socket and
 		# notification data that gets sent over vendor specific API.
-		my ($response, $notify) = $msg_func[$msg_type]->($db, $request, $device);
+		my ($response, $notify) = $msg_func[$msg_type]->($db, $request->{data}, $device);
 
 		$db->{dbh}->commit;
 		if ($@) {
@@ -157,14 +157,13 @@ while (my $client_socket = $server_socket->accept()) {
 
 # Takes a request and verifies device_id is present and valid
 sub get_device {
-	my ($db, $request) = @_;
+	my ($db, $device_id) = @_;
 
-	unless (exists $request->{'device_id'}) {
+	unless (defined $device_id) {
 		$log->print("bad request, missing key 'device_id'\n");
 		return ("a missing message argument was required");
 	}
 
-	my $device_id = $request->{'device_id'};
 	unless ($device_id && $device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
 		$log->print("bad device id\n");
 		return ('the client sent a device id that was not base64');
@@ -375,7 +374,7 @@ sub msg_device_add {
 	$db->{new_device}->execute($device_id, $ph_num, $os, undef, time, time);
 	$log->print("success, '$ph_num':'$fp' os '$os'\n");
 
-	return (make_ok( { device_id => $device_id } ), undef);
+	return (make_ok( { data => $device_id } ), undef);
 }
 
 # 'device_update' message handler. Takes a device_id and a token and updates the
@@ -389,17 +388,16 @@ sub msg_device_update {
 	$db->{update_device}->execute($hex_token, $dev->{num});
 	# $log->print("push token = '$hex_token'\n");
 
-	return make_ok();
+	return make_ok( { data => {} });
 }
 
 # Takes a device_id and a list structure and records this list in the database.
 # Also prepares an friend_added_list notification that should be sent to all my
 # mutual friends.
 sub msg_list_add {
-	my ($db, $request, $dev) = @_;
+	my ($db, $list, $dev) = @_;
 
 	# XXX: check that $list contains the necessary keys!
-	my $list = $request->{list};
 
 	$log->print("device '$dev->{fp}'\n");
 	$log->print("new list name '$list->{name}'\n");
@@ -424,7 +422,7 @@ sub msg_list_add {
 		members => [ $dev->{phnum} ],
 		num_members => 1
 	};
-	my $response = make_ok( { list => $resp_list } );
+	my $response = make_ok( { data => $resp_list } );
 
 	$log->print("new list number is '$list_num'\n");
 
@@ -438,7 +436,7 @@ sub msg_list_add {
 	# selected above. Their client shows your new lists in their other lists
 	# section, which doesn't need a lot of information.
 	$notify->{msg_type} = 'friend_added_list';
-	$notify->{payload} = {
+	$notify->{data} = {
 		num => $resp_list->{num},
 		name => $list->{name},
 		members => [ $dev->{phnum} ],
@@ -449,9 +447,7 @@ sub msg_list_add {
 }
 
 sub msg_list_update {
-	my ($db, $request, $dev) = @_;
-
-	my $list = $request->{'list'};
+	my ($db, $list, $dev) = @_;
 
 	my ($err) = list_number_valid($db, $list->{num});
 	return make_error($err) if ($err);
@@ -475,7 +471,7 @@ sub msg_list_update {
 	$notify->{devices} = [@{ $mutual_friends }, @{ $list_members }];
 
 	$notify->{msg_type} = 'updated_list';
-	$notify->{payload} = {
+	$notify->{data} = {
 		num => $list->{num},
 		name => $list->{name},
 		date => $list->{date}
@@ -488,7 +484,7 @@ sub msg_list_update {
 	$log->print("name = '$list->{name}'\n") if (exists $list->{name});
 	$log->print("date = $list->{date}\n") if (exists $list->{date});
 
-	return (make_ok(), $notify);
+	return (make_ok( { data => {} } ), $notify);
 }
 
 sub msg_list_item_add {
@@ -511,8 +507,7 @@ sub msg_list_item_add {
 }
 
 sub msg_list_join {
-    my ($db, $request, $dev) = @_;
-    my $list_num = $request->{list_num};
+    my ($db, $list_num, $dev) = @_;
 
     my ($list_err, $list_num_num, $list_name, $list_date) = list_number_valid($db, $list_num);
     return make_error($list_err) if ($list_err);
@@ -546,12 +541,11 @@ sub msg_list_join {
     $log->print("device '$dev->{fp}'\n");
     $log->print("list '$list_num'\n");
 
-    return make_ok( { list => $list } );
+    return make_ok( { data => $list } );
 }
 
 sub msg_list_leave {
-    my ($db, $request, $dev) = @_;
-    my $list_num = $request->{list_num};
+    my ($db, $list_num, $dev) = @_;
 
     my ($err) = list_number_valid($db, $list_num);
     return make_error($err) if ($err);
@@ -587,12 +581,11 @@ sub msg_list_leave {
     $log->print("device '$dev->{fp}'\n");
     $log->print("list '$list_num'\n");
 
-    return make_ok($response);
+    return make_ok( { data => $response } );
 }
 
 sub msg_friend_add {
-	my ($db, $request, $dev) = @_;
-	my $friend_phnum = $request->{'friend_phnum'};
+	my ($db, $friend_phnum, $dev) = @_;
 
 	$log->print("'$dev->{fp}' adding '$friend_phnum'\n");
 
@@ -629,12 +622,11 @@ sub msg_friend_add {
 		}
 	}
 
-	return make_ok( { friend_phnum => $friend_phnum } );
+	return make_ok( { data => $friend_phnum } );
 }
 
 sub msg_friend_delete {
-	my ($db, $request, $dev) = @_;
-	my $friend_phnum = $request->{'friend_phnum'};
+	my ($db, $friend_phnum, $dev) = @_;
 
 	unless (looks_like_number($friend_phnum)) {
 		$log->print("bad friends number '$friend_phnum'\n");
@@ -660,7 +652,7 @@ sub msg_friend_delete {
 		$db->{mutual_friends_delete}->execute($friend_num, $dev->{num});
 	}
 
-	return make_ok( { friend_phnum => $friend_phnum } );
+	return make_ok( { data => $friend_phnum } );
 }
 
 # Takes no arguments and finds all of the lists that the given device_id is in.
@@ -700,7 +692,7 @@ sub msg_lists_get {
 		$log->print("list has 0 items\n");
 	}
 
-	return make_ok({ lists => \@lists, num_lists => scalar(@lists) });
+	return make_ok( { data => \@lists} );
 }
 
 sub msg_lists_get_other {
@@ -743,11 +735,7 @@ sub msg_lists_get_other {
 	}
 
 	my @other_lists = values(%list_nums);
-	my $response = {
-		other_lists => \@other_lists,
-		num_other_lists => scalar(@other_lists)
-	};
-	return make_ok($response);
+	return make_ok( { data => \@other_lists } );
 }
 
 sub msg_list_items_get {

@@ -6,12 +6,12 @@ use test;
 
 my $A = client->new();
 
-$A->list_add('this list was made for leaving');
-$A->list_leave($A->lists(0)->{num});
+my $list = $A->list_add({ name => 'this list was made for leaving', date => 0 });
+$A->list_leave($list->{num});
 
 # verify we don't get this list back when requesting all lists
-my @lists = $A->lists_get();
-my @other_lists = $A->lists_get_other();
+my $num_lists = scalar( @{ $A->lists_get() } );
+my $num_other_lists = scalar(@{ $A->lists_get_other() });
 
-fail_num_ne 'wrong number of lists ', scalar @lists, 0;
-fail_num_ne 'wrong number of other lists ', scalar @other_lists, 0;
+fail_num_ne 'wrong number of lists ',$num_lists, 0;
+fail_num_ne 'wrong number of other lists ', $num_other_lists, 0;

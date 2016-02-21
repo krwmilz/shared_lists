@@ -7,4 +7,11 @@ list_add: new list number is <digits>
 list_add: device <base64>
 list_add: new list name <digits>
 list_add: new list number is <digits>
+lists_get: gathering lists for <base64>
+lists_get: found list <digits>:<string>
+lists_get: list has 1 members
+lists_get: list has 0 items
+lists_get: found list <digits>:<digits>
+lists_get: list has 1 members
+lists_get: list has 0 items
 disconnected!

@@ -13,11 +13,10 @@ $A->friend_add($B->phnum());
 $B->friend_add($A->phnum());
 
 # A adds a new list
-$A->list_add('this is a new list that B can see');
-my $as_list = $A->lists(0);
+my $as_list = $A->list_add({ name => 'this is a new list that B can see', date => 0 });
 
 # Check that B can see As list
-my @other_lists = $B->lists_get_other();
+my @other_lists = @{ $B->lists_get_other() };
 fail_msg_ne $other_lists[0]->{name}, $as_list->{'name'};
 fail_msg_ne $other_lists[0]->{num}, $as_list->{'num'};
 fail_num_ne 'wrong number of list members', $other_lists[0]->{num_members}, 1;

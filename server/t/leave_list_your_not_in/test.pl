@@ -10,8 +10,8 @@ use test;
 my $A = client->new();
 my $B = client->new();
 
-$A->list_add('only a can see this list');
+my $list = $A->list_add({ name => 'only a can see this list', date => 0 });
 
 # Who knows how B got this list id, but he did
-$B->list_leave($A->lists(0)->{num}, 'err');
-fail_msg_ne 'the client was not a member of the list', $B->get_error();
+my $err = $B->list_leave($list->{num}, 'err');
+fail_msg_ne 'the client was not a member of the list', $err;

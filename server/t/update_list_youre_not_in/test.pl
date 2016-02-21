@@ -9,9 +9,9 @@ my $A = client->new();
 my $B = client->new();
 
 # A adds a new list
-$A->list_add('this is a new list for a');
-my $list_num = $A->lists(0)->{num};
+my $list = $A->list_add({ name => 'this is a new list for a', date => 0 });
 
 # B tries to update A's list without joining it first
-$B->list_update({ num => $list_num, name => 'some new name', date => 1 }, 'err');
-fail_msg_ne 'client tried to update a list it was not in', $B->get_error();
+my $request = { num => $list->{num}, name => 'some new name', date => 1 };
+my $err = $B->list_update($request, 'err');
+fail_msg_ne 'client tried to update a list it was not in', $err;

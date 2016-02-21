@@ -7,9 +7,7 @@ use test;
 # Test that a message greater than 65KB doesn't get sent
 
 my $A = client->new();
-for (1..600) {
-	$A->list_add($_);
-}
+$A->list_add({ name => $_, date => 0 }) for (1..600);
 
-$A->lists_get('err');
-fail_msg_ne 'response too large', $A->get_error();
+my $err = $A->lists_get('err');
+fail_msg_ne 'response too large', $err;

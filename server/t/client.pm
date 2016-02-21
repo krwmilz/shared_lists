@@ -10,7 +10,6 @@ use test;
 
 require "msgs.pl";
 our (%msg_num, @msg_str);
-my $i = 0;
 
 sub new {
 	my $class = shift;
@@ -32,155 +31,109 @@ sub new {
 
 	$self->{device_id} = undef;
 
-	# Register this device immediately by default
 	if ($dont_register == 0) {
-		$self->device_add({ phone_number => rand_phnum(), os => 'unix' });
-		$self->device_update({ pushtoken_hex => "BADBEEF_$i" });
-		$i++;
+		$self->{phnum} = rand_phnum();
+
+		my $args = { phone_number => $self->{phnum}, os => 'unix' };
+		$self->{device_id} = $self->device_add($args);
+
+		$self->device_update({ pushtoken_hex => "token_$self->{phnum}" }, 'ok');
 	}
 
 	return $self;
 }
 
-sub device_update {
-	my $self = shift;
-	my $msg_args = shift;
-	my $status = shift || 'ok';
+sub device_add {
+	my ($self, $args, $status) = @_;
+	return $self->communicate('device_add', $status, $args);
+}
 
-	my $response = communicate($self, 'device_update', $status, $msg_args);
+sub device_update {
+	my ($self, $args, $status) = @_;
+	return $self->communicate('device_update', $status, $args);
 }
 
 sub list_add {
-	my $self = shift;
-	my $list = {
-		name => shift,
-		date => 0
-	};
-	my $status = shift || 'ok';
-
-	my $response = communicate($self, 'list_add', $status, { list => $list });
-	return if ($status eq 'err');
-
-	push @{$self->{lists}}, $response->{list};
+	my ($self, $args, $status) = @_;
+	return $self->communicate('list_add', $status, $args);
 }
 
 sub list_update {
-	my $self = shift;
-	my $list_ref = shift;
-	my $status = shift || 'ok';
-
-	my $list_data = communicate($self, 'list_update', $status, { list => $list_ref });
-	return if ($status eq 'err');
+	my ($self, $args, $status) = @_;
+	return $self->communicate('list_update', $status, $args);
 }
 
 sub list_join {
-	my $self = shift;
-	my $msg_args = {
-		list_num => shift,
-	};
-	my $status = shift || 'ok';
-
-	my $list_data = communicate($self, 'list_join', $status, $msg_args);
+	my ($self, $args, $status) = @_;
+	return $self->communicate('list_join', $status, $args);
 }
 
 sub list_leave {
-	my $self = shift;
-	my $msg_args = {
-		list_num => shift,
-	};
-	my $status = shift || 'ok';
-
-	my $list_data = communicate($self, 'list_leave', $status, $msg_args);
+	my ($self, $args, $status) = @_;
+	return $self->communicate('list_leave', $status, $args);
 }
 
 sub friend_add {
-	my $self = shift;
-	my $msg_args = {
-		friend_phnum => shift,
-	};
-	my $status = shift || 'ok';
-
-	communicate($self, 'friend_add', $status, $msg_args);
+	my ($self, $args, $status) = @_;
+	return $self->communicate('friend_add', $status, $args);
 }
 
 sub friend_delete {
-	my $self = shift;
-	my $msg_args = {
-		friend_phnum => shift,
-	};
-	my $status = shift || 'ok';
-
-	communicate($self, 'friend_delete', $status, $msg_args);
+	my ($self, $args, $status) = @_;
+	return $self->communicate('friend_delete', $status, $args);
 }
 
 sub lists_get {
-	my $self = shift;
-	my $status = shift || 'ok';
-
-	my $response = communicate($self, 'lists_get', $status);
-	return if ($response->{status} eq 'err');
-
-	return @{ $response->{lists} };
+	my ($self, $status) = @_;
+	return $self->communicate('lists_get', $status);
 }
 
 sub lists_get_other {
-	my $self = shift;
-	my $status = shift || 'ok';
-
-	my $response = communicate($self, 'lists_get_other', $status);
-	return if ($response->{status} eq 'err');
-
-	return @{ $response->{other_lists} };
-}
-
-sub device_add {
-	my $self = shift;
-	my $msg_args = shift;
-	my $exp_status = shift || 'ok';
-
-	# Reset error messages to guard against stale state
-	$self->{err_msg} = undef;
-	$self->{msg_type} = $msg_num{'device_add'};
-
-	send_msg($self, $msg_args);
-	my $response = recv_msg($self, $exp_status);
-
-	if ($response->{status} eq 'ok') {
-		$self->{phnum} = $msg_args->{phone_number};
-		$self->{device_id} = $response->{device_id};
-	}
+	my ($self, $status) = @_;
+	return $self->communicate('lists_get_other', $status);
 }
 
 sub communicate {
-	my ($self, $msg_type, $exp_status, $msg_args) = @_;
+	my ($self, $msg_type, $exp_status, $msg_data) = @_;
 
-	# Reset error message so it doesn't get reused
-	$self->{err_msg} = undef;
-	$self->{msg_type} = $msg_num{$msg_type};
+	# If no expected status was passed in assume 'ok'
+	$exp_status = 'ok' if (! defined $exp_status);
 
-	# Add device id to message arguments
-	$msg_args->{device_id} = $self->{device_id};
+	my $msg_args->{data} = $msg_data;
 
-	send_msg($self, $msg_args);
-	return recv_msg($self, $exp_status);
+	# device_add is the only message type that does not require device_id as
+	# a mandatory argument
+	$msg_args->{device_id} = $self->{device_id} if ($msg_type ne 'device_add');
+
+	$self->send_msg($msg_type, $msg_args);
+	my $resp = $self->recv_msg($msg_type);
+
+	# Check that the received status was the same as the expected status
+	my $status = $resp->{status};
+	confess "wrong message status '$status'" if ($status ne $exp_status);
+
+	# Response indicated error, return the reason
+	return $resp->{reason} if ($status eq 'err');
+
+	# Everything looks good, return the response data
+	return $resp->{data};
 }
 
 sub send_msg {
-	my ($self, $request) = @_;
+	my ($self, $msg_type, $request) = @_;
 
 	# Request comes in as a hash ref, do this now to figure out length
 	my $payload = encode_json($request);
 
-	my $msg_type = $self->{msg_type};
-	confess "invalid message type $msg_type" if ($msg_type > @msg_str);
+	confess "invalid message type $msg_type" unless (grep { $_ eq $msg_type } @msg_str);
 
 	my $version = 0;
 	my $payload_len = length($payload);
-	my $header = pack("nnn", $version, $msg_type, $payload_len);
+	my $header = pack("nnn", $version, $msg_num{$msg_type}, $payload_len);
 
 	my $sent_bytes = 0;
-	$sent_bytes += send_all($self, $header, length($header));
-	$sent_bytes += send_all($self, $payload, $payload_len);
+	$sent_bytes += $self->send_all($header, length($header));
+	$sent_bytes += $self->send_all($payload, $payload_len);
 
 	return $sent_bytes;
 }
@@ -197,20 +150,20 @@ sub send_all {
 }
 
 sub recv_msg {
-	my ($self, $exp_status) = @_;
+	my ($self, $exp_msg_type) = @_;
 
 	# Read header
-	my $header = read_all($self, 6);
+	my $header = $self->read_all(6);
 	my ($version, $msg_type, $payload_size) = unpack("nnn", $header);
 
 	# Check some things
 	confess "unsupported protocol version $version" if ($version != 0);
 	confess "unknown message type $msg_type" if ($msg_type >= @msg_str);
 	confess "0 byte payload" if ($payload_size == 0);
-	confess "unexpected message type $self->{msg_type}" if ($self->{msg_type} != $msg_type);
+	confess "unexpected message type $msg_type" if ($msg_num{$exp_msg_type} != $msg_type);
 
 	# Read again for payload, $payload_size > 0
-	my $payload = read_all($self, $payload_size);
+	my $payload = $self->read_all($payload_size);
 
 	my $response;
 	try {
@@ -219,14 +172,10 @@ sub recv_msg {
 		confess "server sent invalid json";
 	};
 
-	# Don't accept messages with an array root
+	# Don't accept messages without an object root (ie array roots)
 	if (ref($response) ne "HASH") {
 		confess "server didn't send back object root element";
 	}
-
-	my $status = $response->{status};
-	confess "wrong message status '$status'" if ($status ne $exp_status);
-	$self->{err_msg} = $response->{reason} if ($status eq 'err');
 
 	return $response;
 }
@@ -249,16 +198,6 @@ sub read_all {
 	return $data;
 }
 
-sub num_lists {
-	my ($self) = @_;
-	return scalar(@{$self->{lists}});
-}
-
-sub lists {
-	my ($self, $i) = @_;
-	return $self->{lists}[$i];
-}
-
 sub phnum {
 	my ($self) = @_;
 	return $self->{phnum};
@@ -272,16 +211,6 @@ sub device_id {
 sub set_device_id {
 	my ($self, $new_id) = @_;
 	$self->{device_id} = $new_id;
-}
-
-sub set_msg_type {
-	my ($self, $msg_num) = @_;
-	$self->{msg_type} = $msg_num{$msg_num};
-}
-
-sub get_error {
-	my $self = shift;
-	return $self->{err_msg};
 }
 
 1;

@@ -77,8 +77,8 @@ while (my $client_socket = $server_socket->accept()) {
 	# Upgrade plain TCP connection to SSL
 	my $ret = IO::Socket::SSL->start_SSL($client_socket,
 		SSL_server => 1,
-		SSL_cert_file => 'ssl/cert_chain.pem',
-		SSL_key_file => 'ssl/privkey.pem'
+		SSL_cert_file => 'certs/cert_chain.pem',
+		SSL_key_file => 'certs/privkey.pem'
 	);
 	unless ($ret) {
 		$log->print("error: $SSL_ERROR\n");

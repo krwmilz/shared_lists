@@ -155,6 +155,36 @@ while (my $client_socket = $server_socket->accept()) {
 	}
 }
 
+# Takes a request and verifies device_id is present and valid
+sub get_device {
+	my ($db, $request) = @_;
+
+	unless (exists $request->{'device_id'}) {
+		$log->print("bad request, missing key 'device_id'\n");
+		return ("a missing message argument was required");
+	}
+
+	my $device_id = $request->{'device_id'};
+	unless ($device_id && $device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
+		$log->print("bad device id\n");
+		return ('the client sent a device id that was not base64');
+	}
+
+	$db->{select_device_id}->execute($device_id);
+	if (my ($num, $id, $phnum) = $db->{select_device_id}->fetchrow_array()) {
+		my $device = {
+			num => $num,
+			fp => fingerprint($id),
+			phnum => $phnum,
+			id => $id
+		};
+		return (undef, $device);
+	}
+
+	$log->print("unknown device '$device_id'\n");
+	return ('the client sent an unknown device id');
+}
+
 # Connect to a UNIX file system socket and send a JSON encoded message
 # Returns nothing.
 sub send_unix {
@@ -786,34 +816,4 @@ sub make_ok {
 
 	$args->{status} = 'ok';
 	return $args;
-}
-
-# Takes a request and verifies device_id is present and valid
-sub get_device {
-	my ($db, $request) = @_;
-
-	unless (exists $request->{'device_id'}) {
-		$log->print("bad request, missing key 'device_id'\n");
-		return ("a missing message argument was required");
-	}
-
-	my $device_id = $request->{'device_id'};
-	unless ($device_id && $device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
-		$log->print("bad device id\n");
-		return ('the client sent a device id that was not base64');
-	}
-
-	$db->{select_device_id}->execute($device_id);
-	if (my ($num, $id, $phnum) = $db->{select_device_id}->fetchrow_array()) {
-		my $device = {
-			num => $num,
-			fp => fingerprint($id),
-			phnum => $phnum,
-			id => $id
-		};
-		return (undef, $device);
-	}
-
-	$log->print("unknown device '$device_id'\n");
-	return ('the client sent an unknown device id');
 }

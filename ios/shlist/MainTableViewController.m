@@ -40,8 +40,10 @@
 	[default_center addObserver:self selector:@selector(push_friend_added_list:)
 			       name:@"PushNotification_friend_added_list" object:nil];
 
+	/*
 	[default_center addObserver:self selector:@selector(push_updated_list:)
 			       name:@"PushNotification_updated_list" object:nil];
+	 */
 
 	const SEL selectors[] = {
 		@selector(lists_get_finished:),

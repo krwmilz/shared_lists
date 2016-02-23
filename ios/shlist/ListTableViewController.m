@@ -129,7 +129,7 @@
 {
 	// XXX: This is an iOS 7+ hack only!
 	// http://stackoverflow.com/questions/13014592/how-to-get-indexpath-over-touched-button
-	UITableViewCell *cell = [(UITableViewCell *)[[sender superview] superview] superview];
+	UITableViewCell *cell = (UITableViewCell *)[[[sender superview] superview] superview];
 	NSIndexPath *path = [self.tableView indexPathForCell:cell];
 
 	ListItem *item = [_list_items objectAtIndex:[path row]];

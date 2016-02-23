@@ -23,6 +23,8 @@
 		27D805731BA2649D00867494 /* ContactsTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27D805721BA2649D00867494 /* ContactsTableViewController.m */; };
 		27D83D2A1BAFC99D0029F54B /* EditTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 27D83D291BAFC99D0029F54B /* EditTableViewController.m */; };
 		27DCC9EB1B9FF89E00207340 /* AddressBook.m in Sources */ = {isa = PBXBuildFile; fileRef = 27DCC9EA1B9FF89E00207340 /* AddressBook.m */; };
+		27E11A141C791FEA00CF03B5 /* CoreData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27E11A131C791FEA00CF03B5 /* CoreData.framework */; };
+		27E11A171C7920BD00CF03B5 /* shlist.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 27E11A151C7920BD00CF03B5 /* shlist.xcdatamodeld */; };
 		BF7776B91B38928D00526CB0 /* ListTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = BF7776B81B38928D00526CB0 /* ListTableViewController.m */; };
 /* End PBXBuildFile section */
 
@@ -68,6 +70,8 @@
 		27D83D291BAFC99D0029F54B /* EditTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = EditTableViewController.m; sourceTree = "<group>"; };
 		27DCC9E91B9FF89E00207340 /* AddressBook.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AddressBook.h; sourceTree = "<group>"; };
 		27DCC9EA1B9FF89E00207340 /* AddressBook.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AddressBook.m; sourceTree = "<group>"; };
+		27E11A131C791FEA00CF03B5 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
+		27E11A161C7920BD00CF03B5 /* shlist.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = shlist.xcdatamodel; sourceTree = "<group>"; };
 		BF7776B71B38928D00526CB0 /* ListTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListTableViewController.h; sourceTree = "<group>"; };
 		BF7776B81B38928D00526CB0 /* ListTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ListTableViewController.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -77,6 +81,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				27E11A141C791FEA00CF03B5 /* CoreData.framework in Frameworks */,
 				27B03A021B43B8660054B6D2 /* AddressBook.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -94,6 +99,8 @@
 		27C70EF61B32AF7F00DADEB3 = {
 			isa = PBXGroup;
 			children = (
+				27E11A151C7920BD00CF03B5 /* shlist.xcdatamodeld */,
+				27E11A131C791FEA00CF03B5 /* CoreData.framework */,
 				27B195B81C45FEE200D7B2E9 /* MsgTypes.h */,
 				27B03A001B43B8660054B6D2 /* AddressBook.framework */,
 				27C70F011B32AF8000DADEB3 /* shlist */,
@@ -280,6 +287,7 @@
 				27C70F2D1B33F3C300DADEB3 /* NewListTableViewController.m in Sources */,
 				27C70F081B32AF8000DADEB3 /* AppDelegate.m in Sources */,
 				27DCC9EB1B9FF89E00207340 /* AddressBook.m in Sources */,
+				27E11A171C7920BD00CF03B5 /* shlist.xcdatamodeld in Sources */,
 				27C70F301B33F4FA00DADEB3 /* MainTableViewController.m in Sources */,
 				27C70F051B32AF8000DADEB3 /* main.m in Sources */,
 				27D83D2A1BAFC99D0029F54B /* EditTableViewController.m in Sources */,
@@ -410,6 +418,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				INFOPLIST_FILE = shlist/Info.plist;
@@ -425,6 +434,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				INFOPLIST_FILE = shlist/Info.plist;
@@ -501,6 +511,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCVersionGroup section */
+		27E11A151C7920BD00CF03B5 /* shlist.xcdatamodeld */ = {
+			isa = XCVersionGroup;
+			children = (
+				27E11A161C7920BD00CF03B5 /* shlist.xcdatamodel */,
+			);
+			currentVersion = 27E11A161C7920BD00CF03B5 /* shlist.xcdatamodel */;
+			name = shlist.xcdatamodeld;
+			path = shlist/shlist.xcdatamodeld;
+			sourceTree = "<group>";
+			versionGroupType = wrapper.xcdatamodel;
+		};
+/* End XCVersionGroup section */
 	};
 	rootObject = 27C70EF71B32AF7F00DADEB3 /* Project object */;
 }

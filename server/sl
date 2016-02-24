@@ -23,7 +23,7 @@ my %args;
 getopts("p:t", \%args);
 
 # This is used by the parent to create the database if it doesn't already
-# exist, and then each child connects to this db to do queries
+# exist. Each child then connects to this same db to do queries.
 my $db_file = "db";
 $db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
@@ -51,7 +51,7 @@ die "Could not create socket: $!\n" unless($server_socket);
 my ($addr, $port) = ($server_socket->sockhost(), $server_socket->sockport());
 $log->print_bare("accepting connections on $addr:$port (pid = '$$')\n");
 
-# Children who have exited will do not have to be waited on with this
+# Children who have exited do not have to be waited on with this
 $SIG{CHLD} = 'IGNORE';
 
 # Accept new plain TCP connections and handle them in separate processes
@@ -387,8 +387,7 @@ sub msg_device_add {
 sub msg_device_update {
 	my ($db, $request, $dev) = @_;
 
-	my $hex_token = $request->{pushtoken_hex};
-	$db->{update_device}->execute($hex_token, $dev->{num});
+	$db->{update_device}->execute($request, $dev->{num});
 	# $log->print("push token = '$hex_token'\n");
 
 	return make_ok( { data => {} });

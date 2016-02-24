@@ -92,67 +92,70 @@ while (my $client_socket = $server_socket->accept()) {
 	my $db = database->new($db_file);
 	$db->prepare_stmt_handles();
 
-	while (1) {
-		# Database errors and socket connect errors both modify this
-		# value. Make sure it's reset
-		undef $@;
+	handle_message($client_socket, $db) while (1);
+}
 
-		# Wait for an entire message to be received
-		my ($ver, $msg_type, $request) = recv_msg($client_socket);
+sub handle_message {
+	my ($client_socket, $db) = @_;
 
-		$db->{dbh}->begin_work;
+	# Make sure this gets reset
+	undef $@;
 
-		# Every message type except 'device_add' needs to include
-		# 'device_id' in the request. Check that here.
-		my $device = undef;
-		if ($msg_type != $msg_num{device_add}) {
-			(my $err, $device) = get_device($db, $request->{device_id});
+	# Wait for an entire message to be received
+	my ($ver, $msg_type, $request) = recv_msg($client_socket);
 
-			if ($err) {
-				send_msg($client_socket, $ver, $msg_type, make_error($err));
-				$db->{dbh}->commit;
-				next;
-			}
+	$db->{dbh}->begin_work;
+
+	# Every message type except 'device_add' needs to include 'device_id' in
+	# the request. Check that here.
+	my $device = undef;
+	if ($msg_type != $msg_num{device_add}) {
+		(my $err, $device) = get_device($db, $request->{device_id});
+
+		if ($err) {
+			send_msg($client_socket, $ver, $msg_type, make_error($err));
+			$db->{dbh}->commit;
+			return;
 		}
-
-		# Call appropriate message handler. Each handler returns both
-		# data that should be sent back over the main socket and
-		# notification data that gets sent over vendor specific API.
-		my ($response, $notify) = $msg_func[$msg_type]->($db, $request->{data}, $device);
-
-		$db->{dbh}->commit;
-		if ($@) {
-			$log->print("db transaction aborted: $@\n");
-
-			# now rollback to undo the incomplete changes
-			# but do it in an eval{} as it may also fail
-			eval { $db->{dbh}->rollback };
-
-			$response->{status} = 'err';
-			$response->{reason} = 'database transaction aborted';
-
-			send_msg($client_socket, $ver, $msg_type, $response);
-			next;
-		}
-
-		# Respond to client over the main socket
-		send_msg($client_socket, $ver, $msg_type, $response);
-
-		# Some messages don't send notifications
-		next if (! defined $notify);
-
-		# Don't send notifications when there was en error
-		next if ($response->{status} eq 'err');
-
-		# Encode the notification message and find its size
-		my $msg = encode_json($notify);
-		my $msg_len = length($msg);
-
-		# Send to notification daemons
-		send_unix("../apnd.socket", $msg, $msg_len) unless ($args{t});
-		send_unix("../gcmd.socket", $msg, $msg_len) unless ($args{t});
-		send_unix("../testd.socket", $msg, $msg_len) if ($args{t});
 	}
+
+	# Call appropriate message handler. Each handler returns both data that
+	# should be sent back over the main socket and notification data that
+	# gets sent over vendor specific API.
+	my ($response, $notify) = $msg_func[$msg_type]->($db, $request->{data}, $device);
+
+	$db->{dbh}->commit;
+	if ($@) {
+		$log->print("db transaction aborted: $@\n");
+
+		# now rollback to undo the incomplete changes but do it in an
+		# eval{} as it may also fail
+		eval { $db->{dbh}->rollback };
+
+		$response->{status} = 'err';
+		$response->{reason} = 'database transaction aborted';
+
+		send_msg($client_socket, $ver, $msg_type, $response);
+		return;
+	}
+
+	# Respond to client over the main socket
+	send_msg($client_socket, $ver, $msg_type, $response);
+
+	# Some messages don't send notifications
+	return if (! defined $notify);
+
+	# Don't send notifications when there was en error
+	return if ($response->{status} eq 'err');
+
+	# Encode the notification message and find its size
+	my $msg = encode_json($notify);
+	my $msg_len = length($msg);
+
+	# Send to notification daemons
+	send_unix("../apnd.socket", $msg, $msg_len) unless ($args{t});
+	send_unix("../gcmd.socket", $msg, $msg_len) unless ($args{t});
+	send_unix("../testd.socket", $msg, $msg_len) if ($args{t});
 }
 
 # Takes a request and verifies device_id is present and valid

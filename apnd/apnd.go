@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	//"crypto/x509"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -118,6 +119,9 @@ func process_client(c net.Conn, h http.Client) {
 }
 
 func main() {
+	var sock_path = flag.String("p", "../apnd.socket", "path to control socket")
+	flag.Parse()
+
 	// These keys are provided by Apple through their Developer program
 	cert, err := tls.LoadX509KeyPair("certs/aps.pem", "certs/aps.key")
 	if err != nil {
@@ -131,7 +135,7 @@ func main() {
 	}
 
 	// Create socket that listens for connections from the main server
-	l, err := net.Listen("unix", "../apnd.socket")
+	l, err := net.Listen("unix", *sock_path)
 	if err != nil {
 		log.Fatal("listen error:", err)
 	}

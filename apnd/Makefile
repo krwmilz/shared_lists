@@ -1,9 +1,9 @@
-apnd: apnd.go
+apnd: apnd.go src
 	GOPATH=`pwd` go build
 
-depend:
-	GOPATH=`pwd` go get
+src:
+	GOPATH=`pwd` go get -d
 
 clean:
 	# Delete output from make depend too
-	rm -rf apnd src/
+	rm -rf apnd src

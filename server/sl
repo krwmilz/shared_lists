@@ -10,7 +10,6 @@ use IO::Socket::SSL;
 use IO::Socket::UNIX;
 use JSON::XS;
 use Scalar::Util qw(looks_like_number);
-use Try::Tiny;
 
 # Our own modules
 use logger;
@@ -236,17 +235,13 @@ sub recv_msg {
 	# entire thing exactly
 	my $payload = read_all($sock, $payload_size);
 
-	try {
-		# Throws an exception when $payload is bad JSON
-		my $request = decode_json($payload);
+	# Throws an exception when $payload is bad JSON
+	my $request = decode_json($payload);
 
-		if (ref($request) ne "HASH") {
-			$log->fatal("error: json payload didn't have dictionary root\n");
-		}
-		return ($version, $msg_type, $request);
-	} catch {
-		$log->fatal("error: payload wasn't json\n");
+	if (ref($request) ne "HASH") {
+		$log->fatal("error: json payload didn't have dictionary root\n");
 	}
+	return ($version, $msg_type, $request);
 }
 
 # Read an exact amount of bytes from a socket.

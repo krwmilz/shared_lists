@@ -39,13 +39,11 @@ package TestSL::Client;
 use strict;
 use warnings;
 
-use Carp;
 use IO::Socket::SSL;
 use JSON::XS;
 use String::Random;
 use Test;
 use Time::HiRes qw(usleep);
-use Try::Tiny;
 
 require "msgs.pl";
 our (%msg_num, @msg_str);
@@ -168,7 +166,7 @@ sub send_msg {
 	# Request comes in as a hash ref, do this now to figure out length
 	my $payload = encode_json($request);
 
-	confess "invalid message type $msg_type" unless (grep { $_ eq $msg_type } @msg_str);
+	die "invalid message type $msg_type" unless (grep { $_ eq $msg_type } @msg_str);
 
 	my $version = 0;
 	my $payload_len = length($payload);
@@ -186,8 +184,8 @@ sub send_all {
 
 	my $bytes_written = $self->{sock}->syswrite($bytes);
 
-	confess "write failed: $!" if (!defined $bytes_written);
-	confess "wrote $bytes_written instead of $bytes_total bytes" if ($bytes_written != $bytes_total);
+	die "write failed: $!" if (!defined $bytes_written);
+	die "wrote $bytes_written instead of $bytes_total bytes" if ($bytes_written != $bytes_total);
 
 	return $bytes_total;
 }
@@ -200,24 +198,20 @@ sub recv_msg {
 	my ($version, $msg_type, $payload_size) = unpack("nnn", $header);
 
 	# Check some things
-	confess "unsupported protocol version $version" if ($version != 0);
-	confess "unknown message type $msg_type" if ($msg_type >= @msg_str);
-	confess "0 byte payload" if ($payload_size == 0);
-	confess "unexpected message type $msg_type" if ($msg_num{$exp_msg_type} != $msg_type);
+	die "unsupported protocol version $version" if ($version != 0);
+	die "unknown message type $msg_type" if ($msg_type >= @msg_str);
+	die "0 byte payload" if ($payload_size == 0);
+	die "unexpected message type $msg_type" if ($msg_num{$exp_msg_type} != $msg_type);
 
 	# Read again for payload, $payload_size > 0
 	my $payload = $self->read_all($payload_size);
 
-	my $response;
-	try {
-		$response = decode_json($payload);
-	} catch {
-		confess "server sent invalid json";
-	};
+	# This will die if $payload is invalid
+	my $response = decode_json($payload);
 
 	# Don't accept messages without an object root (ie array roots)
 	if (ref($response) ne "HASH") {
-		confess "server didn't send back object root element";
+		die "server didn't send back object root element";
 	}
 
 	return $response;
@@ -231,8 +225,8 @@ sub read_all {
 	while ($bytes_total > 0) {
 		my $read = $self->{sock}->sysread($data, $bytes_total, $bytes_read);
 
-		confess "read failed: $!" unless (defined $read);
-		confess "read EOF on socket" if ($read == 0);
+		die "read failed: $!" unless (defined $read);
+		die "read EOF on socket" if ($read == 0);
 
 		$bytes_total -= $read;
 		$bytes_read += $read;

@@ -1,6 +1,14 @@
 Dependencies
 ============
 
+Ubuntu:
+- liblog-log4perl-perl
+- libbsd-arc4random-perl
+- libjson-xs-perl
+- libio-socket-ssl-perl
+- libdigest-sha-perl
+- libstring-random-perl
+
 OpenBSD:
 - p5-BSD-arc4random
 - p5-IO-Socket-SSL

@@ -1,4 +1,4 @@
-package database;
+package SL::Database;
 
 use DBI;
 use File::Temp;

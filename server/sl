@@ -12,8 +12,7 @@ use JSON::XS;
 use Log::Log4perl qw(:easy);
 use Scalar::Util qw(looks_like_number);
 
-# Our own modules
-use database;
+use SL::Database;
 
 require "msgs.pl";
 our (%msg_num, @msg_str, @msg_func, $protocol_ver);
@@ -35,7 +34,7 @@ my $logger = Log::Log4perl->get_logger('shlist.server');
 
 $logger->info("using database '$db_file'\n");
 
-my $db = database->new($db_file);
+my $db = SL::Database->new($db_file);
 $db->create_tables();
 
 # Create master listening socket, by default on port 5437. All connection
@@ -92,7 +91,7 @@ while (my $client_socket = $server_socket->accept()) {
 	my $ssl_cipher = $client_socket->get_cipher();
 	$logger->debug("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
 
-	my $db = database->new($db_file);
+	my $db = SL::Database->new($db_file);
 	$db->prepare_stmt_handles();
 
 	# Handle messages until this client disconnects

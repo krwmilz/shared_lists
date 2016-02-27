@@ -20,14 +20,14 @@ require "msgs.pl";
 our (%msg_num, @msg_str, @msg_func, $protocol_ver);
 
 my %args;
-getopts("p:t", \%args);
+getopts("p:tv", \%args);
 
 # This is used by the parent to create the database if it doesn't already
 # exist. Each child then connects to this same db to do queries.
 my $db_file = "db";
 $db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
-my $log = logger->new();
+my $log = logger->new($args{v});
 $log->print_bare("using database '$db_file'\n");
 
 my $db = database->new($db_file);
@@ -81,10 +81,7 @@ while (my $client_socket = $server_socket->accept()) {
 		SSL_cert_file => 'certs/cert_chain.pem',
 		SSL_key_file => 'certs/privkey.pem'
 	);
-	unless ($ret) {
-		$log->print("error: $SSL_ERROR\n");
-		exit 0;
-	}
+	$log->fatal("error: $SSL_ERROR\n") unless ($ret);
 
 	my $ssl_ver = $client_socket->get_sslversion();
 	my $ssl_cipher = $client_socket->get_cipher();
@@ -93,9 +90,12 @@ while (my $client_socket = $server_socket->accept()) {
 	my $db = database->new($db_file);
 	$db->prepare_stmt_handles();
 
+	# Handle messages until this client disconnects
 	handle_message($client_socket, $db) while (1);
 }
 
+# Receives a request and sends a response. Also sometimes sends push
+# notifications. Returns nothing.
 sub handle_message {
 	my ($client_socket, $db) = @_;
 
@@ -159,7 +159,7 @@ sub handle_message {
 	send_unix("../testd.socket", $msg, $msg_len) if ($args{t});
 }
 
-# Takes a request and verifies device_id is present and valid
+# Takes a device id and verifies it is present and valid.
 sub get_device {
 	my ($db, $device_id) = @_;
 
@@ -188,13 +188,11 @@ sub get_device {
 	return ('the client sent an unknown device id');
 }
 
-# Connect to a UNIX file system socket and send a JSON encoded message
-# Returns nothing.
+# Connect to a UNIX file system socket and send a JSON encoded message, then
+# disconnect. Returns nothing.
 sub send_unix {
 	my ($socket_path, $msg, $msg_len) = @_;
 
-	# Every time this function is called we create a new connection to the
-	# socket, send our data and then disconnect
 	my $socket = IO::Socket::UNIX->new(
 		Type => SOCK_STREAM(),
 		Peer => $socket_path
@@ -221,22 +219,17 @@ sub recv_msg {
 	my $header = read_all($sock, 6);
 	my ($version, $msg_type, $payload_size) = unpack("nnn", $header);
 
-	if ($version != 0) {
-		$log->print("error: unsupported protocol version $version\n");
-		exit 0;
-	}
+	# Check version and message type are in range
+	$log->fatal("error: unsupported protocol version $version\n") if ($version != 0);
+	$log->fatal("error: unknown message type $msg_type\n") if ($msg_type >= @msg_str);
 
-	if ($msg_type >= @msg_str) {
-		$log->print("error: unknown message type $msg_type\n");
-		exit 0;
-	}
+	# Add logging message type prefix
 	$log->set_msg($msg_str[$msg_type]);
 
 	# Server requests are limited to 4KB size, a 0 byte payload will not be
 	# valid JSON so reject that here
 	if ($payload_size > 4096 || $payload_size == 0) {
-		$log->print("error: $payload_size byte payload invalid\n");
-		exit 0;
+		$log->fatal("error: $payload_size byte payload invalid\n");
 	}
 
 	# Now that we know the size of the message we can try and read the
@@ -244,16 +237,15 @@ sub recv_msg {
 	my $payload = read_all($sock, $payload_size);
 
 	try {
+		# Throws an exception when $payload is bad JSON
 		my $request = decode_json($payload);
 
 		if (ref($request) ne "HASH") {
-			$log->print("error: json payload didn't have dictionary root\n");
-			exit 0;
+			$log->fatal("error: json payload didn't have dictionary root\n");
 		}
 		return ($version, $msg_type, $request);
 	} catch {
-		$log->print("error: payload wasn't json\n");
-		exit 0;
+		$log->fatal("error: payload wasn't json\n");
 	}
 }
 
@@ -267,13 +259,8 @@ sub read_all {
 	while ($bytes_total > 0) {
 		my $read = $sock->sysread($data, $bytes_total, $bytes_read);
 
-		if (!defined $read) {
-			$log->print("error: read failed: $!\n");
-			exit 0;
-		} elsif ($read == 0) {
-			$log->print("disconnected!\n");
-			exit 0;
-		}
+		$log->fatal("error: read failed: $!\n") if (!defined $read);
+		$log->fatal("disconnected!\n") if ($read == 0);
 
 		$bytes_total -= $read;
 		$bytes_read += $read;
@@ -325,10 +312,7 @@ sub send_all {
 	while ($bytes_total) {
 		my $wrote = $socket->syswrite($data, $bytes_total, $bytes_written);
 
-		unless (defined $wrote) {
-			$log->print("error: write failed: $!\n");
-			exit 0;
-		}
+		$log->fatal("error: write failed: $!\n") unless (defined $wrote);
 
 		$bytes_total -= $wrote;
 		$bytes_written += $wrote;
@@ -403,7 +387,7 @@ sub msg_list_add {
 	# XXX: check that $list contains the necessary keys!
 
 	$log->print("device '$dev->{fp}'\n");
-	$log->print("new list name '$list->{name}'\n");
+	#$log->print("new list name '$list->{name}'\n");
 
 	my $now = time;
 	# Create new list, use null for primary key so the new row automatically
@@ -690,7 +674,7 @@ sub msg_lists_get {
 		};
 		push @lists, $list;
 
-		$log->print("found list '$num':'$name'\n");
+		#$log->print("found list '$num':'$name'\n");
 		$log->print("list has $num_members members\n");
 		$log->print("list has 0 items\n");
 	}

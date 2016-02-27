@@ -1,2 +1,0 @@
-new connection (pid = <digits>)
-error: SSL accept attempt failed error:140760FC:SSL routines:SSL23_GET_CLIENT_HELLO:unknown protocol

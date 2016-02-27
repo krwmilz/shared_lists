@@ -9,10 +9,10 @@ use Getopt::Std;
 use IO::Socket::SSL;
 use IO::Socket::UNIX;
 use JSON::XS;
+use Log::Log4perl qw(:easy);
 use Scalar::Util qw(looks_like_number);
 
 # Our own modules
-use logger;
 use database;
 
 require "msgs.pl";
@@ -26,8 +26,14 @@ getopts("p:tv", \%args);
 my $db_file = "db";
 $db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
-my $log = logger->new($args{v});
-$log->print_bare("using database '$db_file'\n");
+if ($args{v}) {
+	Log::Log4perl->easy_init($DEBUG);
+} else {
+	Log::Log4perl->easy_init($ERROR);
+}
+my $logger = Log::Log4perl->get_logger('shlist.server');
+
+$logger->info("using database '$db_file'\n");
 
 my $db = database->new($db_file);
 $db->create_tables();
@@ -48,7 +54,7 @@ my $server_socket = new IO::Socket::INET (
 die "Could not create socket: $!\n" unless($server_socket);
 
 my ($addr, $port) = ($server_socket->sockhost(), $server_socket->sockport());
-$log->print_bare("accepting connections on $addr:$port (pid = '$$')\n");
+$logger->info("accepting connections on $addr:$port (pid = '$$')\n");
 
 # Children who have exited do not have to be waited on with this
 $SIG{CHLD} = 'IGNORE';
@@ -71,8 +77,8 @@ while (my $client_socket = $server_socket->accept()) {
 	# Stir the random pool after fork() just in case
 	arc4random_stir();
 
-	$log->set_peer_host_port($client_socket);
-	$log->print("new connection (pid = '$$')\n");
+	#$log->set_peer_host_port($client_socket);
+	$logger->debug("new connection (pid = '$$')\n");
 
 	# Upgrade plain TCP connection to SSL
 	my $ret = IO::Socket::SSL->start_SSL($client_socket,
@@ -80,11 +86,11 @@ while (my $client_socket = $server_socket->accept()) {
 		SSL_cert_file => 'certs/cert_chain.pem',
 		SSL_key_file => 'certs/privkey.pem'
 	);
-	$log->fatal("error: $SSL_ERROR\n") unless ($ret);
+	$logger->fatal("error: $SSL_ERROR\n") unless ($ret);
 
 	my $ssl_ver = $client_socket->get_sslversion();
 	my $ssl_cipher = $client_socket->get_cipher();
-	$log->print("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
+	$logger->debug("ssl ok, ver = '$ssl_ver' cipher = '$ssl_cipher'\n");
 
 	my $db = database->new($db_file);
 	$db->prepare_stmt_handles();
@@ -126,7 +132,7 @@ sub handle_message {
 
 	$db->{dbh}->commit;
 	if ($@) {
-		$log->print("db transaction aborted: $@\n");
+		$logger->error("db transaction aborted: $@\n");
 
 		# now rollback to undo the incomplete changes but do it in an
 		# eval{} as it may also fail
@@ -163,12 +169,12 @@ sub get_device {
 	my ($db, $device_id) = @_;
 
 	unless (defined $device_id) {
-		$log->print("bad request, missing key 'device_id'\n");
+		$logger->error("bad request, missing key 'device_id'\n");
 		return ("a missing message argument was required");
 	}
 
 	unless ($device_id && $device_id =~ m/^[a-zA-Z0-9+\/=]+$/) {
-		$log->print("bad device id\n");
+		$logger->error("bad device id\n");
 		return ('the client sent a device id that was not base64');
 	}
 
@@ -183,7 +189,7 @@ sub get_device {
 		return (undef, $device);
 	}
 
-	$log->print("unknown device '$device_id'\n");
+	$logger->error("unknown device '$device_id'\n");
 	return ('the client sent an unknown device id');
 }
 
@@ -197,7 +203,7 @@ sub send_unix {
 		Peer => $socket_path
 	);
 	unless ($socket) {
-		$log->print("$socket_path: connect failed: $!\n");
+		$logger->error("$socket_path: connect failed: $!\n");
 		return;
 	}
 
@@ -219,16 +225,16 @@ sub recv_msg {
 	my ($version, $msg_type, $payload_size) = unpack("nnn", $header);
 
 	# Check version and message type are in range
-	$log->fatal("error: unsupported protocol version $version\n") if ($version != 0);
-	$log->fatal("error: unknown message type $msg_type\n") if ($msg_type >= @msg_str);
+	$logger->fatal("error: unsupported protocol version $version\n") if ($version != 0);
+	$logger->fatal("error: unknown message type $msg_type\n") if ($msg_type >= @msg_str);
 
 	# Add logging message type prefix
-	$log->set_msg($msg_str[$msg_type]);
+	#$log->set_msg($msg_str[$msg_type]);
 
 	# Server requests are limited to 4KB size, a 0 byte payload will not be
 	# valid JSON so reject that here
 	if ($payload_size > 4096 || $payload_size == 0) {
-		$log->fatal("error: $payload_size byte payload invalid\n");
+		$logger->fatal("error: $payload_size byte payload invalid\n");
 	}
 
 	# Now that we know the size of the message we can try and read the
@@ -239,7 +245,7 @@ sub recv_msg {
 	my $request = decode_json($payload);
 
 	if (ref($request) ne "HASH") {
-		$log->fatal("error: json payload didn't have dictionary root\n");
+		$logger->fatal("error: json payload didn't have dictionary root\n");
 	}
 	return ($version, $msg_type, $request);
 }
@@ -254,8 +260,8 @@ sub read_all {
 	while ($bytes_total > 0) {
 		my $read = $sock->sysread($data, $bytes_total, $bytes_read);
 
-		$log->fatal("error: read failed: $!\n") if (!defined $read);
-		$log->fatal("disconnected!\n") if ($read == 0);
+		$logger->fatal("error: read failed: $!\n") if (!defined $read);
+		die "disconnected!\n" if ($read == 0);
 
 		$bytes_total -= $read;
 		$bytes_read += $read;
@@ -293,7 +299,7 @@ sub send_msg {
 
 	# Clear logging prefix as late as possible so send errors above will
 	# include the message type in them
-	$log->set_msg('');
+	#$log->set_msg('');
 	return $header_len + $payload_len;
 }
 
@@ -307,7 +313,7 @@ sub send_all {
 	while ($bytes_total) {
 		my $wrote = $socket->syswrite($data, $bytes_total, $bytes_written);
 
-		$log->fatal("error: write failed: $!\n") unless (defined $wrote);
+		$logger->fatal("error: write failed: $!\n") unless (defined $wrote);
 
 		$bytes_total -= $wrote;
 		$bytes_written += $wrote;
@@ -327,18 +333,18 @@ sub msg_device_add {
 	my $os = $request->{'os'};
 
 	unless (looks_like_number($ph_num)) {
-		$log->print("phone number invalid\n");
+		$logger->error("phone number invalid\n");
 		return make_error("the sent phone number is not a number");
 	}
 
 	$db->{ph_num_exists}->execute($ph_num);
 	if ($db->{ph_num_exists}->fetchrow_array()) {
-		$log->print("phone number '$ph_num' already exists\n");
+		$logger->error("phone number '$ph_num' already exists\n");
 		return make_error("the sent phone number already exists");
 	}
 	# Only accept a white list of operating systems
 	if ($os ne 'unix' && $os ne 'android' && $os ne 'ios') {
-		$log->print("unknown operating system '$os'\n");
+		$logger->error("unknown operating system '$os'\n");
 		return make_error("operating system not supported");
 	}
 
@@ -350,12 +356,12 @@ sub msg_device_add {
 	# Check the database to make sure this isn't duplicate
 	$db->{select_device_id}->execute($device_id);
 	if ($db->{select_device_id}->fetchrow_array()) {
-		$log->print("id generation collision for '$device_id'\n");
+		$logger->error("id generation collision for '$device_id'\n");
 		return make_error("device id collision, please try again");
 	}
 
 	$db->{new_device}->execute($device_id, $ph_num, $os, undef, time, time);
-	$log->print("success, '$ph_num':'$fp' os '$os'\n");
+	$logger->debug("success, '$ph_num':'$fp' os '$os'\n");
 
 	return (make_ok( { data => $device_id } ), undef);
 }
@@ -368,7 +374,7 @@ sub msg_device_update {
 	my ($db, $request, $dev) = @_;
 
 	$db->{update_device}->execute($request, $dev->{num});
-	# $log->print("push token = '$hex_token'\n");
+	$logger->debug("push token = '$request'\n");
 
 	return make_ok( { data => {} });
 }
@@ -381,7 +387,7 @@ sub msg_list_add {
 
 	# XXX: check that $list contains the necessary keys!
 
-	$log->print("device '$dev->{fp}'\n");
+	$logger->debug("device '$dev->{fp}'\n");
 	#$log->print("new list name '$list->{name}'\n");
 
 	my $now = time;
@@ -406,7 +412,7 @@ sub msg_list_add {
 	};
 	my $response = make_ok( { data => $resp_list } );
 
-	$log->print("new list number is '$list_num'\n");
+	$logger->debug("new list number is '$list_num'\n");
 
 	# For push notifications a list add on your part means all your friends
 	# gain a list in their other lists section. Create the same response
@@ -437,7 +443,7 @@ sub msg_list_update {
 	# Check that the device is in the list it wants to update
 	$db->{check_list_member}->execute($list->{num}, $dev->{num});
 	unless ($db->{check_list_member}->fetchrow_array()) {
-		$log->print("device '$dev->{fp}' not in list '$list->{num}'\n");
+		$logger->error("device '$dev->{fp}' not in list '$list->{num}'\n");
 		return make_error("client tried to update a list it was not in");
 	}
 
@@ -462,9 +468,9 @@ sub msg_list_update {
 
 	# Update list row, note that some values here can be optional
 	$db->{update_list}->execute($list->{name}, $list->{date}, time, $list->{num});
-	$log->print("num  = '$list->{num}'\n");
-	$log->print("name = '$list->{name}'\n") if (exists $list->{name});
-	$log->print("date = $list->{date}\n") if (exists $list->{date});
+	$logger->debug("num  = '$list->{num}'\n");
+	$logger->debug("name = '$list->{name}'\n") if (exists $list->{name});
+	$logger->debug("date = $list->{date}\n") if (exists $list->{date});
 
 	return (make_ok( { data => {} } ), $notify);
 }
@@ -499,9 +505,9 @@ sub msg_list_join {
 
     if (!$db->{check_list_member}->fetchrow_array()) {
         $db->{new_list_member}->execute($list_num, $dev->{num}, $time);
-        $log->print("device '$dev->{fp}' has been added to list '$list_num'\n");
+        $logger->debug("device '$dev->{fp}' has been added to list '$list_num'\n");
     } else {
-        $log->print("tried to create a duplicate list member entry for device '$dev->{fp}' and list '$list_num'\n");
+        $logger->error("tried to create a duplicate list member entry for device '$dev->{fp}' and list '$list_num'\n");
 	return make_error("the device is already part of this list");
     }
 
@@ -520,8 +526,8 @@ sub msg_list_join {
         num_members => scalar(@members)
     };
 
-    $log->print("device '$dev->{fp}'\n");
-    $log->print("list '$list_num'\n");
+    $logger->debug("device '$dev->{fp}'\n");
+    $logger->debug("list '$list_num'\n");
 
     return make_ok( { data => $list } );
 }
@@ -537,9 +543,9 @@ sub msg_list_leave {
     my $tmp_list_num = $list_num;
     if ($db->{check_list_member}->fetchrow_array()) {
         $db->{remove_list_member}->execute($list_num, $dev->{num});
-        $log->print("device '$dev->{fp}' has been removed from list '$tmp_list_num'\n");
+        $logger->debug("device '$dev->{fp}' has been removed from list '$tmp_list_num'\n");
     } else {
-        $log->print("tried to leave a list the user was not in for device '$dev->{fp}' and list '$tmp_list_num'\n");
+        $logger->error("tried to leave a list the user was not in for device '$dev->{fp}' and list '$tmp_list_num'\n");
         return make_error("the client was not a member of the list");
     }
     $db->{check_list_member}->finish();
@@ -549,7 +555,7 @@ sub msg_list_leave {
     my $list_empty = 0;
 
     if (!$db->{get_list_members}->fetchrow_array()) {
-        $log->print("list '$tmp_list_num' is empty... deleting\n");
+        $logger->debug("list '$tmp_list_num' is empty... deleting\n");
         $db->{delete_list}->execute($list_num);
         $db->{delete_list_data}->execute($list_num);
         $list_empty = 1;
@@ -560,8 +566,8 @@ sub msg_list_leave {
         list_empty => $list_empty
     };
 
-    $log->print("device '$dev->{fp}'\n");
-    $log->print("list '$list_num'\n");
+    $logger->debug("device '$dev->{fp}'\n");
+    $logger->debug("list '$list_num'\n");
 
     return make_ok( { data => $response } );
 }
@@ -569,16 +575,16 @@ sub msg_list_leave {
 sub msg_friend_add {
 	my ($db, $friend_phnum, $dev) = @_;
 
-	$log->print("'$dev->{fp}' adding '$friend_phnum'\n");
+	$logger->debug("'$dev->{fp}' adding '$friend_phnum'\n");
 
 	unless (looks_like_number($friend_phnum)) {
-		$log->print("bad friends number '$friend_phnum'\n");
+		$logger->error("bad friends number '$friend_phnum'\n");
 		return make_error("friends phone number is not a valid phone number");
 	}
 
 	# Check if I'm adding myself as a friend
 	if ($dev->{phnum} eq $friend_phnum) {
-		$log->print("device '$dev->{fp}' tried adding itself\n");
+		$logger->error("device '$dev->{fp}' tried adding itself\n");
 		return make_error("device cannot add itself as a friend");
 	}
 
@@ -589,14 +595,14 @@ sub msg_friend_add {
 	$db->{ph_num_exists}->execute($friend_phnum);
 	if (my ($friend_num, $friend_devid) = $db->{ph_num_exists}->fetchrow_array()) {
 
-		$log->print("added friend is a member\n");
+		$logger->debug("added friend is a member\n");
 		my $friend_fp = fingerprint($friend_devid);
-		$log->print("friends device id is '$friend_fp'\n");
+		$logger->debug("friends device id is '$friend_fp'\n");
 
 		# Check if my phone number is in their friends list
 		$db->{friends_select}->execute($friend_num, $dev->{phnum});
 		if ($db->{friends_select}->fetchrow_array()) {
-			$log->print("found mutual friendship\n");
+			$logger->debug("found mutual friendship\n");
 
 			# Adding both is not necessary but makes lookups easier
 			$db->{mutual_friend_insert}->execute($dev->{num}, $friend_num);
@@ -611,17 +617,17 @@ sub msg_friend_delete {
 	my ($db, $friend_phnum, $dev) = @_;
 
 	unless (looks_like_number($friend_phnum)) {
-		$log->print("bad friends number '$friend_phnum'\n");
+		$logger->error("bad friends number '$friend_phnum'\n");
 		return make_error("friends phone number is not a valid phone number");
 	}
 
 	$db->{friends_select}->execute($dev->{num}, $friend_phnum);
 	if ($db->{friends_select}->fetchrow_array()) {
-		$log->print("removing '$friend_phnum' from friends list\n");
+		$logger->debug("removing '$friend_phnum' from friends list\n");
 		$db->{friends_delete}->execute($dev->{num}, $friend_phnum);
 	}
 	else {
-		$log->print("tried deleting friend '$friend_phnum' but they weren't a friend\n");
+		$logger->error("tried deleting friend '$friend_phnum' but they weren't a friend\n");
 		return make_error("friend sent for deletion was not a friend");
 	}
 
@@ -629,7 +635,7 @@ sub msg_friend_delete {
 	$db->{ph_num_exists}->execute($friend_phnum);
 	if (my ($friend_num) = $db->{ph_num_exists}->fetchrow_array()) {
 
-		$log->print("also removing mutual friend relationship\n");
+		$logger->debug("also removing mutual friend relationship\n");
 		$db->{mutual_friends_delete}->execute($dev->{num}, $friend_num);
 		$db->{mutual_friends_delete}->execute($friend_num, $dev->{num});
 	}
@@ -643,7 +649,7 @@ sub msg_friend_delete {
 sub msg_lists_get {
 	my ($db, $request, $dev) = @_;
 
-	$log->print("gathering lists for '$dev->{fp}'\n");
+	$logger->debug("gathering lists for '$dev->{fp}'\n");
 
 	my @lists;
 	# Find all lists that this device number is a member of
@@ -669,9 +675,9 @@ sub msg_lists_get {
 		};
 		push @lists, $list;
 
-		#$log->print("found list '$num':'$name'\n");
-		$log->print("list has $num_members members\n");
-		$log->print("list has 0 items\n");
+		$logger->debug("found list '$num':'$name'\n");
+		$logger->debug("list has $num_members members\n");
+		$logger->debug("list has 0 items\n");
 	}
 
 	return make_ok( { data => \@lists} );
@@ -680,7 +686,7 @@ sub msg_lists_get {
 sub msg_lists_get_other {
 	my ($db, $request, $dev) = @_;
 
-	$log->print("gathering lists for '$dev->{fp}'\n");
+	$logger->debug("gathering lists for '$dev->{fp}'\n");
 
 	my %list_nums;
 	# Find all mutual friends of this device
@@ -688,7 +694,7 @@ sub msg_lists_get_other {
 	while (my @row = $db->{mutual_friend_select}->fetchrow_array()) {
 
 		my ($friend_num, $friend_phnum) = @row;
-		$log->print("found mutual friend '$friend_phnum'\n");
+		$logger->debug("found mutual friend '$friend_phnum'\n");
 
 		# Find all of the lists my mutual friend is in (but not me)
 		$db->{get_other_lists}->execute($friend_num, $dev->{num});
@@ -712,7 +718,7 @@ sub msg_lists_get_other {
 				num_members => 1
 			};
 			$list_nums{$list_num} = $list;
-			$log->print("found list '$name'\n");
+			$logger->debug("found list '$name'\n");
 		}
 	}
 
@@ -726,7 +732,7 @@ sub msg_list_items_get {
 	my $list_id = $request->{'list_num'};
 
 	if (!$list_id) {
-		$log->print("received null list id");
+		$logger->error("received null list id");
 		return make_error("the sent list id was empty");
 	}
 	# unless ($dbh->selectrow_array($sth{check_list_member}, undef, $list_id, $device_id)) {
@@ -734,14 +740,14 @@ sub msg_list_items_get {
 	# 	$log->print("list_items: $device_id not a member of $list_id\n");
 	# 	return "err\0the sent device id is not a member of the list";
 	# }
-	$log->print("$dev->{id} request items for $list_id\n");
+	$logger->debug("$dev->{id} request items for $list_id\n");
 
 	$db->{get_list_items}->execute($list_id);
 
 	my @items;
 	while (my ($list_id, $pos, $name, $status, $owner, undef) =
 		$db->{get_list_items}->fetchrow_array()) {
-		$log->print("list item #$pos $name\n");
+		$logger->error("list item #$pos $name\n");
 
 		push @items, "$pos:$name:$owner:$status";
 	}
@@ -758,12 +764,12 @@ sub list_number_valid {
 	my ($db, $list_num) = @_;
 
 	unless (defined $list_num) {
-		$log->print("list number key not found\n");
+		$logger->error("list number key not found\n");
 		return ("the client did not send a list number");
 	}
 
 	unless (looks_like_number($list_num)) {
-		$log->print("'$list_num' is not a number\n");
+		$logger->error("'$list_num' is not a number\n");
 		return ("the client sent a list number that was not a number");
 	}
 
@@ -772,7 +778,7 @@ sub list_number_valid {
 		return (undef, @row);
 	}
 
-	$log->print("unknown list number '$list_num'\n");
+	$logger->error("unknown list number '$list_num'\n");
 	return ("the client sent an unknown list number");
 }
 

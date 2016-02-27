@@ -1,7 +1,7 @@
 package TestSL::Server;
 use strict;
 
-use IPC::Open2;
+use IPC::Open3;
 
 sub new {
 	my $class = shift;
@@ -13,17 +13,17 @@ sub new {
 	if ($ARGV[0] eq '-c') {
 		$perl_args = '-MDevel::Cover';
 	}
-	my $pid = open2(\*CHLD_OUT, undef, "perl $perl_args -T sl -t -p 4729");
+	my $pid = open3(undef, undef, \*CHLD_ERR, "perl $perl_args -T sl -t -p 4729");
 
 	$self->{pid} = $pid;
-	$self->{CHLD_OUT} = \*CHLD_OUT;
+	$self->{CHLD_ERR} = \*CHLD_ERR;
 	return $self;
 }
 
 sub readline {
 	my $self = shift;
 
-	return readline $self->{CHLD_OUT};
+	return readline $self->{CHLD_ERR};
 }
 
 sub DESTROY {

@@ -6,6 +6,7 @@ OpenBSD:
 - p5-IO-Socket-SSL
 - p5-JSON-XS
 - p5-String-Random
+- p5-Log-Log4perl
 
 
 Running Tests

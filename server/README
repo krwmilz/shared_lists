@@ -24,7 +24,6 @@ OpenBSD:
 - p5-String-Random
 - p5-Log-Log4perl
 
-
  Running Tests
 ==============
 
@@ -34,3 +33,6 @@ $ prove
 
 For test coverage, pass '-c' to each test:
 $ prove :: -c
+
+Also run 'cover' after test coverage runs to generate summaries:
+$ cover

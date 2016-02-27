@@ -1,14 +1,13 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 44 }
 
-use SL;
-
 # Test that large responses > 16384 bytes work as the underlying ssl layer can
 # only handle that much data at a time
-my $s = SL::Server->new();
-my $A = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 $A->list_add({ name => "$_" x 1000, date => 0}) for (1..20);
 

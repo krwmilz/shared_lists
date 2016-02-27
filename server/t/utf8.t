@@ -1,11 +1,11 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 5 }
 
-use SL;
-my $s = SL::Server->new();
-my $A = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 # Create a new list with a name composed of 3 valid Unicode characters
 # - a left double quotation mark and

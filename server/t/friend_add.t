@@ -1,12 +1,11 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 10 }
 
-use SL;
-
-my $server = SL::Server->new();
-my $A = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 # Normal message
 $A->friend_add('54321');

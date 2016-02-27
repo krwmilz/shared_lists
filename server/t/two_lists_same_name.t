@@ -1,12 +1,11 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 6 }
 
-use SL;
-
-my $s = SL::Server->new();
-my $A = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 # check that adding the same list twice works
 my $name = 'some list thats going to be added twice';

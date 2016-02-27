@@ -1,12 +1,11 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 28 }
 
-use SL;
-
-my $s = SL::Server->new();
-my $A = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 # Create 3 new lists
 my @stored_lists;

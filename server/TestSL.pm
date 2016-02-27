@@ -1,4 +1,4 @@
-package SL::Server;
+package TestSL::Server;
 use strict;
 
 use IPC::Open2;
@@ -10,7 +10,7 @@ sub new {
 	bless ($self, $class);
 
 	my $perl_args = '';
-	if ($ARGV[0] == 1) {
+	if ($ARGV[0] eq '-c') {
 		$perl_args = '-MDevel::Cover';
 	}
 	my $pid = open2(\*CHLD_OUT, undef, "perl $perl_args -T sl -t -p 4729");
@@ -35,7 +35,7 @@ sub DESTROY {
 
 1;
 
-package SL::Client;
+package TestSL::Client;
 use strict;
 use warnings;
 
@@ -262,7 +262,7 @@ sub msg_str {
 
 1;
 
-package SL::Notify;
+package TestSL::Notify;
 use strict;
 
 use IO::Socket::UNIX;

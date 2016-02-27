@@ -1,12 +1,11 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 8 }
 
-use SL;
-
-my $s = SL::Server->new();
-my $A = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 my $list = $A->list_add({ name => 'this list was made for leaving', date => 0 });
 $A->list_leave($list->{num});

@@ -1,13 +1,12 @@
 use strict;
+use Scalar::Util qw(looks_like_number);
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 10 }
 
-use SL;
-use Scalar::Util qw(looks_like_number);
-
-my $s = SL::Server->new();
-my $A = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 # make sure normal list_add works
 my $name = 'this is a new list';

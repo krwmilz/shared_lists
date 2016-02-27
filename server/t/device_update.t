@@ -1,12 +1,11 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 4 }
 
-use SL;
-
-my $server = SL::Server->new();
-my $A = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 $A->device_update({ pushtoken_hex => "AD34A9EF72DC714CED" });
 

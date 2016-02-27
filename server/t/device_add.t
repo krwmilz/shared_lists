@@ -1,12 +1,11 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 12 }
 
-use SL;
-
-my $server = SL::Server->new();
-my $A = SL::Client->new();
+my $server = TestSL::Server->new();
+my $A = TestSL::Client->new();
 
 # Constructor automatically calls device_add so no need to do it here
 my $devid = $A->device_id();

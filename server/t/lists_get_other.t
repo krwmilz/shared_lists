@@ -1,14 +1,13 @@
 use strict;
 use Test;
+use TestSL;
 
 BEGIN { plan tests => 13 }
 
-use SL;
-
 # Create A and B
-my $s = SL::Server->new();
-my $A = SL::Client->new();
-my $B = SL::Client->new();
+my $s = TestSL::Server->new();
+my $A = TestSL::Client->new();
+my $B = TestSL::Client->new();
 
 # A and B become mutual friends
 $A->friend_add($B->phnum());

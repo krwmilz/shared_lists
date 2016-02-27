@@ -1,14 +1,17 @@
 use strict;
-use Test::More tests => 1;
+use Test;
+use TestSL;
 
-use_ok( 'SL' );
+BEGIN { plan tests => 1 }
 
-my $server = SL::Server->new();
+my $s = TestSL::Server->new();
 
 # Send a straight up unparsable json string
-my $client = SL::Client->new(1);
+my $client = TestSL::Client->new(1);
 $client->send_all(pack('nnnZ*', 0, 0, 2, "{"), 8);
 
 # Send an empty array back (which is valid json but we don't use this)
-$client = SL::Client->new(1);
+$client = TestSL::Client->new(1);
 $client->send_all(pack('nnnZ*', 0, 0, 2, "[]"), 9);
+
+ok(1);

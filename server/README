@@ -1,3 +1,4 @@
+
         ""#   
   mmm     #   
  #   "    #   
@@ -28,10 +29,8 @@ OpenBSD:
 ==============
 
 The 'prove' command that comes with TAP works good. By default it looks for
-tests in 't/*.t' which is where our tests are.
-
+tests in 't/*.t' which is where our tests are:
 $ prove
 
-For test coverage, pass '-c' to each test
-
+For test coverage, pass '-c' to each test:
 $ prove :: -c

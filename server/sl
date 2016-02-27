@@ -53,6 +53,7 @@ $log->print_bare("accepting connections on $addr:$port (pid = '$$')\n");
 
 # Children who have exited do not have to be waited on with this
 $SIG{CHLD} = 'IGNORE';
+$SIG{TERM} = sub { exit 0 };
 
 # Accept new plain TCP connections and handle them in separate processes
 while (my $client_socket = $server_socket->accept()) {

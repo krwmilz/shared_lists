@@ -47,17 +47,13 @@ sub new {
 	my $socket_path = "apnd_test.socket";
 
 	my $socket = undef;
-	my $i = 0;
 	while (! $socket) {
 		$socket = IO::Socket::UNIX->new(
 			Type => SOCK_STREAM(),
 			Peer => $socket_path
 		);
-		$i++;
 	}
 	die "$socket_path: connect failed: $!\n" unless ($socket);
-
-	print STDERR "looped $i times\n";
 
 	$self->{socket} = $socket;
 	return $self;

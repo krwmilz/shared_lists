@@ -27,12 +27,13 @@ OpenBSD:
  Running Tests
 ==============
 
-The 'prove' command that comes with TAP works good. By default it looks for
-tests in 't/*.t' which is where our tests are:
+Use the 'prove' command that comes with TAP.
+By default it looks for tests in 't/*.t' which is where the tests are:
 $ prove
 
-For test coverage, pass '-c' to each test:
-$ prove :: -c
+To run an individual test pass the test file name to prove:
+$ prove t/device_add.t
 
-Also run 'cover' after test coverage runs to generate summaries:
+For test coverage summary reports pass '-c' to each test and then run 'cover':
+$ prove :: -c
 $ cover

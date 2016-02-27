@@ -30,4 +30,8 @@ $client->send_all(pack('nnnZ*', 0, 0, 5, 'ab'), 9);
 $client = SL::Client->new(1);
 $client->send_all(pack('nn', 101, 69), 4);
 
+# Zero bytes payload
+$client = SL::Client->new(1);
+$client->send_all(pack('nnn', 0, 0, 0), 6);
+
 ok(1);

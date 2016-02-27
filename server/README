@@ -1,0 +1,21 @@
+Dependencies
+============
+
+OpenBSD:
+- p5-BSD-arc4random
+- p5-IO-Socket-SSL
+- p5-JSON-XS
+- p5-String-Random
+
+
+Running Tests
+=============
+
+The 'prove' command that comes with TAP works good. By default it looks for
+tests in 't/*.t' which is where our tests are.
+
+$ prove
+
+For test coverage, pass '-c' to each test
+
+$ prove :: -c

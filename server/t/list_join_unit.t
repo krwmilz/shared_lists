@@ -1,11 +1,11 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 7 }
 
-my $s = TestSL::Server->new();
-my $A = TestSL::Client->new();
+my $s = SL::Test::Server->new();
+my $A = SL::Test::Client->new();
 
 # Try joining a list that doesn't exist
 my $err = $A->list_join('12345678', 'err');

@@ -1,11 +1,11 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 19 }
 
-my $s = TestSL::Server->new();
-my $A = TestSL::Client->new();
+my $s = SL::Test::Server->new();
+my $A = SL::Test::Client->new();
 
 # Test sending a request with no 'num' key
 my $err = $A->list_update({ name => 'some name' }, 'err');

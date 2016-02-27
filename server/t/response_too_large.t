@@ -1,12 +1,12 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 24 }
 
 # Test that a message greater than 65KB doesn't get sent
-my $s = TestSL::Server->new();
-my $A = TestSL::Client->new();
+my $s = SL::Test::Server->new();
+my $A = SL::Test::Client->new();
 
 $A->list_add({ name => 'a' x 4000, date => 0 }) for (1..20);
 

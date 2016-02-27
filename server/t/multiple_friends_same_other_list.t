@@ -1,17 +1,17 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 19 }
 
 # this test makes sure that when 2 friends of yours are in the same list that
 # your not in, that the list doesn't show up twice in your list_get_other
 # request.
-my $s = TestSL::Server->new();
+my $s = SL::Test::Server->new();
 
-my $A = TestSL::Client->new();
-my $B = TestSL::Client->new();
-my $C = TestSL::Client->new();
+my $A = SL::Test::Client->new();
+my $B = SL::Test::Client->new();
+my $C = SL::Test::Client->new();
 
 # A and B are mutual friends
 $A->friend_add($B->phnum());

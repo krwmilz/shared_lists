@@ -1,13 +1,13 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 10 }
 
 # Test list reference counting to make sure they stay alive when needed
-my $s = TestSL::Server->new();
-my $A = TestSL::Client->new();
-my $B = TestSL::Client->new();
+my $s = SL::Test::Server->new();
+my $A = SL::Test::Client->new();
+my $B = SL::Test::Client->new();
 
 # A creates a new list
 my $list = $A->list_add({ name => 'this list will belong to B soon enough', date => 0 });

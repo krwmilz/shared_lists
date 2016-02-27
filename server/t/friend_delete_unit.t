@@ -1,11 +1,11 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 10 }
 
-my $server = TestSL::Server->new();
-my $A = TestSL::Client->new();
+my $server = SL::Test::Server->new();
+my $A = SL::Test::Client->new();
 
 # Someone who is not your friend
 my $err = $A->friend_delete('12345', 'err');

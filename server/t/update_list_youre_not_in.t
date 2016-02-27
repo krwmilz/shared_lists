@@ -1,14 +1,14 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 7 }
 
-my $s = TestSL::Server->new();
+my $s = SL::Test::Server->new();
 
 # Create A and B
-my $A = TestSL::Client->new();
-my $B = TestSL::Client->new();
+my $A = SL::Test::Client->new();
+my $B = SL::Test::Client->new();
 
 # A adds a new list
 my $list = $A->list_add({ name => 'this is a new list for a', date => 0 });

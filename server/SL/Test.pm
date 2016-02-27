@@ -1,4 +1,4 @@
-package TestSL::Server;
+package SL::Test::Server;
 use strict;
 
 use IPC::Open3;
@@ -35,7 +35,7 @@ sub DESTROY {
 
 1;
 
-package TestSL::Client;
+package SL::Test::Client;
 use strict;
 use warnings;
 
@@ -256,7 +256,7 @@ sub msg_str {
 
 1;
 
-package TestSL::Notify;
+package SL::Test::Notify;
 use strict;
 
 use IO::Socket::UNIX;

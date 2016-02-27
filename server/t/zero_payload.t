@@ -1,12 +1,12 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 12 }
 
 # Create new device, turn off automatic device_add
-my $s = TestSL::Server->new();
-my $A = TestSL::Client->new(1);
+my $s = SL::Test::Server->new();
+my $A = SL::Test::Client->new(1);
 
 # Send size zero payload to all message types
 for ( $A->msg_str() ) {

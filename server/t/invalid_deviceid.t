@@ -1,14 +1,14 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 42 }
 
 # Test that sending invalid device id's results in errors
-my $server = TestSL::Server->new();
+my $server = SL::Test::Server->new();
 
 # Don't register
-my $A = TestSL::Client->new(1);
+my $A = SL::Test::Client->new(1);
 
 my @device_ids = ('' , 'somebull$hit', 'legit');
 my @good_msgs = ('the client sent a device id that was not base64',

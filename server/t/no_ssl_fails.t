@@ -1,14 +1,14 @@
 use strict;
 use IO::Socket::INET;
 use Test;
-use TestSL;
+use SL::Test;
 use Time::HiRes qw(usleep);
 
 BEGIN { plan tests => 1 }
 
 # Check that a non-SSL connection isn't accepted
 
-my $s = TestSL::Server->new();
+my $s = SL::Test::Server->new();
 
 my $socket = undef;
 while (!defined $socket) {

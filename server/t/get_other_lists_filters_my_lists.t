@@ -1,16 +1,16 @@
 use strict;
 use Test;
-use TestSL;
+use SL::Test;
 
 BEGIN { plan tests => 11 }
 
 # Check that when your mutual friends are in your own lists that you don't get
 # your own lists back when doing a lists_get_other request
-my $server = TestSL::Server->new();
+my $server = SL::Test::Server->new();
 
 # Create A and B
-my $A = TestSL::Client->new();
-my $B = TestSL::Client->new();
+my $A = SL::Test::Client->new();
+my $B = SL::Test::Client->new();
 
 # B adds a new list
 $B->list_add({ name => 'bs new list', date => 0 });

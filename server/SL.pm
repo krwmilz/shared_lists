@@ -9,8 +9,11 @@ sub new {
 	my $self = {};
 	bless ($self, $class);
 
-	# perl -MDevel::Cover sl -p $PORT -t &
-	my $pid = open2(\*CHLD_OUT, undef, "perl -T sl -t -p 4729");
+	my $perl_args = '';
+	if ($ARGV[0] == 1) {
+		$perl_args = '-MDevel::Cover';
+	}
+	my $pid = open2(\*CHLD_OUT, undef, "perl $perl_args -T sl -t -p 4729");
 
 	$self->{pid} = $pid;
 	$self->{CHLD_OUT} = \*CHLD_OUT;

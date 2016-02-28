@@ -262,7 +262,7 @@ sub read_all {
 		my $read = $sock->sysread($data, $bytes_total, $bytes_read);
 
 		$logger->logdie("error: read failed: $!\n") if (!defined $read);
-		$logger->logdie("disconnected!\n") && exit 0 if ($read == 0);
+		$logger->logdie("disconnected!\n") if ($read == 0);
 
 		$bytes_total -= $read;
 		$bytes_read += $read;

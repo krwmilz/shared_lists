@@ -11,8 +11,10 @@ sub new {
 
 	my $perl_args = '';
 	if ($ARGV[0] eq '-c') {
-		$perl_args = '-MDevel::Cover';
+		# Enable test coverage when -c is passed to the test
+		$perl_args = '-MDevel::Cover=-silent,1';
 	}
+
 	my $pid = open3(undef, undef, \*CHLD_ERR, "perl $perl_args -T sl -t -p 4729");
 
 	$self->{pid} = $pid;
@@ -22,7 +24,6 @@ sub new {
 
 sub readline {
 	my $self = shift;
-
 	return readline $self->{CHLD_ERR};
 }
 

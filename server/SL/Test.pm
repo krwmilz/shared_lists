@@ -64,7 +64,7 @@ sub new {
 			# SSL certificates are signed with
 			# absentmindedproductions.ca
 			SSL_verifycn_name => "absentmindedproductions.ca",
-		) or usleep(50 * 1000);
+		) or usleep(100 * 1000);
 	}
 	die "failed connect or ssl handshake: $!,$SSL_ERROR" unless ($socket);
 

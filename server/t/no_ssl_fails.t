@@ -21,4 +21,12 @@ while (!defined $socket) {
 my $good_errno = 'Illegal seek';
 $socket->syswrite("a\0\0\0" x 787);
 
-ok($s->readline(), '/SSL accept attempt failed error:140760FC:SSL routines:SSL23_GET_CLIENT_HELLO:unknown protocol/');
+my $ssl_err = '';
+if ($^O eq 'linux') {
+	$ssl_err = '/SSL accept attempt failed with unknown error error:140760FC:SSL routines:SSL23_GET_CLIENT_HELLO:unknown protocol/';
+}
+elsif ($^O eq 'openbsd') {
+	$ssl_err = '/SSL accept attempt failed error:140760FC:SSL routines:SSL23_GET_CLIENT_HELLO:unknown protocol/';
+}
+
+ok( $s->readline(), $ssl_err );

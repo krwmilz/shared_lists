@@ -81,7 +81,7 @@ sub new {
 		my $args = { phone_number => $self->{phnum}, os => 'unix' };
 		$self->{device_id} = $self->device_add($args);
 
-		$self->device_update({ pushtoken_hex => "token_$self->{phnum}" }, 'ok');
+		$self->device_update( "token_$self->{phnum}" );
 	}
 
 	return $self;
@@ -262,8 +262,7 @@ sub msg_str {
 package SL::Test::Notify;
 use strict;
 
-use IO::Socket::UNIX;
-use JSON::XS;
+use IPC::Open2;
 
 sub new {
 	my $class = shift;
@@ -271,41 +270,23 @@ sub new {
 	my $self = {};
 	bless ($self, $class);
 
-	$self->{socket_path} = "../testd.socket";
+	my $pid = open2(\*CHLD_OUT, undef, "perl", "SL/testd.pl");
 
-	my $server = IO::Socket::UNIX->new(
-		Type => SOCK_STREAM(),
-		Local => $self->{socket_path},
-		Listen => 1,
-	);
-	die "$self->{socket_path}: couldn't create socket: $!\n" unless ($server);
-
-	while (my $client = $server->accept()) {
-		$client->read(my $data, 4096);
-		my $notify = decode_json($data);
-
-		my $num_devices = @{ $notify->{devices} };
-		next if ($num_devices == 0);
-
-		print "testd: message type '$notify->{msg_type}'\n";
-		# print "testd: payload is '" . Dumper($notify->{payload}) . "'\n";
-
-		for (@{ $notify->{devices} }) {
-			#print Dumper($_);
-			my ($os, $push_token) = @$_;
-			print "testd: sending to '$push_token' os '$os'\n";
-		}
-	}
-
+	$self->{pid} = $pid;
+	$self->{chld_out} = \*CHLD_OUT;
 	return $self;
+}
+
+sub readline {
+	my $self = shift;
+	return readline $self->{chld_out};
 }
 
 sub DESTROY {
 	my $self = shift;
 
-	unlink $self->{socket_path};
-	#kill 'TERM', $self->{pid};
-	#waitpid( $self->{pid}, 0 );
+	kill 'TERM', $self->{pid};
+	waitpid( $self->{pid}, 0 );
 }
 
 1;

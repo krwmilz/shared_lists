@@ -10,11 +10,13 @@ sub new {
 	bless ($self, $class);
 
 	my $perl_args = '';
-	if ($ARGV[0] eq '-c') {
+	if (defined $ARGV[0] && $ARGV[0] eq '-c') {
 		# Enable test coverage when -c is passed to the test
 		$perl_args = '-MDevel::Cover=-silent,1';
 	}
 
+	$ENV{PATH} = "/bin:/usr/bin";
+	delete @ENV{ 'IFS', 'CDPATH', 'ENV', 'BASH_ENV' };
 	my $pid = open3(undef, undef, \*CHLD_ERR, "perl $perl_args -T sl -t -p 4729");
 
 	$self->{pid} = $pid;

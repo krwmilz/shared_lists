@@ -5,7 +5,7 @@ use SL::Test;
 BEGIN { plan tests => 19 }
 
 my $s = SL::Test::Server->new();
-my $n = SL::Test::Server->new();
+my $n = SL::Test::Notify->new();
 
 my $A = SL::Test::Client->new();
 my $B = SL::Test::Client->new();

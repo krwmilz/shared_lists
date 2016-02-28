@@ -15,15 +15,10 @@ while (!defined $socket) {
 	$socket = new IO::Socket::INET(
 		PeerHost => 'localhost',
 		PeerPort => 4729,
-	);
-	usleep(100 * 1000);
+	) or usleep(100 * 1000);
 }
 
 my $good_errno = 'Illegal seek';
 $socket->syswrite("a\0\0\0" x 787);
-#my $ret = $socket->sysread(my $buf, 6);
-ok(1);
-#fail "expected errno '$good_errno' but got '$!'" if ($! ne $good_errno);
-#fail "sysread returned '$ret', expected '0'" if ($ret != 0);
 
-#print STDERR $server->readline();
+ok($s->readline(), '/SSL accept attempt failed error:140760FC:SSL routines:SSL23_GET_CLIENT_HELLO:unknown protocol/');

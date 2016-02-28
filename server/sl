@@ -9,7 +9,7 @@ use Getopt::Std;
 use IO::Socket::SSL;
 use IO::Socket::UNIX;
 use JSON::XS;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl qw(:easy :no_extra_logdie_message);
 use Scalar::Util qw(looks_like_number);
 
 use SL::Database;
@@ -30,7 +30,7 @@ if ($args{v}) {
 } else {
 	Log::Log4perl->easy_init($ERROR);
 }
-my $logger = Log::Log4perl->get_logger('shlist.server');
+my $logger = get_logger('shlist.server');
 
 $logger->info("using database '$db_file'\n");
 
@@ -85,7 +85,7 @@ while (my $client_socket = $server_socket->accept()) {
 		SSL_cert_file => 'certs/cert_chain.pem',
 		SSL_key_file => 'certs/privkey.pem'
 	);
-	$logger->fatal("error: $SSL_ERROR\n") unless ($ret);
+	$logger->logdie("error: $SSL_ERROR\n") unless ($ret);
 
 	my $ssl_ver = $client_socket->get_sslversion();
 	my $ssl_cipher = $client_socket->get_cipher();
@@ -152,6 +152,8 @@ sub handle_message {
 
 	# Don't send notifications when there was en error
 	return if ($response->{status} eq 'err');
+
+	return if (@{ $notify->{devices} } == 0);
 
 	# Encode the notification message and find its size
 	my $msg = encode_json($notify);
@@ -224,8 +226,8 @@ sub recv_msg {
 	my ($version, $msg_type, $payload_size) = unpack("nnn", $header);
 
 	# Check version and message type are in range
-	$logger->fatal("error: unsupported protocol version $version\n") if ($version != 0);
-	$logger->fatal("error: unknown message type $msg_type\n") if ($msg_type >= @msg_str);
+	$logger->logdie("error: unsupported protocol version $version\n") if ($version != 0);
+	$logger->logdie("error: unknown message type $msg_type\n") if ($msg_type >= @msg_str);
 
 	# Add logging message type prefix
 	#$log->set_msg($msg_str[$msg_type]);
@@ -233,7 +235,7 @@ sub recv_msg {
 	# Server requests are limited to 4KB size, a 0 byte payload will not be
 	# valid JSON so reject that here
 	if ($payload_size > 4096 || $payload_size == 0) {
-		$logger->fatal("error: $payload_size byte payload invalid\n");
+		$logger->logdie("error: $payload_size byte payload invalid\n");
 	}
 
 	# Now that we know the size of the message we can try and read the
@@ -244,7 +246,7 @@ sub recv_msg {
 	my $request = decode_json($payload);
 
 	if (ref($request) ne "HASH") {
-		$logger->fatal("error: json payload didn't have dictionary root\n");
+		$logger->logdie("error: json payload didn't have dictionary root\n");
 	}
 	return ($version, $msg_type, $request);
 }
@@ -259,8 +261,8 @@ sub read_all {
 	while ($bytes_total > 0) {
 		my $read = $sock->sysread($data, $bytes_total, $bytes_read);
 
-		$logger->fatal("error: read failed: $!\n") if (!defined $read);
-		die "disconnected!\n" if ($read == 0);
+		$logger->logdie("error: read failed: $!\n") if (!defined $read);
+		$logger->logdie("disconnected!\n") && exit 0 if ($read == 0);
 
 		$bytes_total -= $read;
 		$bytes_read += $read;
@@ -290,6 +292,7 @@ sub send_msg {
 		my $err = make_error("response too large");
 		# If the new error we pass here is greater than the maximum
 		# payload length this will infinitely recurse.
+		$logger->error("error: $payload_len byte response too large to send");
 		return send_msg($sock, $ver, $msg_type, $err);
 	}
 
@@ -312,7 +315,7 @@ sub send_all {
 	while ($bytes_total) {
 		my $wrote = $socket->syswrite($data, $bytes_total, $bytes_written);
 
-		$logger->fatal("error: write failed: $!\n") unless (defined $wrote);
+		$logger->logdie("error: write failed: $!\n") unless (defined $wrote);
 
 		$bytes_total -= $wrote;
 		$bytes_written += $wrote;

@@ -2,7 +2,7 @@ use strict;
 use Test;
 use SL::Test;
 
-BEGIN { plan tests => 19 }
+BEGIN { plan tests => 21 }
 
 my $s = SL::Test::Server->new();
 my $A = SL::Test::Client->new();
@@ -10,10 +10,12 @@ my $A = SL::Test::Client->new();
 # Test sending a request with no 'num' key
 my $err = $A->list_update({ name => 'some name' }, 'err');
 ok( $err, 'the client did not send a list number' );
+ok( $s->readline(), "/list number key not found/" );
 
 # Try and update a list that doesn't exist
 $err = $A->list_update({ num => 123456, name => 'some name' }, 'err');
 ok( $err, 'the client sent an unknown list number' );
+ok( $s->readline(), "/unknown list number '.*'/" );
 
 # All checks after this require a valid list, create one now
 my $list = $A->list_add({ name => 'this is a new list', date => 0 });

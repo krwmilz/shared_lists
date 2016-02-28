@@ -2,7 +2,7 @@ use strict;
 use Test;
 use SL::Test;
 
-BEGIN { plan tests => 7 }
+BEGIN { plan tests => 8 }
 
 my $s = SL::Test::Server->new();
 
@@ -17,3 +17,4 @@ my $list = $A->list_add({ name => 'this is a new list for a', date => 0 });
 my $request = { num => $list->{num}, name => 'some new name', date => 1 };
 my $err = $B->list_update($request, 'err');
 ok($err, 'client tried to update a list it was not in');
+ok($s->readline(), '/device \'.*\' not in list \'.*\'/');

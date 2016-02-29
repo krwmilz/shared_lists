@@ -1,0 +1,30 @@
+.Dd $Mdocdate: February 28 2015 $
+.Dt SL 1
+.Os
+.Sh NAME
+.Nm sl
+.Nd main shared lists server
+.Sh SYNOPSIS
+.Nm sl
+.Op Fl ptv
+.Sh DESCRIPTION
+The
+.Nm sl
+server is responsible for processing new client connections and persistently
+stores client and list information.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl p
+Port to listen for connections
+.It Fl t
+Start server in "test" mode which uses a temporary database and a different
+port.
+.It Fl v
+Print more verbose runtime information.
+.El
+.Sh EXIT STATUS
+.Ex -std sl
+.Sh SEE ALSO
+.Xr prove 1 ,
+.Xr cover 1

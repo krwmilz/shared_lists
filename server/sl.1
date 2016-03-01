@@ -6,17 +6,18 @@
 .Nd main shared lists server
 .Sh SYNOPSIS
 .Nm sl
-.Op Fl ptv
+.Op Fl tv
+.Op Fl p Ar port
 .Sh DESCRIPTION
 The
 .Nm sl
-server is responsible for processing new client connections and persistently
-stores client and list information.
+program is responsible for processing new client connections and persistently
+storing client and list information.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
-.It Fl p
-Port to listen for connections
+.It Fl p Ar port
+Listen for connections on this port.
 .It Fl t
 Start server in "test" mode which uses a temporary database and a dummy
 notification daemon.

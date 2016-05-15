@@ -85,7 +85,7 @@ sub create_tables {
 		name text,
 		owner integer,
 		status int not null default 0,
-		quantity,
+		quantity int,
 		created int not null,
 		last_updated int not null,
 		foreign key(list) references lists(num),
@@ -196,7 +196,7 @@ sub prepare_stmt_handles {
 	$sql = 'select * from list_data where list = ?';
 	$self->{get_list_items} = $dbh->prepare($sql);
 
-	$sql = 'insert into list_data (list, name, quantity, status, owner, last_updated) values (?, ?, ?, ?, ?, ?)';
+	$sql = 'insert into list_data (list, name, quantity, created, last_updated) values (?, ?, ?, ?, ?)';
 	$self->{new_list_item} = $dbh->prepare($sql);
 }
 

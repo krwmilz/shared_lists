@@ -329,13 +329,13 @@ sub send_all {
 # Does not return any push notifications because this device has no friends yet.
 sub msg_device_add {
 	my ($db, $request) = @_;
-    $logger->error("Incoming request: $request");
+
 	# XXX: check that these exists first
 	my $ph_num = $request->{'phone_number'};
 	my $os = $request->{'os'};
 
 	unless (looks_like_number($ph_num)) {
-		$logger->error("phone number invalid: $ph_num\n");
+		$logger->error("phone number invalid\n");
 		return make_error("the sent phone number is not a number");
 	}
 

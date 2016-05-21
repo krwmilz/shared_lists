@@ -224,9 +224,10 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 - (void) lists_get_finished:(NSNotification *)notification
 {
-	NSDictionary *response = notification.userInfo;
+	NSDictionary *response_dict = notification.userInfo;
+	// Already checked for existence before this function was called
+	NSArray *json_lists = response_dict[@"data"];
 
-	NSArray *json_lists = [response objectForKey:@"lists"];
 	NSLog(@"lists_get: got %lu lists from server", (unsigned long)[json_lists count]);
 
 	NSMutableArray *lists = [_lists objectAtIndex:0];
@@ -245,8 +246,10 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 
 - (void) lists_get_other_finished:(NSNotification *)notification;
 {
-	NSDictionary *response = notification.userInfo;
-	NSArray *other_json_lists = [response objectForKey:@"other_lists"];
+	NSDictionary *response_dict = notification.userInfo;
+	// Already checked for existence before this function was called
+	NSArray *other_json_lists = response_dict[@"data"];
+
 	NSLog(@"lists_get_other: got %lu other lists from server", (unsigned long)[other_json_lists count]);
 
 	NSMutableArray *other_lists = [_lists objectAtIndex:1];
@@ -266,7 +269,7 @@ clickedButtonAtIndex:(NSInteger)buttonIndex
 - (void) finished_new_list_request:(NSNotification *) notification
 {
 	NSDictionary *response = notification.userInfo;
-	NSDictionary *list = [response objectForKey:@"list"];
+	NSDictionary *list = [response objectForKey:@"data"];
 
 	SharedList *shlist = [self deserialize_full_list:list];
 

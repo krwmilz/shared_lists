@@ -14,7 +14,7 @@
 - (bool) load_device_id:(NSString *)phone_number;
 - (NSString *) get_device_id;
 - (bool) connected;
-- (bool) send_message:(uint16_t)msg_type contents:(NSMutableDictionary *)data;
+- (bool) send_message:(uint16_t)msg_type contents:(NSObject *)data;
 
 // returns singleton instance
 + (id) shared_network_connection;

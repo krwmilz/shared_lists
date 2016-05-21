@@ -87,10 +87,7 @@
 	[list setObject:shared_list.name forKey:@"name"];
 	[list setObject:[NSNumber numberWithInt:0] forKey:@"date"];
 
-	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
-	[request setObject:list forKey:@"list"];
-
-	[network_connection send_message:list_add contents:request];
+	[network_connection send_message:list_add contents:list];
 }
 
 @end

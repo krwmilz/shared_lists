@@ -40,11 +40,8 @@
 	}
 
 	NSLog(@"apn: device token is 0x%@", hex_token);
-
-	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
-	[request setObject:hex_token forKey:@"pushtoken_hex"];
 	if ([network_connection get_device_id] != nil) {
-		[network_connection send_message:device_update contents:request];
+		[network_connection send_message:device_update contents:hex_token];
 	}
 }
 

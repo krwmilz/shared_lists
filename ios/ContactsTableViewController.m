@@ -125,20 +125,15 @@
 	UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
 	Contact *contact = [[_cells objectAtIndex:section] objectAtIndex:row];
 
-	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
+	NSString *friend_phnum = [contact.phone_numbers objectAtIndex:0];
 	if ([cell accessoryType] == UITableViewCellAccessoryNone) {
 		// Toggling the contact on, add friend
-
-		[request setObject:[contact.phone_numbers objectAtIndex:0] forKey:@"friend_phnum"];
-		[network_connection send_message:friend_add contents:request];
-
+		[network_connection send_message:friend_add contents:friend_phnum];
 		[cell setAccessoryType:UITableViewCellAccessoryCheckmark];
 	}
 	else {
 		// Toggling contact off, delete friend
-		[request setObject:[contact.phone_numbers objectAtIndex:0] forKey:@"friend_phnum"];
-		[network_connection send_message:friend_delete contents:request];
-
+		[network_connection send_message:friend_delete contents:friend_phnum];
 		[cell setAccessoryType:UITableViewCellAccessoryNone];
 	}
 

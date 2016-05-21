@@ -55,7 +55,7 @@
 	CFWriteStreamRef writeStream;
 
 	CFStringRef host_name = CFSTR("absentmindedproductions.ca");
-	CFStreamCreatePairWithSocketToHost(NULL, host_name, 9999, &readStream, &writeStream);
+	CFStreamCreatePairWithSocketToHost(NULL, host_name, 5437, &readStream, &writeStream);
 
 	input_stream = (__bridge NSInputStream *)readStream;
 	output_stream = (__bridge NSOutputStream *)writeStream;
@@ -118,8 +118,11 @@
 	return false;
 }
 
-- (bool) send_message:(uint16_t)send_msg_type contents:(NSMutableDictionary *)request
+- (bool) send_message:(uint16_t)send_msg_type contents:(NSObject *)data
 {
+	NSMutableDictionary *request = [[NSMutableDictionary alloc] init];
+	[request setObject:data forKey:@"data"];
+
 	if (send_msg_type != device_add) {
 		// Append 'device_id' to all message types except device_add
 		[request setObject:device_id forKey:@"device_id"];
@@ -272,9 +275,16 @@
 		return;
 	}
 
+	// 'data' key is always sent back when "status" is "ok"
+	NSObject *response_data = response[@"data"];
+	if (response_data == nil) {
+		NSLog(@"read: response did not contain 'data' key");
+		return;
+	}
+
 	if (msg_type == device_add) {
 		// device_add responses don't trigger any gui updates
-		device_id = [response objectForKey:@"device_id"];
+		device_id = (NSString *)response_data;
 
 		NSLog(@"device_add: writing new key '%@' to file", device_id);
 		NSError *error = nil;

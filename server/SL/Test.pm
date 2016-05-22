@@ -63,9 +63,7 @@ sub new {
 		$socket = IO::Socket::SSL->new(
 			PeerHost => 'localhost',
 			PeerPort => 4729,
-			# this is needed because PeerHost is localhost and our
-			# SSL certificates are signed with
-			# absentmindedproductions.ca
+			# certs are signed with absentmindedproductions.ca
 			SSL_verifycn_name => "absentmindedproductions.ca",
 		) or usleep(100 * 1000);
 	}
@@ -152,12 +150,11 @@ sub communicate {
 	$self->send_msg($msg_type, $msg_args);
 	my $resp = $self->recv_msg($msg_type);
 
-	# Check that the received status was the same as the expected status
-	my $status = $resp->{status};
-	ok($status, $exp_status);
+	# Check that the response status matches the expected status
+	ok( $resp->{status}, $exp_status );
 
-	# Response indicated error, return the reason
-	return $resp->{reason} if ($status eq 'err');
+	# Return the failure reason if the response status was error
+	return $resp->{reason} if ($resp->{status} eq 'err');
 
 	# Everything looks good, return the response data
 	return $resp->{data};
@@ -209,7 +206,7 @@ sub recv_msg {
 	# Read again for payload, $payload_size > 0
 	my $payload = $self->read_all($payload_size);
 
-	# This will die if $payload is invalid
+	# This will die if $payload is not JSON
 	my $response = decode_json($payload);
 
 	# Don't accept messages without an object root (ie array roots)

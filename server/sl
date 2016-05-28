@@ -124,15 +124,6 @@ sub handle_message {
 		}
 	}
 
-	# Every message type needs a 'data' key
-	if (! exists $request->{data}) {
-		$logger->error("incoming request had no 'data' key\n");
-		send_msg($client_socket, $ver, $msg_type, make_error("missing 'data' key"));
-
-		$db->{dbh}->commit;
-		return;
-	}
-
 	# Call appropriate message handler. Each handler returns both data that
 	# should be sent back over the main socket and notification data that
 	# gets sent over vendor specific API.

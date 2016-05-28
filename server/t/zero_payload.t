@@ -13,8 +13,8 @@ for ( $A->msg_str() ) {
 	my $msg_good = 'a missing message argument was required';
 	my $log_good = "/bad request, missing key 'device_id'/";
 	if ($_ eq 'device_add') {
-		$msg_good = "missing 'data' key";
-		$log_good = "/incoming request had no 'data' key/";
+		$msg_good = 'the sent phone number is not a number';
+		$log_good = "/phone number invalid/";
 	}
 
 	# Send empty dictionary

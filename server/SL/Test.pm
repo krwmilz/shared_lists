@@ -141,7 +141,8 @@ sub communicate {
 	# If no expected status was passed in assume 'ok'
 	$exp_status = 'ok' if (! defined $exp_status);
 
-	my $msg_args->{data} = $msg_data;
+	# Only append "data" key if optional parameter $msg_data is defined
+	my $msg_args->{data} = $msg_data if (defined $msg_data);
 
 	# device_add is the only message type that does not require device_id as
 	# a mandatory argument

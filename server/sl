@@ -275,29 +275,24 @@ sub read_all {
 sub send_msg {
 	my ($sock, $ver, $msg_type, $response) = @_;
 
-	# $payload is now a single JSON string that has no characters whose
-	# value is > 255
+	# Transform $response into JSON string with no character values > 255.
 	my $payload = encode_json($response);
 
 	my $header_len = 6;
 	my $payload_len = length($payload);
 
 	if ($payload_len > 65535) {
-		# Don't send the response that was too large, but do send back a
-		# quick message saying the response was too large
-		my $err = make_error("response too large");
-		# If the new error we pass here is greater than the maximum
-		# payload length this will infinitely recurse.
+		# Don't send a response that's too large.
+		# But do send an error *saying* the response was too large.
 		$logger->error("error: $payload_len byte response too large to send");
+
+		my $err = make_error("response too large");
 		return send_msg($sock, $ver, $msg_type, $err);
 	}
 
 	send_all($sock, pack("nnn", $ver, $msg_type, $payload_len), $header_len);
 	send_all($sock, $payload, $payload_len);
 
-	# Clear logging prefix as late as possible so send errors above will
-	# include the message type in them
-	#$log->set_msg('');
 	return $header_len + $payload_len;
 }
 

@@ -37,13 +37,9 @@ $logger->info("using database '$db_file'\n");
 my $db = SL::Database->new($db_file);
 $db->create_tables();
 
-# Create master listening socket, by default on port 5437. All connection
-# requests are served from this socket. Don't make this an SSL listening socket
-# as the IO::Socket::SSL man page warns about potential blocks that can happen
-# during an SSL handshake (which would be bad).
-#
-# So create the socket as plain TCP, accept plain TCP and then start SSL on the
-# client socket.
+# Create TCP listening socket on port given by '-p' or 5437.
+# All incoming connection requests will be accepted by this socket.
+# SSL Shouldn't be enabled here, see 'man IO::Socket::SSL'.
 my $server_socket = new IO::Socket::INET (
 	LocalPort => $args{p} || '5437',
 	Proto => 'tcp',

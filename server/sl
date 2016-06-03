@@ -25,11 +25,13 @@ getopts("p:tv", \%args);
 my $db_file = "db";
 $db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
-if ($args{v}) {
-	Log::Log4perl->easy_init($DEBUG);
-} else {
-	Log::Log4perl->easy_init($ERROR);
-}
+my $level = $ERROR;
+$level = $DEBUG if ($args{v});
+
+Log::Log4perl->easy_init( {
+		level	=> $level,
+		utf8 	=> 1,
+		layout	=> '%d %P %p> %m%n' } );
 my $logger = get_logger('shlist.server');
 
 $logger->info("using database '$db_file'\n");
@@ -49,7 +51,7 @@ my $server_socket = new IO::Socket::INET (
 die "Could not create socket: $!\n" unless($server_socket);
 
 my ($addr, $port) = ($server_socket->sockhost(), $server_socket->sockport());
-$logger->info("accepting connections on $addr:$port (pid = '$$')\n");
+$logger->info("accepting connections on $addr:$port\n");
 
 # Children who have exited do not have to be waited on with this
 $SIG{CHLD} = 'IGNORE';
@@ -72,8 +74,8 @@ while (my $client_socket = $server_socket->accept()) {
 	# Stir the random pool after fork() just in case
 	arc4random_stir();
 
-	#$log->set_peer_host_port($client_socket);
-	$logger->debug("new connection (pid = '$$')\n");
+	my $peer_addr = $client_socket->peerhost();
+	$logger->debug("new connection from $peer_addr\n");
 
 	# Upgrade plain TCP connection to SSL
 	my $ret = IO::Socket::SSL->start_SSL($client_socket,

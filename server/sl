@@ -21,7 +21,7 @@ my %args;
 getopts("p:tv", \%args);
 
 # This is used by the parent to create the database if it doesn't already
-# exist. Each child then connects to this same db to do queries.
+# exist. Each child then opens $db_file afterwards to do queries.
 my $db_file = "db";
 $db_file = File::Temp->new(SUFFIX => '.db', EXLOCK => 0) if ($args{t});
 
@@ -192,8 +192,8 @@ sub get_device {
 	return ('the client sent an unknown device id');
 }
 
-# Connect to a UNIX file system socket and send a JSON encoded message, then
-# disconnect. Returns nothing.
+# Connect to a Unix domain socket and send a message.
+# Returns nothing.
 sub send_unix {
 	my ($socket_path, $msg, $msg_len) = @_;
 
@@ -212,10 +212,10 @@ sub send_unix {
 	close($socket);
 }
 
-# Receive an entire message, header + payload. Validate version, message type,
-# and payload size from header. Then read the payload and make sure it's valid
-# JSON, and that the JSON root was a dictionary.
-# Returns a ($version, $msg_type, $payload) list. Exits on error.
+# Receive a complete message from the network. Validates:
+# - version, message type, payload size
+# - payload is JSON and the root was an object
+# Returns ($version, $msg_type, $payload) on success, exits on error.
 sub recv_msg {
 	my ($sock) = @_;
 
@@ -227,11 +227,8 @@ sub recv_msg {
 	$logger->logdie("error: unsupported protocol version $version\n") if ($version != 0);
 	$logger->logdie("error: unknown message type $msg_type\n") if ($msg_type >= @msg_str);
 
-	# Add logging message type prefix
-	#$log->set_msg($msg_str[$msg_type]);
-
 	# Server requests are limited to 4KB size, a 0 byte payload will not be
-	# valid JSON so reject that here
+	# valid JSON so reject that here too.
 	if ($payload_size > 4096 || $payload_size == 0) {
 		$logger->logdie("error: $payload_size byte payload invalid\n");
 	}
@@ -250,7 +247,7 @@ sub recv_msg {
 }
 
 # Read an exact amount of bytes from a socket.
-# Returns the data read from the socket, exits on error.
+# Returns the data read from the socket on success, exits on error.
 sub read_all {
 	my ($sock, $bytes_total) = @_;
 
@@ -269,11 +266,10 @@ sub read_all {
 	return $data;
 }
 
-# Send an entire message (header + payload). Creates binary header by appending
-# version, message type, and payload size. Then it appends the payload which is
-# an encoded JSON string. Note we can't send native UTF-8 strings, they must be
-# encoded and then decoded on the other (client) side.
-# Returns number of bytes sent.
+# Creates and sends a complete message by concatentating the following together:
+# - version, message type, payload size
+# - encoded JSON response (we can't send native UTF-8 strings here)
+# Returns number of bytes sent on success, exits on failure.
 sub send_msg {
 	my ($sock, $ver, $msg_type, $response) = @_;
 
@@ -298,9 +294,8 @@ sub send_msg {
 	return $header_len + $payload_len;
 }
 
-# Send an exact amount of data over $socket. SSL can only send max 16KB per
-# frame so we need to loop to make sure everything gets sent.
-# Returns the number of bytes written, exits on write failure.
+# Send an exact amount of bytes to a socket. SSL sends max 16KB per frame.
+# Returns the number of bytes wrote, exits on write failure.
 sub send_all {
 	my ($socket, $data, $bytes_total) = @_;
 
@@ -318,7 +313,7 @@ sub send_all {
 }
 
 # 'device_add' message handler. Validates incoming phone number, makes sure this
-# phone number has not registered already, creates new device_id's.
+# phone number has not registered already and then creates a new device_id.
 # Does not return any push notifications because this device has no friends yet.
 sub msg_device_add {
 	my ($db, $request) = @_;

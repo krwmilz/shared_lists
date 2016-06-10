@@ -6,8 +6,8 @@
  "mmm"    "mm 
 
 
- Dependencies
-=============
+  Dependencies
+  ============
 
 Ubuntu:
 - libdevel-cover-perl
@@ -25,20 +25,17 @@ OpenBSD:
 - p5-HTML-Parser
 - p5-IO-Socket-SSL
 - p5-JSON-XS
-- p5-String-Random
 - p5-Log-Log4perl
+- p5-String-Random
 
 
- Running Tests
-==============
+  Running Tests
+  =============
 
-Use the 'prove' command that comes with TAP.
-By default it looks for tests in 't/*.t' which is where the tests are:
 $ prove
-
-To run an individual test pass the test file name to prove:
+or
 $ prove t/device_add.t
 
-For test coverage summary reports pass '-c' to each test and then run 'cover':
+For test coverage reports:
 $ prove :: -c
 $ cover

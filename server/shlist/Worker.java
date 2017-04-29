@@ -20,7 +20,6 @@ public class Worker implements Runnable {
             inp = sock.getInputStream();
             brinp = new BufferedReader(new InputStreamReader(inp));
         } catch (IOException e) {
-        	e.printStackTrace();
             return;
         }
         System.out.println("Started new thread");
@@ -29,15 +28,19 @@ public class Worker implements Runnable {
             line = brinp.readLine();
             if (line != null) {
             	System.out.println(line);
-            } else {
-            	sock.close();
-            	brinp.close();
-            	System.out.println("Closing Socket");
             }
+        	sock.close();
+        	brinp.close();
+        	System.out.println("Closing Socket");
         } catch (IOException e) {
-            e.printStackTrace();
-            return;
-            }
+        	try {
+	        	sock.close();
+	        	brinp.close();
+	        	System.out.println("Closing Socket");
+        	} catch (IOException e1) {
+        		e1.printStackTrace();
+        	}
+        }
         System.out.println("Exiting Thread");
 	}
 }

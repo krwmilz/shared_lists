@@ -3,6 +3,7 @@ package shlist;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -21,7 +22,7 @@ public class Server {
 		try {
 			sSock = new ServerSocket(PORT);
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("IO Error1: " + e);
 		}
 		
 		// Add the runtime hook, for ctrl+c
@@ -31,11 +32,12 @@ public class Server {
 		while (true) {
 			try {
 				sock = sSock.accept();
+				sock.setSoTimeout(5000);
+				exec.execute(new Worker(sock));
 			} catch (IOException e) {
-					//System.out.println("IO Error: " + e);
+					System.out.println("IO Error: " + e);
 					break;
 			}
-			exec.execute(new Worker(sock));
 		}
 	}
 }

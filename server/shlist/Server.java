@@ -32,7 +32,7 @@ public class Server {
 			try {
 				sock = sSock.accept();
 			} catch (IOException e) {
-					System.out.println("IO Error: " + e);
+					//System.out.println("IO Error: " + e);
 					break;
 			}
 			exec.execute(new Worker(sock));

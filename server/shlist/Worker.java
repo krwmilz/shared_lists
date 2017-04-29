@@ -23,7 +23,7 @@ public class Worker implements Runnable {
         	e.printStackTrace();
             return;
         }
-        System.out.println("Started new thread");
+        //System.out.println("Started new thread");
         String line;
         while (true) {
             try {
@@ -33,7 +33,7 @@ public class Worker implements Runnable {
                 } else {
                 	sock.close();
                 	brinp.close();
-                	System.out.println("Closing Socket");
+                	//System.out.println("Closing Socket");
                 	break;
                 }
             } catch (IOException e) {
@@ -41,6 +41,6 @@ public class Worker implements Runnable {
                 return;
             }
         }
-        System.out.println("Exiting Thread");
+        //System.out.println("Exiting Thread");
 	}
 }

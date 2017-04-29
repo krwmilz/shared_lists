@@ -23,24 +23,21 @@ public class Worker implements Runnable {
         	e.printStackTrace();
             return;
         }
-        //System.out.println("Started new thread");
+        System.out.println("Started new thread");
         String line;
-        while (true) {
-            try {
-                line = brinp.readLine();
-                if (line != null) {
-                	System.out.println(line);
-                } else {
-                	sock.close();
-                	brinp.close();
-                	//System.out.println("Closing Socket");
-                	break;
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
+        try {
+            line = brinp.readLine();
+            if (line != null) {
+            	System.out.println(line);
+            } else {
+            	sock.close();
+            	brinp.close();
+            	System.out.println("Closing Socket");
             }
-        }
-        //System.out.println("Exiting Thread");
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+            }
+        System.out.println("Exiting Thread");
 	}
 }
